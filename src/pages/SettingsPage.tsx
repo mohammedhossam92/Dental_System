@@ -1,23 +1,26 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { WorkingDays, ToothClass, Treatment } from '../types';
+import type { WorkingDays, ToothClass, Treatment, ClassYear } from '../types';
 import { Trash2, Plus, X } from 'lucide-react';
 
 export function SettingsPage() {
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
+  const [classYears, setClassYears] = useState<ClassYear[]>([]);
   const [error, setError] = useState('');
 
   // Modal states
   const [isWorkingDaysModalOpen, setIsWorkingDaysModalOpen] = useState(false);
   const [isToothClassModalOpen, setIsToothClassModalOpen] = useState(false);
   const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
+  const [isClassYearModalOpen, setIsClassYearModalOpen] = useState(false);
 
   // Form states
   const [newWorkingDays, setNewWorkingDays] = useState({ name: '', days: [] as string[] });
   const [newToothClass, setNewToothClass] = useState('');
   const [newTreatment, setNewTreatment] = useState('');
+  const [newClassYear, setNewClassYear] = useState({ startYear: '', endYear: '' });
 
   useEffect(() => {
     fetchSettings();
@@ -25,19 +28,22 @@ export function SettingsPage() {
 
   async function fetchSettings() {
     try {
-      const [workingDaysResult, toothClassesResult, treatmentsResult] = await Promise.all([
+      const [workingDaysResult, toothClassesResult, treatmentsResult, classYearsResult] = await Promise.all([
         supabase.from('working_days').select('*'),
         supabase.from('tooth_classes').select('*'),
-        supabase.from('treatments').select('*')
+        supabase.from('treatments').select('*'),
+        supabase.from('class_years').select('*')
       ]);
 
       if (workingDaysResult.error) throw workingDaysResult.error;
       if (toothClassesResult.error) throw toothClassesResult.error;
       if (treatmentsResult.error) throw treatmentsResult.error;
+      if (classYearsResult.error) throw classYearsResult.error;
 
       setWorkingDays(workingDaysResult.data || []);
       setToothClasses(toothClassesResult.data || []);
       setTreatments(treatmentsResult.data || []);
+      setClassYears(classYearsResult.data || []);
     } catch (error) {
       console.error('Error fetching settings:', error);
       setError('Failed to load settings');
@@ -119,6 +125,33 @@ export function SettingsPage() {
     }
   }
 
+  async function handleAddClassYear(e: React.FormEvent) {
+    e.preventDefault();
+    setError('');
+
+    if (!newClassYear.startYear || !newClassYear.endYear) {
+      setError('Please select both years');
+      return;
+    }
+
+    const yearRange = `${newClassYear.startYear}-${newClassYear.endYear}`;
+
+    try {
+      const { error } = await supabase
+        .from('class_years')
+        .insert([{ year_range: yearRange }]);
+
+      if (error) throw error;
+
+      fetchSettings();
+      setIsClassYearModalOpen(false);
+      setNewClassYear({ startYear: '', endYear: '' });
+    } catch (error) {
+      console.error('Error adding class year:', error);
+      setError('Failed to add class year');
+    }
+  }
+
   async function handleDeleteTreatment(id: string) {
     try {
       const { error } = await supabase
@@ -164,8 +197,23 @@ export function SettingsPage() {
     }
   }
 
+  async function handleDeleteClassYear(id: string) {
+    try {
+      const { error } = await supabase
+        .from('class_years')
+        .delete()
+        .eq('id', id);
+
+      if (error) throw error;
+      fetchSettings();
+    } catch (error) {
+      console.error('Error deleting class year:', error);
+      setError('Failed to delete class year');
+    }
+  }
+
   return (
-    <div className="container mx-auto px-4 py-6 space-y-8">
+    <div className="container mx-auto px-4 sm:px-6 py-6 space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
         <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">Settings</h1>
       </div>
@@ -176,7 +224,7 @@ export function SettingsPage() {
         </div>
       )}
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 xl:grid-cols-4 gap-6">
         {/* Working Days Groups */}
         <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg">
           <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
@@ -255,6 +303,34 @@ export function SettingsPage() {
                 <span className="text-gray-900 dark:text-white font-medium">{treatment.name}</span>
                 <button
                   onClick={() => handleDeleteTreatment(treatment.id)}
+                  className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
+                >
+                  <Trash2 className="h-5 w-5" />
+                </button>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Class Years */}
+        <div className="bg-white dark:bg-gray-800 p-4 sm:p-6 rounded-lg shadow-lg">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
+            <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Class Years</h2>
+            <button
+              onClick={() => setIsClassYearModalOpen(true)}
+              className="w-full sm:w-auto flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+            >
+              <Plus className="h-5 w-5 mr-2" />
+              Add Class Year
+            </button>
+          </div>
+
+          <div className="space-y-3 max-h-[calc(100vh-300px)] overflow-y-auto">
+            {classYears.map((classYear) => (
+              <div key={classYear.id} className="flex justify-between items-center p-3 border rounded-md dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
+                <span className="text-gray-900 dark:text-white font-medium">{classYear.year_range}</span>
+                <button
+                  onClick={() => handleDeleteClassYear(classYear.id)}
                   className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 p-2 rounded-full hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors duration-200"
                 >
                   <Trash2 className="h-5 w-5" />
@@ -426,6 +502,72 @@ export function SettingsPage() {
                   className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
                 >
                   Add Treatment
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Class Year Modal */}
+      {isClassYearModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add Class Year</h2>
+              <button
+                onClick={() => setIsClassYearModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 p-2 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form onSubmit={handleAddClassYear} className="space-y-6">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    Start Year
+                  </label>
+                  <input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={newClassYear.startYear}
+                    onChange={(e) => setNewClassYear({ ...newClassYear, startYear: e.target.value })}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    placeholder="2024"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                    End Year
+                  </label>
+                  <input
+                    type="number"
+                    min="2000"
+                    max="2100"
+                    value={newClassYear.endYear}
+                    onChange={(e) => setNewClassYear({ ...newClassYear, endYear: e.target.value })}
+                    className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    placeholder="2025"
+                  />
+                </div>
+              </div>
+
+              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-8">
+                <button
+                  type="button"
+                  onClick={() => setIsClassYearModalOpen(false)}
+                  className="w-full sm:w-auto px-6 py-3 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg hover:bg-indigo-700 transition-colors duration-200"
+                >
+                  Add Class Year
                 </button>
               </div>
             </form>

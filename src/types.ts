@@ -55,3 +55,9 @@ export interface TreatmentVisit {
 export interface StudentWithDetails extends Student {
   working_days: WorkingDays;
 }
+
+export interface ClassYear {
+  id: string;
+  year_range: string;
+  created_at: string;
+}
