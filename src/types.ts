@@ -5,6 +5,9 @@ export interface Student {
   city: string;
   university: string;
   working_days_id: string;
+  class_year_id: string | null;
+  registration_status: 'registered' | 'unregistered' | 'pending';
+  registration_end_date: string | null;
   is_available: boolean;
   patients_in_progress: number;
   patients_completed: number;

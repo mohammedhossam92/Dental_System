@@ -1,87 +1,153 @@
 import React, { useState, useEffect } from 'react';
 import { Plus, Upload, Search, X } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays } from '../types';
+import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
 
 export function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
+  const [classYears, setClassYears] = useState<ClassYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isEditMode, setIsEditMode] = useState(false);
+  const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [newStudent, setNewStudent] = useState({
     name: '',
     mobile: '',
     city: '',
     university: '',
-    working_days_id: ''
+    working_days_id: '',
+    class_year_id: '',
+    registration_status: 'pending' as const,
+    registration_end_date: ''
   });
   const [error, setError] = useState('');
 
   useEffect(() => {
-    fetchStudents();
-    fetchWorkingDays();
+    fetchData();
   }, []);
 
-  async function fetchStudents() {
+  async function fetchData() {
     try {
-      const { data, error } = await supabase
-        .from('students')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const [studentsResult, workingDaysResult, classYearsResult] = await Promise.all([
+        supabase
+          .from('students')
+          .select(`
+            *,
+            working_days (
+              name,
+              days
+            )
+          `)
+          .order('created_at', { ascending: false }),
+        supabase.from('working_days').select('*'),
+        supabase.from('class_years').select('*')
+      ]);
 
-      if (error) throw error;
-      setStudents(data || []);
+      if (studentsResult.error) throw studentsResult.error;
+      if (workingDaysResult.error) throw workingDaysResult.error;
+      if (classYearsResult.error) throw classYearsResult.error;
+
+      setStudents(studentsResult.data || []);
+      setWorkingDays(workingDaysResult.data || []);
+      setClassYears(classYearsResult.data || []);
     } catch (error) {
-      console.error('Error fetching students:', error);
+      console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
     }
   }
 
-  async function fetchWorkingDays() {
-    try {
-      const { data, error } = await supabase
-        .from('working_days')
-        .select('*');
-
-      if (error) throw error;
-      setWorkingDays(data || []);
-    } catch (error) {
-      console.error('Error fetching working days:', error);
-    }
-  }
-
-  async function handleAddStudent(e: React.FormEvent) {
+  async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
 
-    if (!newStudent.name || !newStudent.mobile || !newStudent.city || !newStudent.university || !newStudent.working_days_id) {
-      setError('Please fill in all fields');
+    const requiredFields = ['name', 'mobile', 'city', 'university', 'working_days_id', 'registration_status'];
+    const missingFields = requiredFields.filter(field => !newStudent[field as keyof typeof newStudent]);
+
+    if (missingFields.length > 0) {
+      setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
+      return;
+    }
+
+    if (newStudent.registration_status === 'registered' && !newStudent.registration_end_date) {
+      setError('Registration end date is required for registered students');
       return;
     }
 
     try {
+      if (isEditMode && selectedStudent) {
+        const { error } = await supabase
+          .from('students')
+          .update(newStudent)
+          .eq('id', selectedStudent.id);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('students')
+          .insert([newStudent]);
+
+        if (error) throw error;
+      }
+
+      fetchData();
+      setIsModalOpen(false);
+      resetForm();
+    } catch (error) {
+      console.error('Error saving student:', error);
+      setError('Failed to save student');
+    }
+  }
+
+  async function handleDelete(id: string) {
+    if (!window.confirm('Are you sure you want to delete this student?')) return;
+
+    try {
       const { error } = await supabase
         .from('students')
-        .insert([newStudent]);
+        .delete()
+        .eq('id', id);
 
       if (error) throw error;
-
-      fetchStudents();
-      setIsModalOpen(false);
-      setNewStudent({
-        name: '',
-        mobile: '',
-        city: '',
-        university: '',
-        working_days_id: ''
-      });
+      fetchData();
     } catch (error) {
-      console.error('Error adding student:', error);
-      setError('Failed to add student');
+      console.error('Error deleting student:', error);
+      setError('Failed to delete student');
     }
+  }
+
+  function handleEdit(student: Student) {
+    setSelectedStudent(student);
+    setNewStudent({
+      name: student.name,
+      mobile: student.mobile,
+      city: student.city,
+      university: student.university,
+      working_days_id: student.working_days_id,
+      class_year_id: student.class_year_id || '',
+      registration_status: student.registration_status,
+      registration_end_date: student.registration_end_date || ''
+    });
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  }
+
+  function resetForm() {
+    setNewStudent({
+      name: '',
+      mobile: '',
+      city: '',
+      university: '',
+      working_days_id: '',
+      class_year_id: '',
+      registration_status: 'pending',
+      registration_end_date: ''
+    });
+    setSelectedStudent(null);
+    setIsEditMode(false);
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -103,7 +169,8 @@ export function StudentsPage() {
             mobile: row['Mobile'],
             city: row['City'],
             university: row['University'],
-            working_days_id: workingDays[0]?.id
+            working_days_id: workingDays[0]?.id,
+            registration_status: 'pending'
           };
 
           const { error } = await supabase
@@ -113,7 +180,7 @@ export function StudentsPage() {
           if (error) throw error;
         }
 
-        fetchStudents();
+        fetchData();
       } catch (error) {
         console.error('Error processing Excel file:', error);
       }
@@ -143,7 +210,10 @@ export function StudentsPage() {
             />
           </label>
           <button 
-            onClick={() => setIsModalOpen(true)}
+            onClick={() => {
+              resetForm();
+              setIsModalOpen(true);
+            }}
             className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
           >
             <Plus className="h-5 w-5 mr-2" />
@@ -172,20 +242,22 @@ export function StudentsPage() {
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
                 <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">City</th>
                 <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">University</th>
+                <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Working Days</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Registration</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No students found
                   </td>
                 </tr>
@@ -196,6 +268,9 @@ export function StudentsPage() {
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.mobile}</td>
                     <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
                     <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
+                    <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      {(student as any).working_days?.days.join(', ')}
+                    </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
                         student.is_available
@@ -205,11 +280,28 @@ export function StudentsPage() {
                         {student.is_available ? 'Available' : 'Busy'}
                       </span>
                     </td>
+                    <td className="hidden xl:table-cell px-6 py-4 whitespace-nowrap">
+                      <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
+                        student.registration_status === 'registered'
+                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                          : student.registration_status === 'unregistered'
+                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      }`}>
+                        {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
+                      </span>
+                    </td>
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 space-x-2">
-                      <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300">
+                      <button
+                        onClick={() => handleEdit(student)}
+                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                      >
                         Edit
                       </button>
-                      <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300">
+                      <button
+                        onClick={() => handleDelete(student.id)}
+                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                      >
                         Delete
                       </button>
                     </td>
@@ -221,13 +313,19 @@ export function StudentsPage() {
         </div>
       </div>
 
+      {/* Add/Edit Student Modal */}
       {isModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add New Student</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {isEditMode ? 'Edit Student' : 'Add New Student'}
+              </h2>
               <button
-                onClick={() => setIsModalOpen(false)}
+                onClick={() => {
+                  setIsModalOpen(false);
+                  resetForm();
+                }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
                 <X className="h-6 w-6" />
@@ -240,81 +338,138 @@ export function StudentsPage() {
               </div>
             )}
 
-            <form onSubmit={handleAddStudent} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Name
-                </label>
-                <input
-                  type="text"
-                  value={newStudent.name}
-                  onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="Enter student name"
-                />
-              </div>
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Name
+                  </label>
+                  <input
+                    type="text"
+                    value={newStudent.name}
+                    onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Enter student name"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Mobile
-                </label>
-                <input
-                  type="text"
-                  value={newStudent.mobile}
-                  onChange={(e) => setNewStudent({ ...newStudent, mobile: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="Enter mobile number"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Mobile
+                  </label>
+                  <input
+                    type="text"
+                    value={newStudent.mobile}
+                    onChange={(e) => setNewStudent({ ...newStudent, mobile: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Enter mobile number"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  City
-                </label>
-                <input
-                  type="text"
-                  value={newStudent.city}
-                  onChange={(e) => setNewStudent({ ...newStudent, city: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="Enter city"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    City
+                  </label>
+                  <input
+                    type="text"
+                    value={newStudent.city}
+                    onChange={(e) => setNewStudent({ ...newStudent, city: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Enter city"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  University
-                </label>
-                <input
-                  type="text"
-                  value={newStudent.university}
-                  onChange={(e) => setNewStudent({ ...newStudent, university: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                  placeholder="Enter university"
-                />
-              </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    University
+                  </label>
+                  <input
+                    type="text"
+                    value={newStudent.university}
+                    onChange={(e) => setNewStudent({ ...newStudent, university: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    placeholder="Enter university"
+                  />
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Working Days
-                </label>
-                <select
-                  value={newStudent.working_days_id}
-                  onChange={(e) => setNewStudent({ ...newStudent, working_days_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                >
-                  <option value="">Select working days</option>
-                  {workingDays.map((group) => (
-                    <option key={group.id} value={group.id}>
-                      {group.name} ({group.days.join(', ')})
-                    </option>
-                  ))}
-                </select>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Working Days
+                  </label>
+                  <select
+                    value={newStudent.working_days_id}
+                    onChange={(e) => setNewStudent({ ...newStudent, working_days_id: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    <option value="">Select working days</option>
+                    {workingDays.map((group) => (
+                      <option key={group.id} value={group.id}>
+                        {group.name} ({group.days.join(', ')})
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Class Year
+                  </label>
+                  <select
+                    value={newStudent.class_year_id}
+                    onChange={(e) => setNewStudent({ ...newStudent, class_year_id: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    <option value="">Select class year</option>
+                    {classYears.map((year) => (
+                      <option key={year.id} value={year.id}>
+                        {year.year_range}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Registration Status
+                  </label>
+                  <select
+                    value={newStudent.registration_status}
+                    onChange={(e) => setNewStudent({
+                      ...newStudent,
+                      registration_status: e.target.value as typeof newStudent.registration_status,
+                      registration_end_date: e.target.value !== 'registered' ? '' : newStudent.registration_end_date
+                    })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="registered">Registered</option>
+                    <option value="unregistered">Unregistered</option>
+                  </select>
+                </div>
+
+                {newStudent.registration_status === 'registered' && (
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Registration End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={newStudent.registration_end_date}
+                      onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      min={new Date().toISOString().split('T')[0]}
+                    />
+                  </div>
+                )}
               </div>
 
               <div className="flex justify-end space-x-3 mt-6">
                 <button
                   type="button"
-                  onClick={() => setIsModalOpen(false)}
+                  onClick={() => {
+                    setIsModalOpen(false);
+                    resetForm();
+                  }}
                   className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
                 >
                   Cancel
@@ -323,7 +478,7 @@ export function StudentsPage() {
                   type="submit"
                   className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
                 >
-                  Add Student
+                  {isEditMode ? 'Save Changes' : 'Add Student'}
                 </button>
               </div>
             </form>
