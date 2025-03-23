@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Upload, Search, X } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
@@ -13,6 +13,10 @@ export function StudentsPage() {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isEditMode, setIsEditMode] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
+  const [error, setError] = useState('');
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'mobile', 'university', 'city', 'status']);
+
   const [newStudent, setNewStudent] = useState({
     name: '',
     mobile: '',
@@ -23,11 +27,55 @@ export function StudentsPage() {
     registration_status: 'pending' as const,
     registration_end_date: ''
   });
-  const [error, setError] = useState('');
+
+  const availableColumns = [
+    { id: 'name', label: 'Name' },
+    { id: 'mobile', label: 'Mobile' },
+    { id: 'university', label: 'University' },
+    { id: 'city', label: 'City' },
+    { id: 'status', label: 'Status' }
+  ];
 
   useEffect(() => {
     fetchData();
+    // Check registration status daily at midnight
+    const now = new Date();
+    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+    
+    setTimeout(() => {
+      checkRegistrationStatus();
+      // After first check, run daily
+      setInterval(checkRegistrationStatus, 24 * 60 * 60 * 1000);
+    }, timeUntilMidnight);
   }, []);
+
+  async function checkRegistrationStatus() {
+    try {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+
+      const { data: expiredStudents, error } = await supabase
+        .from('students')
+        .select('id')
+        .eq('registration_status', 'registered')
+        .lte('registration_end_date', today.toISOString());
+
+      if (error) throw error;
+
+      if (expiredStudents && expiredStudents.length > 0) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ registration_status: 'unregistered' })
+          .in('id', expiredStudents.map(s => s.id));
+
+        if (updateError) throw updateError;
+        fetchData();
+      }
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+    }
+  }
 
   async function fetchData() {
     try {
@@ -64,7 +112,7 @@ export function StudentsPage() {
     e.preventDefault();
     setError('');
 
-    const requiredFields = ['name', 'mobile', 'city', 'university', 'working_days_id', 'registration_status'];
+    const requiredFields = ['name', 'mobile', 'city', 'university', 'working_days_id'];
     const missingFields = requiredFields.filter(field => !newStudent[field as keyof typeof newStudent]);
 
     if (missingFields.length > 0) {
@@ -72,23 +120,23 @@ export function StudentsPage() {
       return;
     }
 
-    if (newStudent.registration_status === 'registered' && !newStudent.registration_end_date) {
-      setError('Registration end date is required for registered students');
-      return;
-    }
+    const studentData = {
+      ...newStudent,
+      registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null
+    };
 
     try {
       if (isEditMode && selectedStudent) {
         const { error } = await supabase
           .from('students')
-          .update(newStudent)
+          .update(studentData)
           .eq('id', selectedStudent.id);
 
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from('students')
-          .insert([newStudent]);
+          .insert([studentData]);
 
         if (error) throw error;
       }
@@ -106,12 +154,22 @@ export function StudentsPage() {
     if (!window.confirm('Are you sure you want to delete this student?')) return;
 
     try {
+      // First, delete related records in patients table
+      const { error: patientsError } = await supabase
+        .from('patients')
+        .delete()
+        .eq('student_id', id);
+
+      if (patientsError) throw patientsError;
+
+      // Then delete the student
       const { error } = await supabase
         .from('students')
         .delete()
         .eq('id', id);
 
       if (error) throw error;
+      
       fetchData();
     } catch (error) {
       console.error('Error deleting student:', error);
@@ -188,11 +246,28 @@ export function StudentsPage() {
     reader.readAsArrayBuffer(file);
   }
 
-  const filteredStudents = students.filter(student =>
-    student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    student.mobile.includes(searchTerm) ||
-    student.city.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredStudents = students.filter(student => {
+    if (!searchTerm) return true;
+    
+    const searchTermLower = searchTerm.toLowerCase();
+    return selectedColumns.some(column => {
+      switch (column) {
+        case 'name':
+          return student.name.toLowerCase().includes(searchTermLower);
+        case 'mobile':
+          return student.mobile.includes(searchTerm);
+        case 'university':
+          return student.university.toLowerCase().includes(searchTermLower);
+        case 'city':
+          return student.city.toLowerCase().includes(searchTermLower);
+        case 'status':
+          return student.registration_status.toLowerCase().includes(searchTermLower) ||
+                 (student.is_available ? 'available' : 'busy').includes(searchTermLower);
+        default:
+          return false;
+      }
+    });
+  });
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -222,15 +297,24 @@ export function StudentsPage() {
         </div>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search students..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      <div className="flex flex-col sm:flex-row gap-4">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
+          <input
+            type="text"
+            placeholder={`Search by ${selectedColumns.join(', ')}...`}
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        <button
+          onClick={() => setIsFilterModalOpen(true)}
+          className="flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+        >
+          <Filter className="h-5 w-5 mr-2" />
+          Filter Columns
+        </button>
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
@@ -238,12 +322,22 @@ export function StudentsPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
-                <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">City</th>
-                <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">University</th>
+                {selectedColumns.includes('name') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                )}
+                {selectedColumns.includes('mobile') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
+                )}
+                {selectedColumns.includes('city') && (
+                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">City</th>
+                )}
+                {selectedColumns.includes('university') && (
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">University</th>
+                )}
                 <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Working Days</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                {selectedColumns.includes('status') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                )}
                 <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Registration</th>
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
               </tr>
@@ -264,22 +358,32 @@ export function StudentsPage() {
               ) : (
                 filteredStudents.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.mobile}</td>
-                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
+                    {selectedColumns.includes('name') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
+                    )}
+                    {selectedColumns.includes('mobile') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.mobile}</td>
+                    )}
+                    {selectedColumns.includes('city') && (
+                      <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
+                    )}
+                    {selectedColumns.includes('university') && (
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
+                    )}
                     <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                       {(student as any).working_days?.days.join(', ')}
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
-                        student.is_available
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      }`}>
-                        {student.is_available ? 'Available' : 'Busy'}
-                      </span>
-                    </td>
+                    {selectedColumns.includes('status') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
+                          student.is_available
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                        }`}>
+                          {student.is_available ? 'Available' : 'Busy'}
+                        </span>
+                      </td>
+                    )}
                     <td className="hidden xl:table-cell px-6 py-4 whitespace-nowrap">
                       <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
                         student.registration_status === 'registered'
@@ -312,6 +416,52 @@ export function StudentsPage() {
           </table>
         </div>
       </div>
+
+      {/* Filter Columns Modal */}
+      {isFilterModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+            <div className="flex justify-between items-center mb-4">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Filter Columns</h2>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="space-y-4">
+              {availableColumns.map((column) => (
+                <label key={column.id} className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedColumns.includes(column.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedColumns([...selectedColumns, column.id]);
+                      } else {
+                        setSelectedColumns(selectedColumns.filter(c => c !== column.id));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">{column.label}</span>
+                </label>
+              ))}
+            </div>
+
+            <div className="flex justify-end mt-6">
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Add/Edit Student Modal */}
       {isModalOpen && (
