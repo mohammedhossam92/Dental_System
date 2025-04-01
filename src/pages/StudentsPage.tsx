@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Plus, Upload, Search, X, Filter } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
@@ -16,6 +16,7 @@ export function StudentsPage() {
   const [error, setError] = useState('');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'mobile', 'university', 'city', 'status']);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   const [newStudent, setNewStudent] = useState({
     name: '',
@@ -269,6 +270,11 @@ export function StudentsPage() {
     });
   });
 
+  const openInfoModal = (student: Student) => {
+    setSelectedStudent(student);
+    setIsInfoModalOpen(true);
+  };
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -395,19 +401,30 @@ export function StudentsPage() {
                         {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
                       </span>
                     </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400 space-x-2">
-                      <button
-                        onClick={() => handleEdit(student)}
-                        className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        onClick={() => handleDelete(student.id)}
-                        className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
-                      >
-                        Delete
-                      </button>
+                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
+                      <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => handleEdit(student)}
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200"
+                          title="Edit"
+                        >
+                          <Edit className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => handleDelete(student.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
+                          title="Delete"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                        <button
+                          onClick={() => openInfoModal(student)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+                          title="Info"
+                        >
+                          <Info className="h-5 w-5" />
+                        </button>
+                      </div>
                     </td>
                   </tr>
                 ))
@@ -632,6 +649,120 @@ export function StudentsPage() {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* Student Info Modal */}
+      {isInfoModalOpen && selectedStudent && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl transform transition-transform duration-300 scale-100">
+            <div className="flex justify-between items-center border-b dark:border-gray-700 pb-4 mb-6">
+              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Student Profile</h2>
+              <button
+                onClick={() => setIsInfoModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 p-2"
+                aria-label="Close"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
+                  <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedStudent.name}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Mobile</label>
+                  <p className="text-gray-900 dark:text-white">{selectedStudent.mobile}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">University</label>
+                  <p className="text-gray-900 dark:text-white">{selectedStudent.university}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">City</label>
+                  <p className="text-gray-900 dark:text-white">{selectedStudent.city}</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Working Days</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {workingDays.find(wd => wd.id === selectedStudent.working_days_id)?.name || 'N/A'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class Year</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {classYears.find(cy => cy.id === selectedStudent.class_year_id)?.year_range || 'N/A'}
+                  </p>
+                </div>
+              </div>
+
+              <div className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration Status</label>
+                  <span className={`inline-flex text-sm font-semibold rounded-full px-2 py-1 ${
+                    selectedStudent.registration_status === 'registered'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : selectedStudent.registration_status === 'unregistered'
+                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                  }`}>
+                    {selectedStudent.registration_status.charAt(0).toUpperCase() + selectedStudent.registration_status.slice(1)}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration End Date</label>
+                  <p className="text-gray-900 dark:text-white">
+                    {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Availability Status</label>
+                  <span className={`inline-flex text-sm font-semibold rounded-full px-2 py-1 ${
+                    selectedStudent.is_available
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                  }`}>
+                    {selectedStudent.is_available ? 'Available' : 'Busy'}
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients in Progress</label>
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{selectedStudent.patients_in_progress}</span>
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">patients</span>
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients Completed</label>
+                  <div className="flex items-center">
+                    <span className="text-xl font-bold text-green-600 dark:text-green-400">{selectedStudent.patients_completed}</span>
+                    <span className="ml-2 text-gray-600 dark:text-gray-400">patients</span>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="flex justify-end mt-8 pt-4 border-t dark:border-gray-700">
+              <button
+                onClick={() => setIsInfoModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}
