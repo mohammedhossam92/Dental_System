@@ -15,7 +15,9 @@ export function StudentsPage() {
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
   const [error, setError] = useState('');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [selectedColumns, setSelectedColumns] = useState<string[]>(['name', 'mobile', 'university', 'city', 'status']);
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([
+    'name', 'mobile', 'university', 'city', 'working_days', 'status', 'registration'
+  ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
   const [newStudent, setNewStudent] = useState({
@@ -34,7 +36,9 @@ export function StudentsPage() {
     { id: 'mobile', label: 'Mobile' },
     { id: 'university', label: 'University' },
     { id: 'city', label: 'City' },
-    { id: 'status', label: 'Status' }
+    { id: 'working_days', label: 'Working Days' },
+    { id: 'status', label: 'Status' },
+    { id: 'registration', label: 'Registration' }
   ];
 
   useEffect(() => {
@@ -324,40 +328,44 @@ export function StudentsPage() {
       </div>
 
       <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
+        <div className="overflow-x-auto relative">
+          <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 {selectedColumns.includes('name') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Name</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Name</th>
                 )}
                 {selectedColumns.includes('mobile') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Mobile</th>
                 )}
                 {selectedColumns.includes('city') && (
-                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">City</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">City</th>
                 )}
                 {selectedColumns.includes('university') && (
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">University</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">University</th>
                 )}
-                <th className="hidden lg:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Working Days</th>
+                {selectedColumns.includes('working_days') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Working Days</th>
+                )}
                 {selectedColumns.includes('status') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Status</th>
                 )}
-                <th className="hidden xl:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Registration</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
+                {selectedColumns.includes('registration') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Registration</th>
+                )}
+                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredStudents.length === 0 ? (
                 <tr>
-                  <td colSpan={8} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No students found
                   </td>
                 </tr>
@@ -371,14 +379,16 @@ export function StudentsPage() {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.mobile}</td>
                     )}
                     {selectedColumns.includes('city') && (
-                      <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
                     )}
                     {selectedColumns.includes('university') && (
-                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
                     )}
-                    <td className="hidden lg:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {(student as any).working_days?.days.join(', ')}
-                    </td>
+                    {selectedColumns.includes('working_days') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {(student as any).working_days?.days.join(', ')}
+                      </td>
+                    )}
                     {selectedColumns.includes('status') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
@@ -390,17 +400,19 @@ export function StudentsPage() {
                         </span>
                       </td>
                     )}
-                    <td className="hidden xl:table-cell px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
-                        student.registration_status === 'registered'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : student.registration_status === 'unregistered'
-                          ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                      }`}>
-                        {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
-                      </span>
-                    </td>
+                    {selectedColumns.includes('registration') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
+                          student.registration_status === 'registered'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : student.registration_status === 'unregistered'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                        }`}>
+                          {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
                       <div className="flex items-center gap-2">
                         <button
@@ -448,7 +460,7 @@ export function StudentsPage() {
               </button>
             </div>
 
-            <div className="space-y-4">
+            <div className="space-y-4 max-h-80 overflow-y-auto">
               {availableColumns.map((column) => (
                 <label key={column.id} className="flex items-center space-x-3">
                   <input
@@ -468,7 +480,16 @@ export function StudentsPage() {
               ))}
             </div>
 
-            <div className="flex justify-end mt-6">
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={() => {
+                  // Select all columns
+                  setSelectedColumns(availableColumns.map(col => col.id));
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              >
+                Select All
+              </button>
               <button
                 onClick={() => setIsFilterModalOpen(false)}
                 className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
