@@ -82,11 +82,20 @@ export function PatientsPage() {
     }
 
     try {
-      const { error } = await supabase
+      // Insert the new patient
+      const { error: insertError } = await supabase
         .from('patients')
         .insert([newPatient]);
 
-      if (error) throw error;
+      if (insertError) throw insertError;
+
+      // Update the student's availability status
+      const { error: updateError } = await supabase
+        .from('students')
+        .update({ is_available: false })
+        .eq('id', newPatient.student_id);
+
+      if (updateError) throw updateError;
 
       fetchData();
       setIsModalOpen(false);
