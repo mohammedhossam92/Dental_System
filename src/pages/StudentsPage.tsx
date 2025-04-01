@@ -655,60 +655,83 @@ export function StudentsPage() {
 
       {/* Student Info Modal */}
       {isInfoModalOpen && selectedStudent && (
-        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-4 z-50 transition-opacity duration-300">
-          <div className="bg-white dark:bg-gray-800 rounded-xl p-6 w-full max-w-lg mx-4 shadow-2xl transform transition-transform duration-300 scale-100">
-            <div className="flex justify-between items-center border-b dark:border-gray-700 pb-4 mb-6">
-              <h2 className="text-2xl font-bold text-gray-900 dark:text-white">Student Profile</h2>
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-3 z-50 transition-opacity duration-300 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 w-full max-w-lg mx-2 sm:mx-4 shadow-2xl transform transition-transform duration-300 scale-100 my-4">
+            <div className="flex justify-between items-center border-b dark:border-gray-700 pb-3 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Student Profile</h2>
               <button
                 onClick={() => setIsInfoModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 p-2"
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 p-1 sm:p-2"
                 aria-label="Close"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              <div className="space-y-4">
-                <div>
+            {/* On mobile, display a profile summary at the top */}
+            <div className="md:hidden mb-4 flex flex-col items-center border-b dark:border-gray-700 pb-4">
+              <p className="text-xl font-bold text-gray-900 dark:text-white mb-2">{selectedStudent.name}</p>
+              <div className="flex space-x-3 mb-3">
+                <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
+                  selectedStudent.registration_status === 'registered'
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : selectedStudent.registration_status === 'unregistered'
+                    ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                    : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                }`}>
+                  {selectedStudent.registration_status.charAt(0).toUpperCase() + selectedStudent.registration_status.slice(1)}
+                </span>
+                <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
+                  selectedStudent.is_available
+                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                }`}>
+                  {selectedStudent.is_available ? 'Available' : 'Busy'}
+                </span>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="space-y-3 sm:space-y-4">
+                <div className="hidden md:block">
                   <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
                   <p className="text-lg font-semibold text-gray-900 dark:text-white">{selectedStudent.name}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Mobile</label>
-                  <p className="text-gray-900 dark:text-white">{selectedStudent.mobile}</p>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Mobile</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedStudent.mobile}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">University</label>
-                  <p className="text-gray-900 dark:text-white">{selectedStudent.university}</p>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">University</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedStudent.university}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">City</label>
-                  <p className="text-gray-900 dark:text-white">{selectedStudent.city}</p>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">City</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedStudent.city}</p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Working Days</label>
-                  <p className="text-gray-900 dark:text-white">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Working Days</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {workingDays.find(wd => wd.id === selectedStudent.working_days_id)?.name || 'N/A'}
                   </p>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class Year</label>
-                  <p className="text-gray-900 dark:text-white">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class Year</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {classYears.find(cy => cy.id === selectedStudent.class_year_id)?.year_range || 'N/A'}
                   </p>
                 </div>
               </div>
 
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration Status</label>
-                  <span className={`inline-flex text-sm font-semibold rounded-full px-2 py-1 ${
+              <div className="space-y-3 sm:space-y-4">
+                <div className="hidden md:block">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration Status</label>
+                  <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
                     selectedStudent.registration_status === 'registered'
                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       : selectedStudent.registration_status === 'unregistered'
@@ -720,15 +743,15 @@ export function StudentsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration End Date</label>
-                  <p className="text-gray-900 dark:text-white">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration End Date</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString() : 'N/A'}
                   </p>
                 </div>
 
-                <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Availability Status</label>
-                  <span className={`inline-flex text-sm font-semibold rounded-full px-2 py-1 ${
+                <div className="hidden md:block">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Availability Status</label>
+                  <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
                     selectedStudent.is_available
                       ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                       : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -738,27 +761,27 @@ export function StudentsPage() {
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients in Progress</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients in Progress</label>
                   <div className="flex items-center">
-                    <span className="text-xl font-bold text-indigo-600 dark:text-indigo-400">{selectedStudent.patients_in_progress}</span>
-                    <span className="ml-2 text-gray-600 dark:text-gray-400">patients</span>
+                    <span className="text-lg sm:text-xl font-bold text-indigo-600 dark:text-indigo-400">{selectedStudent.patients_in_progress}</span>
+                    <span className="ml-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">patients</span>
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients Completed</label>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients Completed</label>
                   <div className="flex items-center">
-                    <span className="text-xl font-bold text-green-600 dark:text-green-400">{selectedStudent.patients_completed}</span>
-                    <span className="ml-2 text-gray-600 dark:text-gray-400">patients</span>
+                    <span className="text-lg sm:text-xl font-bold text-green-600 dark:text-green-400">{selectedStudent.patients_completed}</span>
+                    <span className="ml-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">patients</span>
                   </div>
                 </div>
               </div>
             </div>
 
-            <div className="flex justify-end mt-8 pt-4 border-t dark:border-gray-700">
+            <div className="flex justify-end mt-6 pt-4 border-t dark:border-gray-700">
               <button
                 onClick={() => setIsInfoModalOpen(false)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center text-sm sm:text-base"
               >
                 Close
               </button>
