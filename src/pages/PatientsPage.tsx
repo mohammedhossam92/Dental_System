@@ -75,7 +75,7 @@ export function PatientsPage() {
     e.preventDefault();
     setError('');
 
-    if (!newPatient.ticket_number || !newPatient.name || !newPatient.student_id || 
+    if (!newPatient.ticket_number || !newPatient.name || !newPatient.student_id ||
         !newPatient.treatment_id || !newPatient.tooth_number || !newPatient.tooth_class_id) {
       setError('Please fill in all fields');
       return;
@@ -119,6 +119,46 @@ export function PatientsPage() {
     }
   }
 
+  async function handleEditPatient(patient: Patient) {
+    setNewPatient(patient);
+    setIsModalOpen(true);
+  }
+
+  async function handleSavePatient() {
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .update(newPatient)
+        .eq('id', newPatient.id);
+
+      if (error) throw error;
+
+      fetchData();
+      setIsModalOpen(false);
+    } catch (error) {
+      console.error('Error updating patient:', error);
+      setError('Failed to update patient');
+    }
+  }
+
+  async function handleDeletePatient(patientId: string) {
+    if (!window.confirm('Are you sure you want to delete this patient?')) return;
+
+    try {
+      const { error } = await supabase
+        .from('patients')
+        .delete()
+        .eq('id', patientId);
+
+      if (error) throw error;
+
+      fetchData();
+    } catch (error) {
+      console.error('Error deleting patient:', error);
+      setError('Failed to delete patient');
+    }
+  }
+
   const filteredPatients = patients.filter(patient =>
     patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
     patient.ticket_number.includes(searchTerm)
@@ -128,7 +168,7 @@ export function PatientsPage() {
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Patients Management</h1>
-        <button 
+        <button
           onClick={() => setIsModalOpen(true)}
           className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
         >
@@ -214,10 +254,16 @@ export function PatientsPage() {
                             Complete
                           </button>
                         )}
-                        <button className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200">
+                        <button
+                          onClick={() => handleEditPatient(patient)}
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200"
+                        >
                           Edit
                         </button>
-                        <button className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200">
+                        <button
+                          onClick={() => handleDeletePatient(patient.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
+                        >
                           Delete
                         </button>
                       </div>

@@ -42,7 +42,7 @@ export function StudentsPage() {
     const now = new Date();
     const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
     const timeUntilMidnight = tomorrow.getTime() - now.getTime();
-    
+
     setTimeout(() => {
       checkRegistrationStatus();
       // After first check, run daily
@@ -169,7 +169,7 @@ export function StudentsPage() {
         .eq('id', id);
 
       if (error) throw error;
-      
+
       fetchData();
     } catch (error) {
       console.error('Error deleting student:', error);
@@ -248,7 +248,7 @@ export function StudentsPage() {
 
   const filteredStudents = students.filter(student => {
     if (!searchTerm) return true;
-    
+
     const searchTermLower = searchTerm.toLowerCase();
     return selectedColumns.some(column => {
       switch (column) {
@@ -284,7 +284,7 @@ export function StudentsPage() {
               onChange={handleFileUpload}
             />
           </label>
-          <button 
+          <button
             onClick={() => {
               resetForm();
               setIsModalOpen(true);
