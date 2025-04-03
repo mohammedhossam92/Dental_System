@@ -1,11 +1,14 @@
 import React, { useState } from 'react';
-import { Users, UserCircle, Settings, FileText, Home, Sun, Moon } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import { Users, UserCircle, Settings, FileText, Home, Sun, Moon, LogOut } from 'lucide-react';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../context/DarkModeContext';
+import { useAuth } from '../context/AuthContext';
 
 export function Navbar() {
   const location = useLocation();
+  const navigate = useNavigate();
   const { darkMode, toggleDarkMode } = useDarkMode();
+  const { signOut } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -18,6 +21,15 @@ export function Navbar() {
 
   const toggleMobileMenu = () => {
     setIsMobileMenuOpen(!isMobileMenuOpen);
+  };
+
+  const handleSignOut = async () => {
+    try {
+      await signOut();
+      navigate('/login');
+    } catch (error) {
+      console.error('Error signing out:', error);
+    }
   };
 
   return (
@@ -80,6 +92,14 @@ export function Navbar() {
             >
               {darkMode ? <Sun className="h-5 w-5 text-gray-200" /> : <Moon className="h-5 w-5 text-gray-700" />}
             </button>
+
+            <button
+              onClick={handleSignOut}
+              className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors duration-200"
+            >
+              <LogOut className="h-5 w-5" />
+              <span>Sign Out</span>
+            </button>
           </div>
         </div>
       </div>
@@ -98,7 +118,7 @@ export function Navbar() {
                     ? 'bg-indigo-100 text-indigo-700 dark:bg-indigo-900 dark:text-indigo-200'
                     : 'text-gray-700 hover:bg-gray-100 dark:text-gray-200 dark:hover:bg-gray-600'
                 }`}
-              onClick={() => setIsMobileMenuOpen(false)} // Close menu on item click
+                onClick={() => setIsMobileMenuOpen(false)}
               >
                 <Icon className="h-5 w-5" />
                 <span>{item.label}</span>
@@ -111,6 +131,13 @@ export function Navbar() {
           >
             {darkMode ? <Sun className="h-5 w-5 text-gray-200" /> : <Moon className="h-5 w-5 text-gray-700" />}
             <span>Toggle Dark Mode</span>
+          </button>
+          <button
+            onClick={handleSignOut}
+            className="flex items-center space-x-1 px-3 py-2 rounded-md text-sm font-medium text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 transition-colors duration-200 w-full"
+          >
+            <LogOut className="h-5 w-5" />
+            <span>Sign Out</span>
           </button>
         </div>
       </div>
