@@ -8,7 +8,7 @@ export function Navbar() {
   const location = useLocation();
   const navigate = useNavigate();
   const { darkMode, toggleDarkMode } = useDarkMode();
-  const { signOut } = useAuth();
+  const { signOut, user } = useAuth();
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
 
   const navItems = [
@@ -38,7 +38,14 @@ export function Navbar() {
         <div className="flex items-center justify-between h-16">
           <Link to="/" className="flex items-center space-x-2">
             <UserCircle className="h-8 w-8 text-indigo-600 dark:text-indigo-400" />
-            <span className="text-xl font-bold text-gray-900 dark:text-white">Dental System</span>
+            <div className="flex flex-col">
+              <span className="text-xl font-bold text-gray-900 dark:text-white">Dental System</span>
+              {user && (
+                <span className="text-sm text-gray-600 dark:text-gray-300">
+                  Hello, {user.user_metadata?.name || user.email?.split('@')[0]}
+                </span>
+              )}
+            </div>
           </Link>
 
           {/* Mobile Menu Button */}

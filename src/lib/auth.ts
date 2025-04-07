@@ -4,7 +4,8 @@ import { supabase } from './supabase';
 export type SignUpData = {
   email: string;
   password: string;
-  inviteCode?: string;
+  name: string;
+  inviteCode: string;
 };
 
 export type SignInData = {
@@ -12,7 +13,7 @@ export type SignInData = {
   password: string;
 };
 
-export async function signUp({ email, password, inviteCode }: SignUpData) {
+export async function signUp({ email, password, name, inviteCode }: SignUpData) {
   try {
     // First validate the invite code
     const { data: validationData, error: validationError } = await supabase
@@ -25,6 +26,10 @@ export async function signUp({ email, password, inviteCode }: SignUpData) {
       throw validationError;
     }
 
+    if (!validationData) {
+      throw new Error('Invalid invitation code');
+    }
+
     const organization_id = validationData;
 
     // Sign up the user
@@ -33,6 +38,7 @@ export async function signUp({ email, password, inviteCode }: SignUpData) {
       password,
       options: {
         data: {
+          name,
           organization_id,
           role: 'employee' // Default role for new signups
         }
@@ -84,17 +90,21 @@ export async function signOut() {
 }
 
 export async function getCurrentUser() {
+  // First check for active session
+  const { data: { session } } = await supabase.auth.getSession();
+  
+  if (!session) {
+    console.log('No active session found');
+    return null;
+  }
+
   try {
     const { data: { user }, error } = await supabase.auth.getUser();
     
-    if (error) {
-      console.error('Error getting current user:', error);
-      return null; // Return null instead of throwing error when no session exists
-    }
-
+    if (error) throw error;
     return user;
   } catch (error) {
     console.error('Error getting current user:', error);
-    return null; // Return null for any other errors
+    return null;
   }
 }

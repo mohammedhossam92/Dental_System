@@ -1,10 +1,12 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
+import { useAuth } from '../context/AuthContext';
 
 export function StudentsPage() {
+  const { organizationId } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
@@ -20,15 +22,16 @@ export function StudentsPage() {
   ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
-  const [newStudent, setNewStudent] = useState({
+  const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'is_available' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
     name: '',
     mobile: '',
     city: '',
     university: '',
     working_days_id: '',
     class_year_id: '',
-    registration_status: 'pending' as const,
-    registration_end_date: ''
+    organization_id: '',
+    registration_status: 'pending',
+    registration_end_date: null
   });
 
   const availableColumns = [
@@ -41,62 +44,32 @@ export function StudentsPage() {
     { id: 'registration', label: 'Registration' }
   ];
 
-  useEffect(() => {
-    fetchData();
-    // Check registration status daily at midnight
-    const now = new Date();
-    const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
-    const timeUntilMidnight = tomorrow.getTime() - now.getTime();
-
-    setTimeout(() => {
-      checkRegistrationStatus();
-      // After first check, run daily
-      setInterval(checkRegistrationStatus, 24 * 60 * 60 * 1000);
-    }, timeUntilMidnight);
-  }, []);
-
-  async function checkRegistrationStatus() {
+  const memoizedFetchData = useCallback(async () => {
     try {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
-
-      const { data: expiredStudents, error } = await supabase
-        .from('students')
-        .select('id')
-        .eq('registration_status', 'registered')
-        .lte('registration_end_date', today.toISOString());
-
-      if (error) throw error;
-
-      if (expiredStudents && expiredStudents.length > 0) {
-        const { error: updateError } = await supabase
-          .from('students')
-          .update({ registration_status: 'unregistered' })
-          .in('id', expiredStudents.map(s => s.id));
-
-        if (updateError) throw updateError;
-        fetchData();
+      if (!organizationId) {
+        console.error('No organization ID found');
+        setError('Organization not found');
+        return;
       }
-    } catch (error) {
-      console.error('Error checking registration status:', error);
-    }
-  }
 
-  async function fetchData() {
-    try {
+      console.log('Organization ID:', organizationId);
+
       const [studentsResult, workingDaysResult, classYearsResult] = await Promise.all([
         supabase
           .from('students')
-          .select(`
-            *,
-            working_days (
-              name,
-              days
-            )
-          `)
+          .select('*, working_days:working_days_id (name, days)')
+          .eq('organization_id', organizationId)
           .order('created_at', { ascending: false }),
-        supabase.from('working_days').select('*'),
-        supabase.from('class_years').select('*')
+        supabase
+          .from('working_days')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('name', { ascending: true }),
+        supabase
+          .from('class_years')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .order('year_range', { ascending: true })
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
@@ -108,14 +81,66 @@ export function StudentsPage() {
       setClassYears(classYearsResult.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
+      setError('Failed to load data');
     } finally {
       setLoading(false);
     }
-  }
+  }, [organizationId]);
+
+  const memoizedCheckRegistrationStatus = useCallback(async () => {
+    try {
+      if (!organizationId) return;
+
+      const today = new Date();
+      const { data: expiredStudents, error } = await supabase
+        .from('students')
+        .select('id')
+        .eq('organization_id', organizationId)
+        .eq('registration_status', 'registered')
+        .lte('registration_end_date', today.toISOString());
+
+      if (error) throw error;
+
+      if (expiredStudents.length > 0) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ registration_status: 'unregistered', registration_end_date: null })
+          .in('id', expiredStudents.map(s => s.id));
+
+        if (updateError) throw updateError;
+
+        memoizedFetchData();
+      }
+    } catch (error) {
+      console.error('Error checking registration status:', error);
+    }
+  }, [organizationId, memoizedFetchData]);
+
+  useEffect(() => {
+    const checkAndScheduleRegistration = () => {
+      memoizedCheckRegistrationStatus();
+      const now = new Date();
+      const tomorrow = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1);
+      const timeUntilMidnight = tomorrow.getTime() - now.getTime();
+
+      setTimeout(() => {
+        memoizedCheckRegistrationStatus();
+        setInterval(memoizedCheckRegistrationStatus, 24 * 60 * 60 * 1000);
+      }, timeUntilMidnight);
+    };
+
+    memoizedFetchData();
+    checkAndScheduleRegistration();
+  }, [memoizedFetchData, memoizedCheckRegistrationStatus]);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError('');
+
+    if (!organizationId) {
+      setError('Organization not found');
+      return;
+    }
 
     const requiredFields = ['name', 'mobile', 'city', 'university', 'working_days_id'];
     const missingFields = requiredFields.filter(field => !newStudent[field as keyof typeof newStudent]);
@@ -127,6 +152,7 @@ export function StudentsPage() {
 
     const studentData = {
       ...newStudent,
+      organization_id: organizationId,
       registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null
     };
 
@@ -135,7 +161,8 @@ export function StudentsPage() {
         const { error } = await supabase
           .from('students')
           .update(studentData)
-          .eq('id', selectedStudent.id);
+          .eq('id', selectedStudent.id)
+          .eq('organization_id', organizationId);
 
         if (error) throw error;
       } else {
@@ -146,7 +173,7 @@ export function StudentsPage() {
         if (error) throw error;
       }
 
-      fetchData();
+      memoizedFetchData();
       setIsModalOpen(false);
       resetForm();
     } catch (error) {
@@ -171,11 +198,12 @@ export function StudentsPage() {
       const { error } = await supabase
         .from('students')
         .delete()
-        .eq('id', id);
+        .eq('id', id)
+        .eq('organization_id', organizationId);
 
       if (error) throw error;
 
-      fetchData();
+      memoizedFetchData();
     } catch (error) {
       console.error('Error deleting student:', error);
       setError('Failed to delete student');
@@ -191,6 +219,7 @@ export function StudentsPage() {
       university: student.university,
       working_days_id: student.working_days_id,
       class_year_id: student.class_year_id || '',
+      organization_id: student.organization_id,
       registration_status: student.registration_status,
       registration_end_date: student.registration_end_date || ''
     });
@@ -206,16 +235,16 @@ export function StudentsPage() {
       university: '',
       working_days_id: '',
       class_year_id: '',
+      organization_id: '',
       registration_status: 'pending',
-      registration_end_date: ''
+      registration_end_date: null
     });
     setSelectedStudent(null);
     setIsEditMode(false);
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
-    const file = event.target.files?.[0];
-    if (!file) return;
+    if (!event.target.files?.[0]) return;
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -224,31 +253,56 @@ export function StudentsPage() {
         const workbook = XLSX.read(data, { type: 'array' });
         const sheetName = workbook.SheetNames[0];
         const worksheet = workbook.Sheets[sheetName];
-        const jsonData = XLSX.utils.sheet_to_json(worksheet);
+        const rows = XLSX.utils.sheet_to_json(worksheet) as Record<string, string>[];
 
-        for (const row of jsonData) {
-          const student = {
-            name: row['Name'],
-            mobile: row['Mobile'],
-            city: row['City'],
-            university: row['University'],
-            working_days_id: workingDays[0]?.id,
-            registration_status: 'pending'
-          };
-
-          const { error } = await supabase
-            .from('students')
-            .insert([student]);
-
-          if (error) throw error;
+        if (!organizationId) {
+          setError('Organization not found');
+          return;
         }
 
-        fetchData();
+        // Get default working days
+        const { data: workingDaysData } = await supabase
+          .from('working_days')
+          .select('*')
+          .eq('organization_id', organizationId)
+          .limit(1);
+
+        if (!workingDaysData?.length) {
+          setError('No working days found. Please create working days first.');
+          return;
+        }
+
+        const students = rows.map(row => ({
+          name: row['Name'] || '',
+          mobile: row['Mobile'] || '',
+          city: row['City'] || '',
+          university: row['University'] || '',
+          working_days_id: workingDaysData[0].id,
+          organization_id: organizationId,
+          registration_status: 'pending' as const,
+          class_year_id: null,
+          registration_end_date: null
+        }));
+
+        const { error } = await supabase
+          .from('students')
+          .insert(students);
+
+        if (error) throw error;
+
+        memoizedFetchData();
+        event.target.value = '';
       } catch (error) {
-        console.error('Error processing Excel file:', error);
+        console.error('Error importing students:', error);
+        setError('Failed to import students');
       }
     };
-    reader.readAsArrayBuffer(file);
+
+    reader.readAsArrayBuffer(event.target.files[0]);
+  }
+
+  function handleSearch(e: React.ChangeEvent<HTMLInputElement>) {
+    setSearchTerm(e.target.value);
   }
 
   const filteredStudents = students.filter(student => {
@@ -274,10 +328,10 @@ export function StudentsPage() {
     });
   });
 
-  const openInfoModal = (student: Student) => {
+  function openInfoModal(student: Student) {
     setSelectedStudent(student);
     setIsInfoModalOpen(true);
-  };
+  }
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -315,7 +369,7 @@ export function StudentsPage() {
             placeholder={`Search by ${selectedColumns.join(', ')}...`}
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
             value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
+            onChange={handleSearch}
           />
         </div>
         <button
@@ -625,7 +679,7 @@ export function StudentsPage() {
                     onChange={(e) => setNewStudent({
                       ...newStudent,
                       registration_status: e.target.value as typeof newStudent.registration_status,
-                      registration_end_date: e.target.value !== 'registered' ? '' : newStudent.registration_end_date
+                      registration_end_date: e.target.value !== 'registered' ? null : newStudent.registration_end_date
                     })}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                   >
@@ -642,8 +696,8 @@ export function StudentsPage() {
                     </label>
                     <input
                       type="date"
-                      value={newStudent.registration_end_date}
-                      onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value })}
+                      value={newStudent.registration_end_date || ''}
+                      onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value || null })}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                       min={new Date().toISOString().split('T')[0]}
                     />

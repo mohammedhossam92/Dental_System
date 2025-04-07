@@ -114,14 +114,17 @@ export function SettingsPage() {
         .from('treatments')
         .insert([{ name: newTreatment }]);
 
-      if (error) throw error;
+      if (error) {
+        console.error('Supabase error:', error);
+        throw new Error(error.message || 'Failed to add treatment');
+      }
 
       fetchSettings();
       setIsTreatmentModalOpen(false);
       setNewTreatment('');
     } catch (error) {
       console.error('Error adding treatment:', error);
-      setError('Failed to add treatment');
+      setError(error instanceof Error ? error.message : 'Failed to add treatment');
     }
   }
 
