@@ -1,0 +1,281 @@
+export type Json = string | number | boolean | null | { [key: string]: Json | undefined } | Json[]
+
+export interface Database {
+  public: {
+    Tables: {
+      class_years: {
+        Row: {
+          created_at: string
+          id: string
+          year_range: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          year_range: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          year_range?: string
+        }
+        Relationships: []
+      }
+      invites: {
+        Row: {
+          code: string
+          created_at: string
+          email: string
+          organization_id: string | null
+        }
+        Insert: {
+          code: string
+          created_at?: string
+          email: string
+          organization_id?: string | null
+        }
+        Update: {
+          code?: string
+          created_at?: string
+          email?: string
+          organization_id?: string | null
+        }
+        Relationships: []
+      }
+      patients: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          name: string
+          start_date: string | null
+          status: "pending" | "in_progress" | "completed" | "cancelled"
+          student_id: string
+          ticket_number: string
+          tooth_class_id: string
+          tooth_number: string
+          treatment_id: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name: string
+          start_date?: string | null
+          status: "pending" | "in_progress" | "completed" | "cancelled"
+          student_id: string
+          ticket_number: string
+          tooth_class_id: string
+          tooth_number: string
+          treatment_id: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          name?: string
+          start_date?: string | null
+          status?: "pending" | "in_progress" | "completed" | "cancelled"
+          student_id?: string
+          ticket_number?: string
+          tooth_class_id?: string
+          tooth_number?: string
+          treatment_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "patients_student_id_fkey"
+            columns: ["student_id"]
+            referencedRelation: "students"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_tooth_class_id_fkey"
+            columns: ["tooth_class_id"]
+            referencedRelation: "tooth_classes"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "patients_treatment_id_fkey"
+            columns: ["treatment_id"]
+            referencedRelation: "treatments"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      students: {
+        Row: {
+          city: string
+          class_year_id: string | null
+          created_at: string
+          id: string
+          is_available: boolean
+          mobile: string
+          name: string
+          organization_id: string
+          patients_completed: number
+          patients_in_progress: number
+          registration_end_date: string | null
+          registration_status: "registered" | "unregistered" | "pending"
+          university: string
+          working_days_id: string
+        }
+        Insert: {
+          city: string
+          class_year_id?: string | null
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          mobile: string
+          name: string
+          organization_id: string
+          patients_completed?: number
+          patients_in_progress?: number
+          registration_end_date?: string | null
+          registration_status: "registered" | "unregistered" | "pending"
+          university: string
+          working_days_id: string
+        }
+        Update: {
+          city?: string
+          class_year_id?: string | null
+          created_at?: string
+          id?: string
+          is_available?: boolean
+          mobile?: string
+          name?: string
+          organization_id?: string
+          patients_completed?: number
+          patients_in_progress?: number
+          registration_end_date?: string | null
+          registration_status?: "registered" | "unregistered" | "pending"
+          university?: string
+          working_days_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "students_class_year_id_fkey"
+            columns: ["class_year_id"]
+            referencedRelation: "class_years"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "students_working_days_id_fkey"
+            columns: ["working_days_id"]
+            referencedRelation: "working_days"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      tooth_classes: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      treatments: {
+        Row: {
+          created_at: string
+          id: string
+          name: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          name: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          name?: string
+        }
+        Relationships: []
+      }
+      treatment_visits: {
+        Row: {
+          created_at: string
+          id: string
+          notes: string | null
+          patient_id: string
+          visit_date: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          patient_id: string
+          visit_date: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          notes?: string | null
+          patient_id?: string
+          visit_date?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "treatment_visits_patient_id_fkey"
+            columns: ["patient_id"]
+            referencedRelation: "patients"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      working_days: {
+        Row: {
+          created_at: string
+          days: string[]
+          id: string
+          name: string
+          organization_id: string | null
+        }
+        Insert: {
+          created_at?: string
+          days: string[]
+          id?: string
+          name: string
+          organization_id?: string | null
+        }
+        Update: {
+          created_at?: string
+          days?: string[]
+          id?: string
+          name?: string
+          organization_id?: string | null
+        }
+        Relationships: []
+      }
+    }
+    Views: {
+      [_ in never]: never
+    }
+    Functions: {
+      validate_invite_code: {
+        Args: {
+          p_email: string
+          p_invite_code: string
+        }
+        Returns: string
+      }
+    }
+    Enums: {
+      [_ in never]: never
+    }
+    CompositeTypes: {
+      [_ in never]: never
+    }
+  }
+}

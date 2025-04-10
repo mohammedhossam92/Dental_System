@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
@@ -10,6 +10,12 @@ export function StudentsPage() {
   const [students, setStudents] = useState<Student[]>([]);
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
+  // Add new state for class year filter
+  const [selectedClassYearFilter, setSelectedClassYearFilter] = useState<string>(() => {
+    return localStorage.getItem('studentClassYearFilter') || 'all';
+  });
+  // Add the missing state variable for dropdown
+  const [isClassYearDropdownOpen, setIsClassYearDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -305,7 +311,19 @@ export function StudentsPage() {
     setSearchTerm(e.target.value);
   }
 
+  // Add effect to persist filter selection
+  useEffect(() => {
+    localStorage.setItem('studentClassYearFilter', selectedClassYearFilter);
+  }, [selectedClassYearFilter]);
+
+  // Modify the filteredStudents logic to include class year filtering
   const filteredStudents = students.filter(student => {
+    // First apply class year filter
+    if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
+      return false;
+    }
+
+    // Then apply search term filter
     if (!searchTerm) return true;
 
     const searchTermLower = searchTerm.toLowerCase();
@@ -338,6 +356,57 @@ export function StudentsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Students Management</h1>
         <div className="flex flex-col sm:flex-row gap-4">
+          {/* Replace select with styled button */}
+          <div className="relative">
+            <button
+              onClick={() => setIsClassYearDropdownOpen(!isClassYearDropdownOpen)}
+              className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+            >
+              <Filter className="h-5 w-5 mr-2" />
+              {selectedClassYearFilter === 'all' 
+                ? 'All Class Years' 
+                : classYears.find(year => year.id === selectedClassYearFilter)?.year_range || 'Class Year'}
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </button>
+            
+            {isClassYearDropdownOpen && (
+              <div className="absolute z-10 mt-1 w-56 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                <ul className="py-1 max-h-60 overflow-auto">
+                  <li 
+                    className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                      selectedClassYearFilter === 'all' 
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                        : 'text-gray-900 dark:text-white'
+                    }`}
+                    onClick={() => {
+                      setSelectedClassYearFilter('all');
+                      setIsClassYearDropdownOpen(false);
+                    }}
+                  >
+                    All Class Years
+                  </li>
+                  {classYears.map((year) => (
+                    <li 
+                      key={year.id}
+                      className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                        selectedClassYearFilter === year.id 
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                          : 'text-gray-900 dark:text-white'
+                      }`}
+                      onClick={() => {
+                        setSelectedClassYearFilter(year.id);
+                        setIsClassYearDropdownOpen(false);
+                      }}
+                    >
+                      {year.year_range}
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          {/* Existing buttons */}
           <label className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer transition-colors duration-200">
             <Upload className="h-5 w-5 mr-2" />
             Import Excel
