@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear } from '../types';
 import * as XLSX from 'xlsx';
@@ -27,6 +27,20 @@ export function StudentsPage() {
     'name', 'mobile', 'university', 'city', 'working_days', 'status', 'registration'
   ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  
+  // New state for sorting and filtering
+  const [sortConfig, setSortConfig] = useState<{column: string | null, direction: 'asc' | 'desc' | null}>({
+    column: null,
+    direction: null
+  });
+  const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy'>('all');
+  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered' | 'pending'>('all');
+  const [columnDropdownOpen, setColumnDropdownOpen] = useState<string | null>(null);
+  const [universityFilter, setUniversityFilter] = useState<string>('all');
+  const [universitySearchTerm, setUniversitySearchTerm] = useState<string>('');
+  const [cityFilter, setCityFilter] = useState<string>('all');
+  const [citySearchTerm, setCitySearchTerm] = useState<string>('');
+  const [workingDaysFilter, setWorkingDaysFilter] = useState<string>('all');
 
   const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'is_available' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
     name: '',
@@ -316,35 +330,152 @@ export function StudentsPage() {
     localStorage.setItem('studentClassYearFilter', selectedClassYearFilter);
   }, [selectedClassYearFilter]);
 
-  // Modify the filteredStudents logic to include class year filtering
-  const filteredStudents = students.filter(student => {
-    // First apply class year filter
-    if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
-      return false;
-    }
-
-    // Then apply search term filter
-    if (!searchTerm) return true;
-
-    const searchTermLower = searchTerm.toLowerCase();
-    return selectedColumns.some(column => {
-      switch (column) {
-        case 'name':
-          return student.name.toLowerCase().includes(searchTermLower);
-        case 'mobile':
-          return student.mobile.includes(searchTerm);
-        case 'university':
-          return student.university.toLowerCase().includes(searchTermLower);
-        case 'city':
-          return student.city.toLowerCase().includes(searchTermLower);
-        case 'status':
-          return student.registration_status.toLowerCase().includes(searchTermLower) ||
-                 (student.is_available ? 'available' : 'busy').includes(searchTermLower);
-        default:
-          return false;
+  // Function to handle sorting
+  const handleSort = (column: string) => {
+    let direction: 'asc' | 'desc' | null = 'asc';
+    
+    if (sortConfig.column === column) {
+      if (sortConfig.direction === 'asc') {
+        direction = 'desc';
+      } else if (sortConfig.direction === 'desc') {
+        direction = null;
       }
+    }
+    
+    setSortConfig({ column, direction });
+  };
+
+  // Function to toggle column dropdown
+  const toggleColumnDropdown = (column: string | null) => {
+    if (columnDropdownOpen === column) {
+      setColumnDropdownOpen(null);
+    } else {
+      setColumnDropdownOpen(column);
+    }
+  };
+
+  // Get unique universities, cities and working days for filters
+  const uniqueUniversities = React.useMemo(() => {
+    const universities = students.map(student => student.university);
+    return [...new Set(universities)].filter(Boolean).sort();
+  }, [students]);
+
+  const uniqueCities = React.useMemo(() => {
+    const cities = students.map(student => student.city);
+    return [...new Set(cities)].filter(Boolean).sort();
+  }, [students]);
+
+  // Filtered universities based on search term
+  const filteredUniversities = React.useMemo(() => {
+    if (!universitySearchTerm) return uniqueUniversities;
+    return uniqueUniversities.filter(university => 
+      university.toLowerCase().includes(universitySearchTerm.toLowerCase())
+    );
+  }, [uniqueUniversities, universitySearchTerm]);
+
+  // Filtered cities based on search term
+  const filteredCities = React.useMemo(() => {
+    if (!citySearchTerm) return uniqueCities;
+    return uniqueCities.filter(city => 
+      city.toLowerCase().includes(citySearchTerm.toLowerCase())
+    );
+  }, [uniqueCities, citySearchTerm]);
+
+  // Modify the filteredStudents logic to include class year filtering, sorting, and column-specific filtering
+  const filteredStudents = students
+    .filter(student => {
+      // First apply class year filter
+      if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
+        return false;
+      }
+
+      // Apply status filter
+      if (statusFilter !== 'all') {
+        if (statusFilter === 'available' && !student.is_available) return false;
+        if (statusFilter === 'busy' && student.is_available) return false;
+      }
+
+      // Apply registration filter
+      if (registrationFilter !== 'all' && student.registration_status !== registrationFilter) {
+        return false;
+      }
+
+      // Apply university filter
+      if (universityFilter !== 'all' && student.university !== universityFilter) {
+        return false;
+      }
+
+      // Apply city filter
+      if (cityFilter !== 'all' && student.city !== cityFilter) {
+        return false;
+      }
+
+      // Apply working days filter
+      if (workingDaysFilter !== 'all' && student.working_days_id !== workingDaysFilter) {
+        return false;
+      }
+
+      // Then apply search term filter
+      if (!searchTerm) return true;
+
+      const searchTermLower = searchTerm.toLowerCase();
+      return selectedColumns.some(column => {
+        switch (column) {
+          case 'name':
+            return student.name.toLowerCase().includes(searchTermLower);
+          case 'mobile':
+            return student.mobile.includes(searchTerm);
+          case 'university':
+            return student.university.toLowerCase().includes(searchTermLower);
+          case 'city':
+            return student.city.toLowerCase().includes(searchTermLower);
+          case 'status':
+            return (student.is_available ? 'available' : 'busy').includes(searchTermLower);
+          case 'registration':
+            return student.registration_status.toLowerCase().includes(searchTermLower);
+          default:
+            return false;
+        }
+      });
+    })
+    .sort((a, b) => {
+      if (!sortConfig.column || !sortConfig.direction) return 0;
+      
+      let valueA, valueB;
+      
+      switch (sortConfig.column) {
+        case 'name':
+          valueA = a.name.toLowerCase();
+          valueB = b.name.toLowerCase();
+          break;
+        case 'mobile':
+          valueA = a.mobile;
+          valueB = b.mobile;
+          break;
+        case 'university':
+          valueA = a.university.toLowerCase();
+          valueB = b.university.toLowerCase();
+          break;
+        case 'city':
+          valueA = a.city.toLowerCase();
+          valueB = b.city.toLowerCase();
+          break;
+        case 'status':
+          valueA = a.is_available ? 'available' : 'busy';
+          valueB = b.is_available ? 'available' : 'busy';
+          break;
+        case 'registration':
+          valueA = a.registration_status;
+          valueB = b.registration_status;
+          break;
+        default:
+          return 0;
+      }
+      
+      if (valueA < valueB) return sortConfig.direction === 'asc' ? -1 : 1;
+      if (valueA > valueB) return sortConfig.direction === 'asc' ? 1 : -1;
+      return 0;
     });
-  });
 
   function openInfoModal(student: Student) {
     setSelectedStudent(student);
@@ -456,25 +587,435 @@ export function StudentsPage() {
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
                 {selectedColumns.includes('name') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Name</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span>Name</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => handleSort('name')}
+                          className="focus:outline-none mr-1"
+                          title="Sort by name"
+                        >
+                          {sortConfig.column === 'name' ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-500" />
+                            ) : sortConfig.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-500" />
+                            ) : (
+                              <div className="h-3 w-3"></div>
+                            )
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('mobile') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Mobile</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center">
+                      <span>Mobile</span>
+                      <button 
+                        onClick={() => handleSort('mobile')}
+                        className="ml-1 focus:outline-none"
+                      >
+                        {sortConfig.column === 'mobile' ? (
+                          sortConfig.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3 text-indigo-500" />
+                          ) : sortConfig.direction === 'desc' ? (
+                            <ArrowDown className="h-3 w-3 text-indigo-500" />
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )
+                        ) : (
+                          <div className="h-3 w-3"></div>
+                        )}
+                      </button>
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('city') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">City</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>City</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => handleSort('city')}
+                          className="focus:outline-none mr-1"
+                        >
+                          {sortConfig.column === 'city' ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-500" />
+                            ) : sortConfig.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-500" />
+                            ) : (
+                              <div className="h-3 w-3"></div>
+                            )
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => toggleColumnDropdown('city')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+                      
+                      {columnDropdownOpen === 'city' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                              <input
+                                type="text"
+                                placeholder="Search city..."
+                                className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                value={citySearchTerm}
+                                onChange={(e) => setCitySearchTerm(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                          <ul className="py-1 max-h-60 overflow-auto">
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                cityFilter === 'all' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setCityFilter('all');
+                                setCitySearchTerm('');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All Cities
+                            </li>
+                            {filteredCities.map((city) => (
+                              <li 
+                                key={city}
+                                className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                  cityFilter === city 
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                    : 'text-gray-900 dark:text-white'
+                                }`}
+                                onClick={() => {
+                                  setCityFilter(city);
+                                  setCitySearchTerm('');
+                                  toggleColumnDropdown(null);
+                                }}
+                              >
+                                {city}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('university') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">University</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>University</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => handleSort('university')}
+                          className="focus:outline-none mr-1"
+                        >
+                          {sortConfig.column === 'university' ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-500" />
+                            ) : sortConfig.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-500" />
+                            ) : (
+                              <div className="h-3 w-3"></div>
+                            )
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => toggleColumnDropdown('university')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+                      
+                      {columnDropdownOpen === 'university' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <div className="p-2 border-b border-gray-200 dark:border-gray-700">
+                            <div className="relative">
+                              <Search className="absolute left-2 top-1/2 transform -translate-y-1/2 h-3 w-3 text-gray-400" />
+                              <input
+                                type="text"
+                                placeholder="Search university..."
+                                className="w-full pl-7 pr-2 py-1 text-xs border border-gray-300 rounded-md focus:ring-1 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                                value={universitySearchTerm}
+                                onChange={(e) => setUniversitySearchTerm(e.target.value)}
+                                onClick={(e) => e.stopPropagation()}
+                              />
+                            </div>
+                          </div>
+                          <ul className="py-1 max-h-60 overflow-auto">
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                universityFilter === 'all' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setUniversityFilter('all');
+                                setUniversitySearchTerm('');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All Universities
+                            </li>
+                            {filteredUniversities.map((university) => (
+                              <li 
+                                key={university}
+                                className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                  universityFilter === university 
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                    : 'text-gray-900 dark:text-white'
+                                }`}
+                                onClick={() => {
+                                  setUniversityFilter(university);
+                                  setUniversitySearchTerm('');
+                                  toggleColumnDropdown(null);
+                                }}
+                              >
+                                {university}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('working_days') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Working Days</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>Working Days</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => toggleColumnDropdown('working_days')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+                      
+                      {columnDropdownOpen === 'working_days' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <ul className="py-1 max-h-60 overflow-auto">
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                workingDaysFilter === 'all' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setWorkingDaysFilter('all');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All Working Days
+                            </li>
+                            {workingDays.map((workingDay) => (
+                              <li 
+                                key={workingDay.id}
+                                className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                  workingDaysFilter === workingDay.id 
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                    : 'text-gray-900 dark:text-white'
+                                }`}
+                                onClick={() => {
+                                  setWorkingDaysFilter(workingDay.id);
+                                  toggleColumnDropdown(null);
+                                }}
+                              >
+                                {workingDay.name} ({workingDay.days.join(', ')})
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('status') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Status</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>Status</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => handleSort('status')}
+                          className="focus:outline-none mr-1"
+                        >
+                          {sortConfig.column === 'status' ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-500" />
+                            ) : sortConfig.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-500" />
+                            ) : (
+                              <div className="h-3 w-3"></div>
+                            )
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => toggleColumnDropdown('status')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+                      
+                      {columnDropdownOpen === 'status' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-32 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <ul className="py-1">
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                statusFilter === 'all' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setStatusFilter('all');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All
+                            </li>
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                statusFilter === 'available' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setStatusFilter('available');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Available
+                            </li>
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                statusFilter === 'busy' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setStatusFilter('busy');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Busy
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 )}
                 {selectedColumns.includes('registration') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Registration</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>Registration</span>
+                      <div className="flex items-center ml-1">
+                        <button 
+                          onClick={() => handleSort('registration')}
+                          className="focus:outline-none mr-1"
+                        >
+                          {sortConfig.column === 'registration' ? (
+                            sortConfig.direction === 'asc' ? (
+                              <ArrowUp className="h-3 w-3 text-indigo-500" />
+                            ) : sortConfig.direction === 'desc' ? (
+                              <ArrowDown className="h-3 w-3 text-indigo-500" />
+                            ) : (
+                              <div className="h-3 w-3"></div>
+                            )
+                          ) : (
+                            <div className="h-3 w-3"></div>
+                          )}
+                        </button>
+                        <button 
+                          onClick={() => toggleColumnDropdown('registration')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+                      
+                      {columnDropdownOpen === 'registration' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-32 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <ul className="py-1">
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationFilter === 'all' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationFilter('all');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All
+                            </li>
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationFilter === 'registered' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationFilter('registered');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Registered
+                            </li>
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationFilter === 'unregistered' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationFilter('unregistered');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Unregistered
+                            </li>
+                            <li 
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationFilter === 'pending' 
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationFilter('pending');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Pending
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
                 )}
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
