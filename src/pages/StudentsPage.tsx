@@ -1218,10 +1218,10 @@ export function StudentsPage() {
 
       {/* Add/Edit Student Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4">
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl mx-auto my-4 sm:my-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
                 {isEditMode ? 'Edit Student' : 'Add New Student'}
               </h2>
               <button
@@ -1231,18 +1231,18 @@ export function StudentsPage() {
                 }}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
               >
-                <X className="h-6 w-6" />
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
               </button>
             </div>
 
             {error && (
-              <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
+              <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded text-sm">
                 {error}
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <form onSubmit={handleSubmit} className="space-y-4 max-h-[70vh] overflow-y-auto pr-1">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     Name
@@ -1251,7 +1251,7 @@ export function StudentsPage() {
                     type="text"
                     value={newStudent.name}
                     onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                     placeholder="Enter full name (at least 4 names)"
                   />
                   <p className="text-xs text-gray-500 mt-1">Full name should include at least 4 names</p>
@@ -1270,99 +1270,97 @@ export function StudentsPage() {
                         setNewStudent({ ...newStudent, mobile: e.target.value });
                       }
                     }}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                     placeholder="Enter 11-digit mobile number"
                     maxLength={11}
+                    inputMode="numeric"
                   />
                   <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits</p>
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     City
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={newStudent.city}
-                      onChange={(e) => {
-                        setNewStudent({ ...newStudent, city: e.target.value });
-                        setShowCityDropdown(true);
-                      }}
-                      onFocus={() => setShowCityDropdown(true)}
-                      onBlur={() => {
-                        // Delay hiding dropdown to allow for selection
-                        setTimeout(() => setShowCityDropdown(false), 200);
-                      }}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Enter city"
-                    />
-                    {showCityDropdown && filteredCitiesForInput.length > 0 && (
-                      <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredCitiesForInput.map((city, index) => (
-                          <li
-                            key={index}
-                            className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
-                            onMouseDown={() => {
-                              setNewStudent({ ...newStudent, city });
-                              setShowCityDropdown(false);
-                            }}
-                          >
-                            {city}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={newStudent.city}
+                    onChange={(e) => {
+                      setNewStudent({ ...newStudent, city: e.target.value });
+                      setShowCityDropdown(true);
+                    }}
+                    onFocus={() => setShowCityDropdown(true)}
+                    onBlur={() => {
+                      // Delay hiding dropdown to allow for selection
+                      setTimeout(() => setShowCityDropdown(false), 200);
+                    }}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                    placeholder="Enter city"
+                  />
+                  {showCityDropdown && filteredCitiesForInput.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 sm:max-h-60 overflow-auto">
+                      {filteredCitiesForInput.map((city, index) => (
+                        <li
+                          key={index}
+                          className="px-3 py-1.5 sm:px-4 sm:py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm sm:text-base"
+                          onMouseDown={() => {
+                            setNewStudent({ ...newStudent, city });
+                            setShowCityDropdown(false);
+                          }}
+                        >
+                          {city}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
 
-                <div>
+                <div className="relative">
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     University
                   </label>
-                  <div className="relative">
-                    <input
-                      type="text"
-                      value={newStudent.university}
-                      onChange={(e) => {
-                        setNewStudent({ ...newStudent, university: e.target.value });
-                        setShowUniversityDropdown(true);
-                      }}
-                      onFocus={() => setShowUniversityDropdown(true)}
-                      onBlur={() => {
-                        // Delay hiding dropdown to allow for selection
-                        setTimeout(() => setShowUniversityDropdown(false), 200);
-                      }}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                      placeholder="Enter university"
-                    />
-                    {showUniversityDropdown && filteredUniversitiesForInput.length > 0 && (
-                      <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
-                        {filteredUniversitiesForInput.map((university, index) => (
-                          <li
-                            key={index}
-                            className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
-                            onMouseDown={() => {
-                              setNewStudent({ ...newStudent, university });
-                              setShowUniversityDropdown(false);
-                            }}
-                          >
-                            {university}
-                          </li>
-                        ))}
-                      </ul>
-                    )}
-                  </div>
+                  <input
+                    type="text"
+                    value={newStudent.university}
+                    onChange={(e) => {
+                      setNewStudent({ ...newStudent, university: e.target.value });
+                      setShowUniversityDropdown(true);
+                    }}
+                    onFocus={() => setShowUniversityDropdown(true)}
+                    onBlur={() => {
+                      // Delay hiding dropdown to allow for selection
+                      setTimeout(() => setShowUniversityDropdown(false), 200);
+                    }}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                    placeholder="Enter university"
+                  />
+                  {showUniversityDropdown && filteredUniversitiesForInput.length > 0 && (
+                    <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-48 sm:max-h-60 overflow-auto">
+                      {filteredUniversitiesForInput.map((university, index) => (
+                        <li
+                          key={index}
+                          className="px-3 py-1.5 sm:px-4 sm:py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white text-sm sm:text-base"
+                          onMouseDown={() => {
+                            setNewStudent({ ...newStudent, university });
+                            setShowUniversityDropdown(false);
+                          }}
+                        >
+                          {university}
+                        </li>
+                      ))}
+                    </ul>
+                  )}
                 </div>
-
+                
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     University Type
                   </label>
                   <select
                     value={newStudent.university_type}
-                    onChange={(e) => setNewStudent({ ...newStudent, university_type: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    onChange={(e) => setNewStudent({ ...newStudent, university_type: e.target.value as 'حكومي' | 'خاص' | 'اخري' })}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
                   >
                     <option value="حكومي">حكومي</option>
                     <option value="خاص">خاص</option>
@@ -1377,7 +1375,8 @@ export function StudentsPage() {
                   <select
                     value={newStudent.working_days_id}
                     onChange={(e) => setNewStudent({ ...newStudent, working_days_id: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
                   >
                     <option value="">Select working days</option>
                     {workingDays.map((group) => (
@@ -1395,7 +1394,8 @@ export function StudentsPage() {
                   <select
                     value={newStudent.class_year_id}
                     onChange={(e) => setNewStudent({ ...newStudent, class_year_id: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
                   >
                     <option value="">Select class year</option>
                     {classYears.map((year) => (
@@ -1417,7 +1417,8 @@ export function StudentsPage() {
                       registration_status: e.target.value as typeof newStudent.registration_status,
                       registration_end_date: e.target.value !== 'registered' ? null : newStudent.registration_end_date
                     })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
                   >
                     <option value="pending">Pending</option>
                     <option value="registered">Registered</option>
@@ -1434,27 +1435,27 @@ export function StudentsPage() {
                       type="date"
                       value={newStudent.registration_end_date || ''}
                       onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value || null })}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                       min={new Date().toISOString().split('T')[0]}
                     />
                   </div>
                 )}
               </div>
 
-              <div className="flex justify-end space-x-3 mt-6">
+              <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-6 pt-4 border-t dark:border-gray-700">
                 <button
                   type="button"
                   onClick={() => {
                     setIsModalOpen(false);
                     resetForm();
                   }}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+                  className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 text-sm sm:text-base"
                 >
                   Cancel
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+                  className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm sm:text-base"
                 >
                   {isEditMode ? 'Save Changes' : 'Add Student'}
                 </button>
