@@ -47,6 +47,7 @@ export function StudentsPage() {
     mobile: '',
     city: '',
     university: '',
+    university_type: 'حكومي',
     working_days_id: '',
     class_year_id: '',
     organization_id: '',
@@ -155,8 +156,36 @@ export function StudentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    setError('');
-
+    
+    // Validate name has at least 4 words
+    const nameWords = newStudent.name.trim().split(/\s+/);
+    if (nameWords.length < 4) {
+      setError('Name must contain at least 4 words');
+      return;
+    }
+    
+    // Validate mobile number is exactly 11 digits
+    if (!/^\d{11}$/.test(newStudent.mobile)) {
+      setError('Mobile number must be exactly 11 digits');
+      return;
+    }
+    
+    // Check if mobile number is unique (for new students)
+    if (!isEditMode) {
+      const { data: existingMobile } = await supabase
+        .from('students')
+        .select('id')
+        .eq('mobile', newStudent.mobile)
+        .eq('organization_id', organizationId)
+        .maybeSingle();
+        
+      if (existingMobile) {
+        setError('Mobile number already exists');
+        return;
+      }
+    }
+    
+    // Continue with the rest of the function
     if (!organizationId) {
       setError('Organization not found');
       return;
@@ -231,17 +260,17 @@ export function StudentsPage() {
   }
 
   function handleEdit(student: Student) {
-    setSelectedStudent(student);
     setNewStudent({
       name: student.name,
       mobile: student.mobile,
       city: student.city,
       university: student.university,
+      university_type: student.university_type || 'حكومي', // Add default if not present
       working_days_id: student.working_days_id,
       class_year_id: student.class_year_id || '',
       organization_id: student.organization_id,
       registration_status: student.registration_status,
-      registration_end_date: student.registration_end_date || ''
+      registration_end_date: student.registration_end_date
     });
     setIsEditMode(true);
     setIsModalOpen(true);
@@ -253,14 +282,16 @@ export function StudentsPage() {
       mobile: '',
       city: '',
       university: '',
+      university_type: 'حكومي',
       working_days_id: '',
       class_year_id: '',
-      organization_id: '',
+      organization_id: organizationId || '',
       registration_status: 'pending',
       registration_end_date: null
     });
-    setSelectedStudent(null);
     setIsEditMode(false);
+    setSelectedStudent(null);
+    setError('');
   }
 
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
@@ -380,6 +411,26 @@ export function StudentsPage() {
       city.toLowerCase().includes(citySearchTerm.toLowerCase())
     );
   }, [uniqueCities, citySearchTerm]);
+
+  // Add state for city and university autocomplete
+  const [showCityDropdown, setShowCityDropdown] = useState(false);
+  const [showUniversityDropdown, setShowUniversityDropdown] = useState(false);
+  
+  // Filtered cities based on input
+  const filteredCitiesForInput = React.useMemo(() => {
+    if (!newStudent.city) return uniqueCities;
+    return uniqueCities.filter(city => 
+      city.toLowerCase().includes(newStudent.city.toLowerCase())
+    );
+  }, [uniqueCities, newStudent.city]);
+  
+  // Filtered universities based on input
+  const filteredUniversitiesForInput = React.useMemo(() => {
+    if (!newStudent.university) return uniqueUniversities;
+    return uniqueUniversities.filter(university => 
+      university.toLowerCase().includes(newStudent.university.toLowerCase())
+    );
+  }, [uniqueUniversities, newStudent.university]);
 
   // Modify the filteredStudents logic to include class year filtering, sorting, and column-specific filtering
   const filteredStudents = students
@@ -1201,8 +1252,9 @@ export function StudentsPage() {
                     value={newStudent.name}
                     onChange={(e) => setNewStudent({ ...newStudent, name: e.target.value })}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Enter student name"
+                    placeholder="Enter full name (at least 4 names)"
                   />
+                  <p className="text-xs text-gray-500 mt-1">Full name should include at least 4 names</p>
                 </div>
 
                 <div>
@@ -1210,38 +1262,112 @@ export function StudentsPage() {
                     Mobile
                   </label>
                   <input
-                    type="text"
+                    type="number"
                     value={newStudent.mobile}
-                    onChange={(e) => setNewStudent({ ...newStudent, mobile: e.target.value })}
+                    onChange={(e) => {
+                      // Limit to 11 digits
+                      if (e.target.value.length <= 11) {
+                        setNewStudent({ ...newStudent, mobile: e.target.value });
+                      }
+                    }}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Enter mobile number"
+                    placeholder="Enter 11-digit mobile number"
+                    maxLength={11}
                   />
+                  <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits</p>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     City
                   </label>
-                  <input
-                    type="text"
-                    value={newStudent.city}
-                    onChange={(e) => setNewStudent({ ...newStudent, city: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Enter city"
-                  />
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={newStudent.city}
+                      onChange={(e) => {
+                        setNewStudent({ ...newStudent, city: e.target.value });
+                        setShowCityDropdown(true);
+                      }}
+                      onFocus={() => setShowCityDropdown(true)}
+                      onBlur={() => {
+                        // Delay hiding dropdown to allow for selection
+                        setTimeout(() => setShowCityDropdown(false), 200);
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      placeholder="Enter city"
+                    />
+                    {showCityDropdown && filteredCitiesForInput.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredCitiesForInput.map((city, index) => (
+                          <li
+                            key={index}
+                            className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+                            onMouseDown={() => {
+                              setNewStudent({ ...newStudent, city });
+                              setShowCityDropdown(false);
+                            }}
+                          >
+                            {city}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
                 </div>
 
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     University
                   </label>
-                  <input
-                    type="text"
-                    value={newStudent.university}
-                    onChange={(e) => setNewStudent({ ...newStudent, university: e.target.value })}
+                  <div className="relative">
+                    <input
+                      type="text"
+                      value={newStudent.university}
+                      onChange={(e) => {
+                        setNewStudent({ ...newStudent, university: e.target.value });
+                        setShowUniversityDropdown(true);
+                      }}
+                      onFocus={() => setShowUniversityDropdown(true)}
+                      onBlur={() => {
+                        // Delay hiding dropdown to allow for selection
+                        setTimeout(() => setShowUniversityDropdown(false), 200);
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                      placeholder="Enter university"
+                    />
+                    {showUniversityDropdown && filteredUniversitiesForInput.length > 0 && (
+                      <ul className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-auto">
+                        {filteredUniversitiesForInput.map((university, index) => (
+                          <li
+                            key={index}
+                            className="px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-600 text-gray-900 dark:text-white"
+                            onMouseDown={() => {
+                              setNewStudent({ ...newStudent, university });
+                              setShowUniversityDropdown(false);
+                            }}
+                          >
+                            {university}
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    University Type
+                  </label>
+                  <select
+                    value={newStudent.university_type}
+                    onChange={(e) => setNewStudent({ ...newStudent, university_type: e.target.value })}
                     className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                    placeholder="Enter university"
-                  />
+                  >
+                    <option value="حكومي">حكومي</option>
+                    <option value="خاص">خاص</option>
+                    <option value="اخري">اخري</option>
+                  </select>
                 </div>
 
                 <div>

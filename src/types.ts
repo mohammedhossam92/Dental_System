@@ -4,6 +4,7 @@ export interface Student {
   mobile: string;
   city: string;
   university: string;
+  university_type: 'حكومي' | 'خاص' | 'اخري';
   working_days_id: string;
   class_year_id: string | null;
   organization_id: string;
