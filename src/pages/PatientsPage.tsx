@@ -1,28 +1,57 @@
-import React, { useState, useEffect } from 'react';
-import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw } from 'lucide-react';
+import React, { useState, useEffect, useMemo } from 'react';
+import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Patient, Student, Treatment, ToothClass } from '../types';
+import type { Patient, Student, Treatment, ToothClass, ClassYear } from '../types';
 
 export function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
+  const [classYears, setClassYears] = useState<ClassYear[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [error, setError] = useState('');
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [editPatient, setEditPatient] = useState<Patient | null>(null);
+  const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
+  const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
+  const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
+  const [selectedClassYear, setSelectedClassYear] = useState<string>('');
+  const [studentSearchTerm, setStudentSearchTerm] = useState('');
+  const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
 
-  const [newPatient, setNewPatient] = useState({
+  // Column visibility state
+  const [selectedColumns, setSelectedColumns] = useState<string[]>([
+    'ticket', 'name', 'doctor', 'treatment', 'tooth_number', 'start_date', 'end_date', 'status'
+  ]);
+
+  const availableColumns = [
+    { id: 'ticket', label: 'Ticket' },
+    { id: 'name', label: 'Name' },
+    { id: 'mobile', label: 'Mobile' },
+    { id: 'doctor', label: 'Doctor' },
+    { id: 'class_year', label: 'Class Year' },
+    { id: 'treatment', label: 'Treatment' },
+    { id: 'tooth_number', label: 'Tooth Number' },
+    { id: 'tooth_class', label: 'Tooth Class' },
+    { id: 'start_date', label: 'Start Date' },
+    { id: 'end_date', label: 'End Date' },
+    { id: 'status', label: 'Status' }
+  ];
+
+  // Initialize state for new patient
+  const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'>>({
     ticket_number: '',
     name: '',
+    mobile: null,
+    class_year_id: '',
     student_id: '',
     treatment_id: '',
     tooth_number: '',
     tooth_class_id: '',
-    status: 'pending' as const
+    status: 'pending'
   });
 
   const adultTeeth = [
@@ -49,23 +78,27 @@ export function PatientsPage() {
         patientsResult,
         studentsResult,
         treatmentsResult,
-        toothClassesResult
+        toothClassesResult,
+        classYearsResult
       ] = await Promise.all([
-        supabase.from('patients').select('*, student:students(name), start_date, end_date'),
+        supabase.from('patients').select('*, student:student_id(id, name)'),
         supabase.from('students').select('*').eq('is_available', true),
         supabase.from('treatments').select('*'),
-        supabase.from('tooth_classes').select('*')
+        supabase.from('tooth_classes').select('*'),
+        supabase.from('class_years').select('*')
       ]);
 
       if (patientsResult.error) throw patientsResult.error;
       if (studentsResult.error) throw studentsResult.error;
       if (treatmentsResult.error) throw treatmentsResult.error;
       if (toothClassesResult.error) throw toothClassesResult.error;
+      if (classYearsResult.error) throw classYearsResult.error;
 
       setPatients(patientsResult.data || []);
       setStudents(studentsResult.data || []);
       setTreatments(treatmentsResult.data || []);
       setToothClasses(toothClassesResult.data || []);
+      setClassYears(classYearsResult.data || []);
     } catch (error) {
       console.error('Error fetching data:', error);
     } finally {
@@ -77,9 +110,33 @@ export function PatientsPage() {
     e.preventDefault();
     setError('');
 
-    if (!newPatient.ticket_number || !newPatient.name || !newPatient.student_id ||
-        !newPatient.treatment_id || !newPatient.tooth_number || !newPatient.tooth_class_id) {
-      setError('Please fill in all fields');
+    if (!newPatient.ticket_number || !newPatient.name || !newPatient.class_year_id ||
+        !newPatient.student_id || !newPatient.treatment_id || !newPatient.tooth_number || !newPatient.tooth_class_id) {
+      setError('Please fill in all required fields');
+      return;
+    }
+
+    // Validate mobile number if provided
+    if (newPatient.mobile && newPatient.mobile.length !== 11) {
+      setError('Mobile number must be exactly 11 digits');
+      return;
+    }
+
+    // Check if ticket number is unique
+    const { data: existingTicket, error: ticketError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('ticket_number', newPatient.ticket_number)
+      .maybeSingle();
+
+    if (ticketError) {
+      console.error('Error checking ticket number:', ticketError);
+      setError('Failed to check ticket number');
+      return;
+    }
+
+    if (existingTicket) {
+      setError('Ticket number already exists');
       return;
     }
 
@@ -104,12 +161,16 @@ export function PatientsPage() {
       setNewPatient({
         ticket_number: '',
         name: '',
+        mobile: null,
+        class_year_id: '',
         student_id: '',
         treatment_id: '',
         tooth_number: '',
         tooth_class_id: '',
         status: 'pending'
       });
+      setSelectedClassYear('');
+      setStudentSearchTerm('');
     } catch (error) {
       console.error('Error adding patient:', error);
       setError('Failed to add patient');
@@ -164,7 +225,7 @@ export function PatientsPage() {
     setIsEditModalOpen(true);
   };
 
-  const handleEditSubmit = async (e: React.FormEvent) => {
+  async function handleEditPatient(e: React.FormEvent) {
     e.preventDefault();
     if (!editPatient) return;
 
@@ -174,6 +235,8 @@ export function PatientsPage() {
         .update({
           ticket_number: editPatient.ticket_number,
           name: editPatient.name,
+          mobile: editPatient.mobile,
+          class_year_id: editPatient.class_year_id,
           student_id: editPatient.student_id,
           treatment_id: editPatient.treatment_id,
           tooth_number: editPatient.tooth_number,
@@ -211,29 +274,71 @@ export function PatientsPage() {
     }
   }
 
-  const filteredPatients = patients.filter(patient =>
-    patient.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    patient.ticket_number.includes(searchTerm)
-  );
+  const filteredPatients = useMemo(() => {
+    return patients.filter(patient => {
+      const searchTermLower = searchTerm.toLowerCase();
+      return (
+        patient.name.toLowerCase().includes(searchTermLower) ||
+        patient.ticket_number.includes(searchTerm) ||
+        (patient.mobile && patient.mobile.includes(searchTerm)) ||
+        (patient.student?.name && patient.student.name.toLowerCase().includes(searchTermLower))
+      );
+    });
+  }, [patients, searchTerm]);
+
+  // Filter students based on class year and search term
+  const filteredStudents = useMemo(() => {
+    let filtered = students.filter(student => student.is_available);
+    
+    // Filter by selected class year if one is selected
+    if (selectedClassYear) {
+      filtered = filtered.filter(student => student.class_year_id === selectedClassYear);
+    }
+    
+    // Filter by search term if one is entered
+    if (studentSearchTerm) {
+      const searchTermLower = studentSearchTerm.toLowerCase();
+      filtered = filtered.filter(student => 
+        student.name.toLowerCase().includes(searchTermLower) ||
+        (student.mobile && student.mobile.toLowerCase().includes(searchTermLower))
+      );
+    }
+    
+    return filtered;
+  }, [students, selectedClassYear, studentSearchTerm]);
+
+  const openInfoModal = (patient: Patient) => {
+    setSelectedPatient(patient);
+    setIsInfoModalOpen(true);
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Patients Management</h1>
-        <button
-          onClick={() => setIsModalOpen(true)}
-          className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
-        >
-          <Plus className="h-5 w-5 mr-2" />
-          Add Patient
-        </button>
+        <div className="flex flex-col sm:flex-row gap-2">
+          <button
+            onClick={() => setIsFilterModalOpen(true)}
+            className="flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+          >
+            <Filter className="h-5 w-5 mr-2" />
+            Filter Columns
+          </button>
+          <button
+            onClick={() => setIsModalOpen(true)}
+            className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+          >
+            <Plus className="h-5 w-5 mr-2" />
+            Add Patient
+          </button>
+        </div>
       </div>
 
       <div className="relative">
         <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
         <input
           type="text"
-          placeholder="Search patients..."
+          placeholder="Search by name, ticket number, mobile or doctor..."
           className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
           value={searchTerm}
           onChange={(e) => setSearchTerm(e.target.value)}
@@ -245,57 +350,113 @@ export function PatientsPage() {
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
               <tr>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ticket #</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Patient Name</th>
-                <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Student</th>
-                <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Treatment</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
-                <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                {selectedColumns.includes('ticket') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ticket #</th>
+                )}
+                {selectedColumns.includes('name') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Patient Name</th>
+                )}
+                {selectedColumns.includes('mobile') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
+                )}
+                {selectedColumns.includes('doctor') && (
+                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Doctor</th>
+                )}
+                {selectedColumns.includes('class_year') && (
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Class Year</th>
+                )}
+                {selectedColumns.includes('treatment') && (
+                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Treatment</th>
+                )}
+                {selectedColumns.includes('tooth_number') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tooth Number</th>
+                )}
+                {selectedColumns.includes('tooth_class') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tooth Class</th>
+                )}
+                {selectedColumns.includes('start_date') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
+                )}
+                {selectedColumns.includes('end_date') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
+                )}
+                {selectedColumns.includes('status') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Status</th>
+                )}
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Actions</th>
               </tr>
             </thead>
             <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700">
               {loading ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     Loading...
                   </td>
                 </tr>
               ) : filteredPatients.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
+                  <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No patients found
                   </td>
                 </tr>
               ) : (
                 filteredPatients.map((patient) => (
                   <tr key={patient.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{patient.ticket_number}</td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{patient.name}</td>
-                    <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {patient.student?.name || 'Unassigned'}
-                    </td>
-                    <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {treatments.find(t => t.id === patient.treatment_id)?.name}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {patient.start_date ? new Date(patient.start_date).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                      {patient.end_date ? new Date(patient.end_date).toLocaleDateString() : '-'}
-                    </td>
-                    <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                      <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
-                        patient.status === 'completed'
-                          ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                          : patient.status === 'in_progress'
-                          ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                          : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
-                      }`}>
-                        {patient.status.charAt(0).toUpperCase() + patient.status.slice(1).replace('_', ' ')}
-                      </span>
-                    </td>
+                    {selectedColumns.includes('ticket') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{patient.ticket_number}</td>
+                    )}
+                    {selectedColumns.includes('name') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{patient.name}</td>
+                    )}
+                    {selectedColumns.includes('mobile') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{patient.mobile}</td>
+                    )}
+                    {selectedColumns.includes('doctor') && (
+                      <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {patient.student?.name || 'Unassigned'}
+                      </td>
+                    )}
+                    {selectedColumns.includes('class_year') && (
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {classYears.find(cy => cy.id === patient.class_year_id)?.name}
+                      </td>
+                    )}
+                    {selectedColumns.includes('treatment') && (
+                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {treatments.find(t => t.id === patient.treatment_id)?.name}
+                      </td>
+                    )}
+                    {selectedColumns.includes('tooth_number') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{patient.tooth_number}</td>
+                    )}
+                    {selectedColumns.includes('tooth_class') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {toothClasses.find(tc => tc.id === patient.tooth_class_id)?.name}
+                      </td>
+                    )}
+                    {selectedColumns.includes('start_date') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {patient.start_date ? new Date(patient.start_date).toLocaleDateString() : '-'}
+                      </td>
+                    )}
+                    {selectedColumns.includes('end_date') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {patient.end_date ? new Date(patient.end_date).toLocaleDateString() : '-'}
+                      </td>
+                    )}
+                    {selectedColumns.includes('status') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
+                          patient.status === 'completed'
+                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                            : patient.status === 'in_progress'
+                            ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                            : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                        }`}>
+                          {patient.status.charAt(0).toUpperCase() + patient.status.slice(1).replace('_', ' ')}
+                        </span>
+                      </td>
+                    )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
                       <div className="flex flex-col sm:flex-row gap-2 sm:gap-4">
                         {patient.status === 'pending' && (
@@ -331,6 +492,13 @@ export function PatientsPage() {
                           </button>
                         )}
                         <button
+                          onClick={() => openInfoModal(patient)}
+                          className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300 transition-colors duration-200"
+                          title="Info"
+                        >
+                          <Info className="h-5 w-5" />
+                        </button>
+                        <button
                           onClick={() => openEditModal(patient)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200"
                         >
@@ -354,297 +522,653 @@ export function PatientsPage() {
 
       {/* Add Patient Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
-          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-            <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Add New Patient</h2>
-              <button
-                onClick={() => setIsModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
-              >
-                <X className="h-6 w-6" />
-              </button>
-            </div>
-
-            {error && (
-              <div className="mb-4 p-2 bg-red-100 border border-red-400 text-red-700 rounded">
-                {error}
-              </div>
-            )}
-
-            <form onSubmit={handleAddPatient} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ticket Number
-                </label>
-                <input
-                  type="text"
-                  value={newPatient.ticket_number}
-                  onChange={(e) => setNewPatient({ ...newPatient, ticket_number: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                  placeholder="Enter ticket number"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Patient Name
-                </label>
-                <input
-                  type="text"
-                  value={newPatient.name}
-                  onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                  placeholder="Enter patient name"
-                />
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Assigned Student
-                </label>
-                <select
-                  value={newPatient.student_id}
-                  onChange={(e) => setNewPatient({ ...newPatient, student_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select student</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Treatment
-                </label>
-                <select
-                  value={newPatient.treatment_id}
-                  onChange={(e) => setNewPatient({ ...newPatient, treatment_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select treatment</option>
-                  {treatments.map((treatment) => (
-                    <option key={treatment.id} value={treatment.id}>
-                      {treatment.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tooth Number
-                </label>
-                <select
-                  value={newPatient.tooth_number}
-                  onChange={(e) => setNewPatient({ ...newPatient, tooth_number: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select tooth number</option>
-                  <optgroup label="Adult Teeth">
-                    {adultTeeth.map((tooth) => (
-                      <option key={tooth} value={tooth}>
-                        {tooth}
-                      </option>
-                    ))}
-                  </optgroup>
-                  <optgroup label="Pediatric Teeth">
-                    {pediatricTeeth.map((tooth) => (
-                      <option key={tooth} value={tooth}>
-                        {tooth}
-                      </option>
-                    ))}
-                  </optgroup>
-                </select>
-              </div>
-
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tooth Class
-                </label>
-                <select
-                  value={newPatient.tooth_class_id}
-                  onChange={(e) => setNewPatient({ ...newPatient, tooth_class_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select tooth class</option>
-                  {toothClasses.map((toothClass) => (
-                    <option key={toothClass.id} value={toothClass.id}>
-                      {toothClass.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              <div className="flex flex-col sm:flex-row justify-end gap-3 mt-6">
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Patient</h2>
                 <button
-                  type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="w-full sm:w-auto px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
                 >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="w-full sm:w-auto px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
-                >
-                  Add Patient
+                  <X size={24} />
                 </button>
               </div>
-            </form>
+              
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <form onSubmit={handleAddPatient} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Ticket Number
+                    </label>
+                    <input
+                      type="text"
+                      value={newPatient.ticket_number}
+                      onChange={(e) => setNewPatient({ ...newPatient, ticket_number: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter ticket number"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Patient Name
+                    </label>
+                    <input
+                      type="text"
+                      value={newPatient.name}
+                      onChange={(e) => setNewPatient({ ...newPatient, name: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter patient name"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="text"
+                      value={newPatient.mobile === null ? '' : newPatient.mobile}
+                      onChange={(e) => {
+                        // Validate for exactly 11 digits if not empty
+                        const value = e.target.value;
+                        if (value === '' || /^\d{0,11}$/.test(value)) {
+                          setNewPatient({ ...newPatient, mobile: value || null });
+                        }
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter mobile number (optional)"
+                      maxLength={11}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits if provided</p>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Class Year
+                    </label>
+                    <select
+                      value={newPatient.class_year_id || ''}
+                      onChange={(e) => {
+                        const selectedValue = e.target.value;
+                        setNewPatient({ ...newPatient, class_year_id: selectedValue || null, student_id: '' });
+                        setSelectedClassYear(selectedValue);
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    >
+                      <option value="">Select class year</option>
+                      {classYears.map((classYear) => (
+                        <option key={classYear.id} value={classYear.id}>
+                          {classYear.year_range}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Assigned Student
+                  </label>
+                  <div className="relative">
+                    <div className="flex">
+                      <input
+                        type="text"
+                        placeholder="Search students..."
+                        value={studentSearchTerm}
+                        onChange={(e) => {
+                          setStudentSearchTerm(e.target.value);
+                          if (!isStudentDropdownOpen) {
+                            setIsStudentDropdownOpen(true);
+                          }
+                        }}
+                        onClick={() => setIsStudentDropdownOpen(true)}
+                        className="w-full p-2 pl-8 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      />
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                        <Search size={16} className="text-gray-400" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                        className="p-2 border border-l-0 rounded-r-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      >
+                        {isStudentDropdownOpen ? <X size={16} /> : <Search size={16} />}
+                      </button>
+                    </div>
+                    
+                    {isStudentDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:text-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600  rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredStudents.length > 0 ? (
+                          filteredStudents.map((student) => (
+                            <div
+                              key={student.id}
+                              className="p-2 hover:bg-gray-100  dark:hover:bg-gray-600 cursor-pointer"
+                              onClick={() => {
+                                setNewPatient({ ...newPatient, student_id: student.id });
+                                setStudentSearchTerm(student.name);
+                                setIsStudentDropdownOpen(false);
+                              }}
+                            >
+                              {student.name}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-gray-500 dark:text-white-400">No students found</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Hidden input to store the selected value */}
+                    <input type="hidden" value={newPatient.student_id} />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Treatment
+                  </label>
+                  <select
+                    value={newPatient.treatment_id}
+                    onChange={(e) => setNewPatient({ ...newPatient, treatment_id: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  >
+                    <option value="">Select treatment</option>
+                    {treatments.map((treatment) => (
+                      <option key={treatment.id} value={treatment.id}>
+                        {treatment.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tooth Class
+                  </label>
+                  <select
+                    value={newPatient.tooth_class_id}
+                    onChange={(e) => setNewPatient({ ...newPatient, tooth_class_id: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  >
+                    <option value="">Select tooth class</option>
+                    {toothClasses.map((toothClass) => (
+                      <option key={toothClass.id} value={toothClass.id}>
+                        {toothClass.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tooth Number
+                  </label>
+                  <select
+                    value={newPatient.tooth_number}
+                    onChange={(e) => setNewPatient({ ...newPatient, tooth_number: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  >
+                    <option value="">Select tooth number</option>
+                    <optgroup label="Adult Teeth">
+                      {adultTeeth.map((tooth) => (
+                        <option key={tooth} value={tooth}>
+                          {tooth}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Pediatric Teeth">
+                      {pediatricTeeth.map((tooth) => (
+                        <option key={tooth} value={tooth}>
+                          {tooth}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsModalOpen(false)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    Add Patient
+                  </button>
+                </div>
+              </form>
+            </div>
+          </div>
+        </div>
+      )}
+      
+      {/* Edit Patient Modal */}
+      {isEditModalOpen && editPatient && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Edit Patient</h2>
+                <button
+                  onClick={() => setIsEditModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              
+              {error && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
+                  {error}
+                </div>
+              )}
+              
+              <form onSubmit={handleEditPatient} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Ticket Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editPatient.ticket_number}
+                      onChange={(e) => setEditPatient({ ...editPatient, ticket_number: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      disabled
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Patient Name
+                    </label>
+                    <input
+                      type="text"
+                      value={editPatient.name}
+                      onChange={(e) => setEditPatient({ ...editPatient, name: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    />
+                  </div>
+                
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="text"
+                      value={editPatient.mobile === null ? '' : editPatient.mobile}
+                      onChange={(e) => {
+                        // Validate for exactly 11 digits if not empty
+                        const value = e.target.value;
+                        if (value === '' || /^\d{0,11}$/.test(value)) {
+                          setEditPatient({ ...editPatient, mobile: value || null });
+                        }
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      maxLength={11}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits if provided</p>
+                  </div>
+                
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Treatment
+                    </label>
+                    <select
+                      value={editPatient.treatment_id}
+                      onChange={(e) => setEditPatient({ ...editPatient, treatment_id: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    >
+                      <option value="">Select treatment</option>
+                      {treatments.map((treatment) => (
+                        <option key={treatment.id} value={treatment.id}>
+                          {treatment.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Assigned Student
+                  </label>
+                  <div className="relative">
+                    <div className="flex">
+                      <input
+                        type="text"
+                        placeholder="Search students..."
+                        value={studentSearchTerm}
+                        onChange={(e) => {
+                          setStudentSearchTerm(e.target.value);
+                          if (!isStudentDropdownOpen) {
+                            setIsStudentDropdownOpen(true);
+                          }
+                        }}
+                        onClick={() => setIsStudentDropdownOpen(true)}
+                        className="w-full p-2 pl-8 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      />
+                      <div className="absolute inset-y-0 left-0 flex items-center pl-2 pointer-events-none">
+                        <Search size={16} className="text-gray-400" />
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setIsStudentDropdownOpen(!isStudentDropdownOpen)}
+                        className="p-2 border border-l-0 rounded-r-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      >
+                        {isStudentDropdownOpen ? <X size={16} /> : <Search size={16} />}
+                      </button>
+                    </div>
+                    
+                    {isStudentDropdownOpen && (
+                      <div className="absolute z-10 w-full mt-1 bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md shadow-lg max-h-60 overflow-y-auto">
+                        {filteredStudents.length > 0 ? (
+                          filteredStudents.map((student) => (
+                            <div
+                              key={student.id}
+                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+                              onClick={() => {
+                                setEditPatient({ ...editPatient, student_id: student.id });
+                                setStudentSearchTerm(student.name);
+                                setIsStudentDropdownOpen(false);
+                              }}
+                            >
+                              {student.name}
+                            </div>
+                          ))
+                        ) : (
+                          <div className="p-2 text-gray-500 dark:text-gray-400">No students found</div>
+                        )}
+                      </div>
+                    )}
+                    
+                    {/* Hidden input to store the selected value */}
+                    <input type="hidden" value={editPatient.student_id} />
+                  </div>
+                </div>
+                
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Tooth Number
+                  </label>
+                  <select
+                    value={editPatient.tooth_number}
+                    onChange={(e) => setEditPatient({ ...editPatient, tooth_number: e.target.value })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  >
+                    <option value="">Select tooth number</option>
+                    <optgroup label="Adult Teeth">
+                      {adultTeeth.map((tooth) => (
+                        <option key={tooth} value={tooth}>
+                          {tooth}
+                        </option>
+                      ))}
+                    </optgroup>
+                    <optgroup label="Pediatric Teeth">
+                      {pediatricTeeth.map((tooth) => (
+                        <option key={tooth} value={tooth}>
+                          {tooth}
+                        </option>
+                      ))}
+                    </optgroup>
+                  </select>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Tooth Class
+                    </label>
+                    <select
+                      value={editPatient.tooth_class_id}
+                      onChange={(e) => setEditPatient({ ...editPatient, tooth_class_id: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    >
+                      <option value="">Select tooth class</option>
+                      {toothClasses.map((toothClass) => (
+                        <option key={toothClass.id} value={toothClass.id}>
+                          {toothClass.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Status
+                    </label>
+                    <select
+                      value={editPatient.status}
+                      onChange={(e) => setEditPatient({ ...editPatient, status: e.target.value as Patient['status'] })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    >
+                      <option value="pending">Pending</option>
+                      <option value="in_progress">In Progress</option>
+                      <option value="completed">Completed</option>
+                      <option value="cancelled">Cancelled</option>
+                    </select>
+                  </div>
+                </div>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Start Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editPatient.start_date || ''}
+                      onChange={(e) => setEditPatient({ ...editPatient, start_date: e.target.value || null })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    />
+                  </div>
+                  
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      End Date
+                    </label>
+                    <input
+                      type="date"
+                      value={editPatient.end_date || ''}
+                      onChange={(e) => setEditPatient({ ...editPatient, end_date: e.target.value || null })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    />
+                  </div>
+                </div>
+                
+                <div className="flex justify-end space-x-3 mt-6">
+                  <button
+                    type="button"
+                    onClick={() => setIsEditModalOpen(false)}
+                    className="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="submit"
+                    className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    Update Patient
+                  </button>
+                </div>
+              </form>
+            </div>
           </div>
         </div>
       )}
 
-      {/* Edit Patient Modal */}
-      {isEditModalOpen && editPatient && (
+      {/* Filter Columns Modal */}
+      {isFilterModalOpen && (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Edit Patient</h2>
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Filter Columns</h2>
               <button
-                onClick={() => setIsEditModalOpen(false)}
+                onClick={() => setIsFilterModalOpen(false)}
                 className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
               >
                 <X className="h-6 w-6" />
               </button>
             </div>
 
-            <form onSubmit={handleEditSubmit} className="space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Ticket Number
+            <div className="space-y-4 max-h-80 overflow-y-auto">
+              {availableColumns.map((column) => (
+                <label key={column.id} className="flex items-center space-x-3">
+                  <input
+                    type="checkbox"
+                    checked={selectedColumns.includes(column.id)}
+                    onChange={(e) => {
+                      if (e.target.checked) {
+                        setSelectedColumns([...selectedColumns, column.id]);
+                      } else {
+                        setSelectedColumns(selectedColumns.filter(c => c !== column.id));
+                      }
+                    }}
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <span className="text-gray-700 dark:text-gray-300">{column.label}</span>
                 </label>
-                <input
-                  type="text"
-                  value={editPatient.ticket_number}
-                  onChange={(e) => setEditPatient({ ...editPatient, ticket_number: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
+              ))}
+            </div>
+
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={() => {
+                  // Select all columns
+                  setSelectedColumns(availableColumns.map(col => col.id));
+                }}
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+              >
+                Select All
+              </button>
+              <button
+                onClick={() => setIsFilterModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Patient Info Modal */}
+      {isInfoModalOpen && selectedPatient && (
+        <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center p-3 z-50 transition-opacity duration-300 overflow-y-auto">
+          <div className="bg-white dark:bg-gray-800 rounded-xl p-4 sm:p-6 w-full max-w-lg mx-2 sm:mx-4 shadow-2xl transform transition-transform duration-300 scale-100 my-4">
+            <div className="flex justify-between items-center border-b dark:border-gray-700 pb-3 mb-4">
+              <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Patient Details</h2>
+              <button
+                onClick={() => setIsInfoModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 p-1 sm:p-2"
+                aria-label="Close"
+              >
+                <X className="h-5 w-5 sm:h-6 sm:w-6" />
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 sm:gap-6 max-h-[60vh] overflow-y-auto pr-1">
+              <div className="space-y-3 sm:space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Ticket Number</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedPatient.ticket_number}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Name</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedPatient.name}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Mobile</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedPatient.mobile || 'N/A'}</p>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class Year</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {classYears.find(cy => cy.id === selectedPatient.class_year_id)?.year_range || 'N/A'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Doctor</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {selectedPatient.student?.name || 'Unassigned'}
+                  </p>
+                </div>
               </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Patient Name
-                </label>
-                <input
-                  type="text"
-                  value={editPatient.name}
-                  onChange={(e) => setEditPatient({ ...editPatient, name: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
-              </div>
+              <div className="space-y-3 sm:space-y-4">
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Treatment</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {treatments.find(t => t.id === selectedPatient.treatment_id)?.name || 'N/A'}
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Assigned Student
-                </label>
-                <select
-                  value={editPatient.student_id}
-                  onChange={(e) => setEditPatient({ ...editPatient, student_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select student</option>
-                  {students.map((student) => (
-                    <option key={student.id} value={student.id}>
-                      {student.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Tooth Number</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedPatient.tooth_number}</p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Treatment
-                </label>
-                <select
-                  value={editPatient.treatment_id}
-                  onChange={(e) => setEditPatient({ ...editPatient, treatment_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select treatment</option>
-                  {treatments.map((treatment) => (
-                    <option key={treatment.id} value={treatment.id}>
-                      {treatment.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Tooth Class</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {toothClasses.find(tc => tc.id === selectedPatient.tooth_class_id)?.name || 'N/A'}
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tooth Number
-                </label>
-                <input
-                  type="text"
-                  value={editPatient.tooth_number}
-                  onChange={(e) => setEditPatient({ ...editPatient, tooth_number: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
-              </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {selectedPatient.start_date ? new Date(selectedPatient.start_date).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Tooth Class
-                </label>
-                <select
-                  value={editPatient.tooth_class_id}
-                  onChange={(e) => setEditPatient({ ...editPatient, tooth_class_id: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                >
-                  <option value="">Select tooth class</option>
-                  {toothClasses.map((toothClass) => (
-                    <option key={toothClass.id} value={toothClass.id}>
-                      {toothClass.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {selectedPatient.end_date ? new Date(selectedPatient.end_date).toLocaleDateString() : 'N/A'}
+                  </p>
+                </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  Start Date
-                </label>
-                <input
-                  type="date"
-                  value={editPatient.start_date ? new Date(editPatient.start_date).toISOString().split('T')[0] : ''}
-                  onChange={(e) => setEditPatient({ ...editPatient, start_date: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Status</label>
+                  <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
+                    selectedPatient.status === 'completed'
+                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                      : selectedPatient.status === 'in_progress'
+                      ? 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
+                      : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                  }`}>
+                    {selectedPatient.status.charAt(0).toUpperCase() + selectedPatient.status.slice(1).replace('_', ' ')}
+                  </span>
+                </div>
               </div>
+            </div>
 
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  End Date
-                </label>
-                <input
-                  type="date"
-                  value={editPatient.end_date ? new Date(editPatient.end_date).toISOString().split('T')[0] : ''}
-                  onChange={(e) => setEditPatient({ ...editPatient, end_date: e.target.value })}
-                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                />
-              </div>
-
-              <div className="flex justify-end space-x-3 mt-6">
-                <button
-                  type="button"
-                  onClick={() => setIsEditModalOpen(false)}
-                  className="px-4 py-2 text-gray-700 bg-gray-100 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
-                >
-                  Save Changes
-                </button>
-              </div>
-            </form>
+            <div className="flex justify-end mt-6 pt-4 border-t dark:border-gray-700">
+              <button
+                onClick={() => setIsInfoModalOpen(false)}
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center text-sm sm:text-base"
+              >
+                Close
+              </button>
+            </div>
           </div>
         </div>
       )}

@@ -39,7 +39,10 @@ export interface Patient {
   id: string;
   ticket_number: string;
   name: string;
+  mobile: string | null;
+  class_year_id: string | null;
   student_id: string;
+  student?: { id: string; name: string };
   treatment_id: string;
   tooth_number: string;
   tooth_class_id: string;
@@ -64,5 +67,6 @@ export interface StudentWithDetails extends Student {
 export interface ClassYear {
   id: string;
   year_range: string;
+  name: string;
   created_at: string;
 }
