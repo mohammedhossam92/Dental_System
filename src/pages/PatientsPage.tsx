@@ -1,4 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
+import { DentalChartPicker } from '../components/DentalChartPicker';
+import PatientTreatmentsList from '../components/PatientTreatmentsList';
+import EditPatientTreatments from '../components/EditPatientTreatments';
 import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Patient, Student, Treatment, ToothClass, ClassYear } from '../types';
@@ -42,17 +45,44 @@ export function PatientsPage() {
   ];
 
   // Initialize state for new patient
+  const getDefaultClassYearId = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const prevYear = currentYear - 1;
+    const range = `${prevYear}-${currentYear}`;
+    const match = classYears.find(cy => cy.year_range === range);
+    return match ? match.id : '';
+  };
+
   const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'>>({
     ticket_number: '',
     name: '',
     mobile: null,
-    class_year_id: '',
+    class_year_id: getDefaultClassYearId(),
     student_id: '',
-    treatment_id: '',
-    tooth_number: '',
-    tooth_class_id: '',
-    status: 'pending'
+    status: 'pending',
+    age: undefined
   });
+
+  const [toothTreatments, setToothTreatments] = useState<{
+    treatment_id: string;
+    tooth_number: string;
+    tooth_class_id: string;
+  }[]>([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
+
+  // Modal state for dental chart picker per treatment row
+  const [toothChartModal, setToothChartModal] = useState<{ open: boolean; idx: number | null }>({ open: false, idx: null });
+
+  const addToothTreatment = () => {
+    if (window.confirm('Are you sure to add new tooth treatment to the same patient?')) {
+      setToothTreatments([...toothTreatments, { treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
+    }
+  };
+
+  const updateToothTreatment = (idx: number, field: string, value: string) => {
+    setToothTreatments(tts => tts.map((tt, i) => i === idx ? { ...tt, [field]: value } : tt));
+  };
+
 
   const adultTeeth = [
     '11','12','13','14','15','16','17','18',
@@ -110,65 +140,80 @@ export function PatientsPage() {
     e.preventDefault();
     setError('');
 
-    if (!newPatient.ticket_number || !newPatient.name || !newPatient.class_year_id ||
-        !newPatient.student_id || !newPatient.treatment_id || !newPatient.tooth_number || !newPatient.tooth_class_id) {
+    if (!newPatient.ticket_number || !newPatient.name || !newPatient.class_year_id || !newPatient.student_id) {
       setError('Please fill in all required fields');
       return;
     }
-
-    // Validate mobile number if provided
+    // Only require tooth_number if mode is adult; for pediatric, allow empty tooth_number
+    if (toothTreatments.some(tt => !tt.treatment_id || !tt.tooth_class_id || (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric'))) {
+      setError('Please fill in all tooth treatment fields');
+      return;
+    }
     if (newPatient.mobile && newPatient.mobile.length !== 11) {
       setError('Mobile number must be exactly 11 digits');
       return;
     }
-
-    // Check if ticket number is unique
     const { data: existingTicket, error: ticketError } = await supabase
       .from('patients')
       .select('id')
       .eq('ticket_number', newPatient.ticket_number)
       .maybeSingle();
-
     if (ticketError) {
       console.error('Error checking ticket number:', ticketError);
       setError('Failed to check ticket number');
       return;
     }
-
     if (existingTicket) {
       setError('Ticket number already exists');
       return;
     }
-
     try {
       // Insert the new patient
-      const { error: insertError } = await supabase
+      // Use the first tooth treatment for the main patient fields
+      const mainTreatment = toothTreatments[0];
+      const { data: patientInsertData, error: insertError } = await supabase
         .from('patients')
-        .insert([newPatient]);
-
+        .insert([{
+          ...newPatient,
+          age: newPatient.age ?? null,
+          treatment_id: mainTreatment.treatment_id,
+          tooth_number: mainTreatment.tooth_number,
+          tooth_class_id: mainTreatment.tooth_class_id
+        }])
+        .select('id')
+        .maybeSingle();
       if (insertError) throw insertError;
-
+      const patientId = patientInsertData?.id;
+      // Insert tooth treatments
+      for (const tt of toothTreatments) {
+        const { error: ttError } = await supabase
+          .from('patient_tooth_treatments')
+          .insert({
+            patient_id: patientId,
+            treatment_id: tt.treatment_id,
+            tooth_number: tt.tooth_number,
+            tooth_class_id: tt.tooth_class_id
+          });
+        if (ttError) throw ttError;
+      }
       // Update the student's availability status
       const { error: updateError } = await supabase
         .from('students')
         .update({ is_available: false })
         .eq('id', newPatient.student_id);
-
       if (updateError) throw updateError;
-
       fetchData();
       setIsModalOpen(false);
       setNewPatient({
         ticket_number: '',
         name: '',
         mobile: null,
-        class_year_id: '',
+        class_year_id: getDefaultClassYearId(),
         student_id: '',
-        treatment_id: '',
-        tooth_number: '',
-        tooth_class_id: '',
-        status: 'pending'
+        status: 'pending',
+        age: undefined
       });
+      setToothTreatments([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
       setSelectedClassYear('');
       setStudentSearchTerm('');
     } catch (error) {
@@ -248,6 +293,14 @@ export function PatientsPage() {
         .eq('id', editPatient.id);
 
       if (error) throw error;
+
+      // If status changed from 'completed' to 'in_progress', set the assigned student as busy again
+      if (editPatient.status === 'in_progress' && previousStatus === 'completed' && editPatient.student_id) {
+        await supabase
+          .from('students')
+          .update({ is_available: false })
+          .eq('id', editPatient.student_id);
+      }
 
       setIsEditModalOpen(false);
       fetchData(); // Refresh the data
@@ -671,69 +724,69 @@ export function PatientsPage() {
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Treatment
+                {/* Tooth Treatments Section */}
+                <div className="space-y-4">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Tooth Treatments
                   </label>
-                  <select
-                    value={newPatient.treatment_id}
-                    onChange={(e) => setNewPatient({ ...newPatient, treatment_id: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                  {toothTreatments.map((tt, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-3 gap-4 items-end">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Treatment</label>
+                        <select
+                          value={tt.treatment_id}
+                          onChange={e => updateToothTreatment(idx, 'treatment_id', e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                        >
+                          <option value="">Select treatment</option>
+                          {treatments.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tooth Number</label>
+<button
+  type="button"
+  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-white hover:bg-indigo-50 dark:hover:bg-indigo-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+  onClick={() => setToothChartModal({ open: true, idx })}
+>
+  {tt.tooth_number ? `Tooth: ${tt.tooth_number}` : 'Select tooth number'}
+</button>
+{toothChartModal.open && toothChartModal.idx === idx && (
+  <DentalChartPicker
+    open={toothChartModal.open}
+    onClose={() => setToothChartModal({ open: false, idx: null })}
+    onSelect={tooth => {
+      updateToothTreatment(idx, 'tooth_number', tooth);
+      setToothChartModal({ open: false, idx: null });
+    }}
+  />
+)}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tooth Class</label>
+                        <select
+                          value={tt.tooth_class_id}
+                          onChange={e => updateToothTreatment(idx, 'tooth_class_id', e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                        >
+                          <option value="">Select tooth class</option>
+                          {toothClasses.map(tc => (
+                            <option key={tc.id} value={tc.id}>{tc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    className="mt-2 flex items-center text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-200 font-medium"
+                    onClick={addToothTreatment}
                   >
-                    <option value="">Select treatment</option>
-                    {treatments.map((treatment) => (
-                      <option key={treatment.id} value={treatment.id}>
-                        {treatment.name}
-                      </option>
-                    ))}
-                  </select>
+                    <Plus className="h-5 w-5 mr-1" /> Add Tooth Treatment
+                  </button>
                 </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Tooth Class
-                  </label>
-                  <select
-                    value={newPatient.tooth_class_id}
-                    onChange={(e) => setNewPatient({ ...newPatient, tooth_class_id: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                  >
-                    <option value="">Select tooth class</option>
-                    {toothClasses.map((toothClass) => (
-                      <option key={toothClass.id} value={toothClass.id}>
-                        {toothClass.name}
-                      </option>
-                    ))}
-                  </select>
-                </div>
-                
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Tooth Number
-                  </label>
-                  <select
-                    value={newPatient.tooth_number}
-                    onChange={(e) => setNewPatient({ ...newPatient, tooth_number: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                  >
-                    <option value="">Select tooth number</option>
-                    <optgroup label="Adult Teeth">
-                      {adultTeeth.map((tooth) => (
-                        <option key={tooth} value={tooth}>
-                          {tooth}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Pediatric Teeth">
-                      {pediatricTeeth.map((tooth) => (
-                        <option key={tooth} value={tooth}>
-                          {tooth}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
-                
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
@@ -900,32 +953,7 @@ export function PatientsPage() {
                   </div>
                 </div>
                 
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Tooth Number
-                  </label>
-                  <select
-                    value={editPatient.tooth_number}
-                    onChange={(e) => setEditPatient({ ...editPatient, tooth_number: e.target.value })}
-                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                  >
-                    <option value="">Select tooth number</option>
-                    <optgroup label="Adult Teeth">
-                      {adultTeeth.map((tooth) => (
-                        <option key={tooth} value={tooth}>
-                          {tooth}
-                        </option>
-                      ))}
-                    </optgroup>
-                    <optgroup label="Pediatric Teeth">
-                      {pediatricTeeth.map((tooth) => (
-                        <option key={tooth} value={tooth}>
-                          {tooth}
-                        </option>
-                      ))}
-                    </optgroup>
-                  </select>
-                </div>
+
                 
                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                   <div>
@@ -989,6 +1017,12 @@ export function PatientsPage() {
                   </div>
                 </div>
                 
+                <div className="my-6">
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">Edit Treatments &amp; Teeth</label>
+                  {editPatient?.id && (
+                    <EditPatientTreatments patientId={editPatient.id} treatments={treatments} toothClasses={toothClasses} onChange={fetchData} />
+                  )}
+                </div>
                 <div className="flex justify-end space-x-3 mt-6">
                   <button
                     type="button"
@@ -1159,6 +1193,11 @@ export function PatientsPage() {
                   </span>
                 </div>
               </div>
+            </div>
+
+            <div className="mt-6">
+              <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-2">All Treatments &amp; Teeth</label>
+              <PatientTreatmentsList patientId={selectedPatient.id} treatments={treatments} toothClasses={toothClasses} />
             </div>
 
             <div className="flex justify-end mt-6 pt-4 border-t dark:border-gray-700">

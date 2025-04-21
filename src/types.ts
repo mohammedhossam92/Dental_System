@@ -43,12 +43,18 @@ export interface Patient {
   class_year_id: string | null;
   student_id: string;
   student?: { id: string; name: string };
-  treatment_id: string;
-  tooth_number: string;
-  tooth_class_id: string;
   start_date: string | null;
   end_date: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
+  created_at: string;
+}
+
+export interface PatientToothTreatment {
+  id: string;
+  patient_id: string;
+  treatment_id: string;
+  tooth_number: string;
+  tooth_class_id: string;
   created_at: string;
 }
 
