@@ -71,9 +71,15 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             <span className="truncate w-1/2 text-left">{quadrantLabels[0]}</span>
             <span className="truncate w-1/2 text-right">{quadrantLabels[1]}</span>
           </div>
-          <div className={`flex justify-center ${mode === 'adult' ? 'gap-0.5' : 'gap-2'} sm:gap-8 mt-1 w-full`}>
-            {/* Quadrant 1: UR (center to right) */}
-            <div className={`flex flex-row-reverse ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
+          <div
+            className={`w-full ${mode === 'adult' ? 'overflow-x-auto min-w-0' : ''}`}
+            style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
+          >
+            <div
+              className={`flex justify-center ${mode === 'adult' ? 'gap-0.5 min-w-[500px]' : 'gap-2'} sm:gap-8 mt-1`}
+            >
+              {/* Quadrant 1: UR (center to right) */}
+              <div className={`flex flex-row-reverse ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
               {quadrants[0].map(tooth => (
                 <button
                   key={tooth}
@@ -116,10 +122,15 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             <span className="truncate w-1/2 text-left">{quadrantLabels[2]}</span>
             <span className="truncate w-1/2 text-right">{quadrantLabels[3]}</span>
           </div>
-          {/* Lower arch: center is 31 (LL) and 41 (LR) for adults, 71 and 81 for pediatric */}
-          <div className={`flex justify-center ${mode === 'adult' ? 'gap-0.5' : 'gap-2'} sm:gap-8 mt-1 w-full`}>
-            {/* Quadrant 4: LR (center to right, e.g. 41/81 at center) */}
-            <div className={`flex ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
+          <div
+            className={`w-full ${mode === 'adult' ? 'overflow-x-auto min-w-0' : ''}`}
+            style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
+          >
+            <div
+              className={`flex justify-center ${mode === 'adult' ? 'gap-0.5 min-w-[500px]' : 'gap-2'} sm:gap-8 mt-1`}
+            >
+              {/* Quadrant 4: LR (center to right, e.g. 41/81 at center) */}
+              <div className={`flex ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
               {/* For adult, center 41, then 42-48 to the right, 48 at far right. For pediatric, 81 at center. */}
               {mode === 'adult'
                 ? quadrants[3].slice().reverse().map(tooth => (
@@ -164,7 +175,9 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
                   {tooth}
                 </button>
               ))}
-            </div>
+            </div> {/* END Quadrant 3 */}
+          </div> {/* END inner flex justify-center ... */}
+        </div> {/* END scrollable wrapper for bottom arch */}
           </div>
         </div>
       </div>
