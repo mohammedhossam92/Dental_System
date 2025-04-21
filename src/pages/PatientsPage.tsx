@@ -82,7 +82,7 @@ export function PatientsPage() {
         classYearsResult
       ] = await Promise.all([
         supabase.from('patients').select('*, student:student_id(id, name)'),
-        supabase.from('students').select('*').eq('is_available', true),
+        supabase.from('students').select('*').eq('is_available', true).eq('registration_status', 'registered'),
         supabase.from('treatments').select('*'),
         supabase.from('tooth_classes').select('*'),
         supabase.from('class_years').select('*')
