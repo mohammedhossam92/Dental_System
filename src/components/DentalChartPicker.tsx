@@ -76,39 +76,85 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
           >
             <div
-              className={`flex justify-center ${mode === 'adult' ? 'gap-0.5 min-w-[500px]' : 'gap-2'} sm:gap-8 mt-1`}
+              className={`flex justify-center gap-2 sm:gap-2 mt-1`}
             >
               {/* Quadrant 1: UR (center to right) */}
-              <div className={`flex flex-row-reverse ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
-              {quadrants[0].map(tooth => (
-                <button
-                  key={tooth}
-                  className={`
-  ${mode === 'adult' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}
-  sm:w-10 sm:h-10 sm:text-lg
-  bg-gray-100 dark:bg-gray-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center
-`}
-                  onClick={() => { onSelect(tooth); onClose(); }}
-                >
-                  {tooth}
-                </button>
-              ))}
+              <div className="relative flex flex-row-reverse gap-2 sm:gap-2 items-center h-10 sm:h-12">
+              {quadrants[0].map((tooth, idx, arr) => {
+  let color = '';
+  const n = Number(tooth);
+  if (n >= 11 && n <= 18) color = 'bg-blue-200 dark:bg-blue-700';
+  else if (n >= 21 && n <= 28) color = 'bg-green-200 dark:bg-green-700';
+  else if (n >= 31 && n <= 38) color = 'bg-pink-200 dark:bg-pink-700';
+  else if (n >= 41 && n <= 48) color = 'bg-purple-200 dark:bg-purple-700';
+  else if (n >= 51 && n <= 55) color = 'bg-yellow-200 dark:bg-yellow-600';
+  else if (n >= 61 && n <= 65) color = 'bg-orange-200 dark:bg-orange-600';
+  else if (n >= 71 && n <= 75) color = 'bg-teal-200 dark:bg-teal-700';
+  else if (n >= 81 && n <= 85) color = 'bg-red-200 dark:bg-red-700';
+  // Quadrant 1: UR (blue)
+
+  // Insert gap after 11 if next is 21 (UR to UL center)
+  if (mode === 'adult' && tooth === 11 && arr[idx + 1] === 21) {
+    return [
+      <button
+        key={tooth}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+        onClick={() => { onSelect(tooth); onClose(); }}
+      >
+        {tooth}
+      </button>,
+      <div key="gap-11-21" className="border-l-2 border-white h-8 sm:h-12 mx-2 flex-shrink-0" />
+    ];
+  }
+  return (
+    <button
+      key={tooth}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+      onClick={() => { onSelect(tooth); onClose(); }}
+    >
+      {tooth}
+    </button>
+  );
+})}
             </div>
             {/* Quadrant 2: UL (center to left) */}
-            <div className={`flex ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
-              {quadrants[1].map(tooth => (
-                <button
-                  key={tooth}
-                  className={`
-  ${mode === 'adult' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}
-  sm:w-10 sm:h-10 sm:text-lg
-  bg-gray-100 dark:bg-gray-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center
-`}
-                  onClick={() => { onSelect(tooth); onClose(); }}
-                >
-                  {tooth}
-                </button>
-              ))}
+            <div className={`flex gap-2 sm:gap-2`}>
+              {quadrants[1].map((tooth, idx, arr) => {
+  let color = '';
+  const n = Number(tooth);
+  if (n >= 11 && n <= 18) color = 'bg-blue-200 dark:bg-blue-700';
+  else if (n >= 21 && n <= 28) color = 'bg-green-200 dark:bg-green-700';
+  else if (n >= 31 && n <= 38) color = 'bg-pink-200 dark:bg-pink-700';
+  else if (n >= 41 && n <= 48) color = 'bg-purple-200 dark:bg-purple-700';
+  else if (n >= 51 && n <= 55) color = 'bg-yellow-200 dark:bg-yellow-600';
+  else if (n >= 61 && n <= 65) color = 'bg-orange-200 dark:bg-orange-600';
+  else if (n >= 71 && n <= 75) color = 'bg-teal-200 dark:bg-teal-700';
+  else if (n >= 81 && n <= 85) color = 'bg-red-200 dark:bg-red-700';
+  // Quadrant 2: UL (green)
+
+  // Insert gap after 21 if previous was 11 (UL after UR)
+  if (mode === 'adult' && tooth === 21 && arr[idx - 1] === 11) {
+    return [
+      <div key="gap-11-21" className="border-l-2 border-white h-8 sm:h-12 mx-2 flex-shrink-0" />,
+      <button
+        key={tooth}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+        onClick={() => { onSelect(tooth); onClose(); }}
+      >
+        {tooth}
+      </button>
+    ];
+  }
+  return (
+    <button
+      key={tooth}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+      onClick={() => { onSelect(tooth); onClose(); }}
+    >
+      {tooth}
+    </button>
+  );
+})}
             </div>
           </div>
         </div>
@@ -127,54 +173,109 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
           >
             <div
-              className={`flex justify-center ${mode === 'adult' ? 'gap-0.5 min-w-[500px]' : 'gap-2'} sm:gap-8 mt-1`}
+              className={`flex justify-center gap-2 sm:gap-2 mt-1`}
             >
               {/* Quadrant 4: LR (center to right, e.g. 41/81 at center) */}
-              <div className={`flex ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
+              <div className={`flex gap-2 sm:gap-2`}>
               {/* For adult, center 41, then 42-48 to the right, 48 at far right. For pediatric, 81 at center. */}
               {mode === 'adult'
-                ? quadrants[3].slice().reverse().map(tooth => (
-                    <button
-                      key={tooth}
-                      className={`
-  ${mode === 'adult' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}
-  sm:w-10 sm:h-10 sm:text-lg
-  bg-gray-100 dark:bg-gray-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center
-`}
-                      onClick={() => { onSelect(tooth); onClose(); }}
-                    >
-                      {tooth}
-                    </button>
-                  ))
-                : quadrants[3].slice().reverse().map(tooth => (
-                    <button
-                      key={tooth}
-                      className={`
-  ${mode === 'adult' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}
-  sm:w-10 sm:h-10 sm:text-lg
-  bg-gray-100 dark:bg-gray-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center
-`}
-                      onClick={() => { onSelect(tooth); onClose(); }}
-                    >
-                      {tooth}
-                    </button>
-                  ))}
+                 ? quadrants[3].slice().reverse().map((tooth, idx, arr) => {
+  let color = '';
+  const n = Number(tooth);
+  if (n >= 11 && n <= 18) color = 'bg-blue-200 dark:bg-blue-700';
+  else if (n >= 21 && n <= 28) color = 'bg-green-200 dark:bg-green-700';
+  else if (n >= 31 && n <= 38) color = 'bg-pink-200 dark:bg-pink-700';
+  else if (n >= 41 && n <= 48) color = 'bg-purple-200 dark:bg-purple-700';
+  else if (n >= 51 && n <= 55) color = 'bg-yellow-200 dark:bg-yellow-600';
+  else if (n >= 61 && n <= 65) color = 'bg-orange-200 dark:bg-orange-600';
+  else if (n >= 71 && n <= 75) color = 'bg-teal-200 dark:bg-teal-700';
+  else if (n >= 81 && n <= 85) color = 'bg-red-200 dark:bg-red-700';
+  // Quadrant 4: LR (purple)
+
+                     // Insert gap after 41 if next is 31 (LR to LL center)
+                     if (tooth === 41 && arr[idx + 1] === 31) {
+                       return [
+                         <button
+                           key={tooth}
+                           className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg bg-purple-100 dark:bg-purple-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center`}
+                           onClick={() => { onSelect(tooth); onClose(); }}
+                         >
+                           {tooth}
+                         </button>,
+                         <div key="gap-41-31" className="border-l-2 border-white h-8 sm:h-12 mx-2 flex-shrink-0" />
+                       ];
+                     }
+                     return (
+                       <button
+                         key={tooth}
+                         className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+                         onClick={() => { onSelect(tooth); onClose(); }}
+                       >
+                         {tooth}
+                       </button>
+                     );
+                   })
+                 : quadrants[3].slice().reverse().map(tooth => {
+                    let color = '';
+                    const n = Number(tooth);
+                    if (n >= 11 && n <= 18) color = 'bg-blue-200 dark:bg-blue-700';
+                    else if (n >= 21 && n <= 28) color = 'bg-green-200 dark:bg-green-700';
+                    else if (n >= 31 && n <= 38) color = 'bg-pink-200 dark:bg-pink-700';
+                    else if (n >= 41 && n <= 48) color = 'bg-purple-200 dark:bg-purple-700';
+                    else if (n >= 51 && n <= 55) color = 'bg-yellow-200 dark:bg-yellow-600';
+                    else if (n >= 61 && n <= 65) color = 'bg-orange-200 dark:bg-orange-600';
+                    else if (n >= 71 && n <= 75) color = 'bg-teal-200 dark:bg-teal-700';
+                    else if (n >= 81 && n <= 85) color = 'bg-red-200 dark:bg-red-700';
+                    return (
+                      <button
+                        key={tooth}
+                        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+                        onClick={() => { onSelect(tooth); onClose(); }}
+                      >
+                        {tooth}
+                      </button>
+                    );
+                  })}
             </div>
             {/* Quadrant 3: LL (center to left, e.g. 31/71 at center) */}
-            <div className={`flex ${mode === 'adult' ? 'gap-0' : 'gap-0.5'} sm:gap-1`}>
-              {quadrants[2].map(tooth => (
-                <button
-                  key={tooth}
-                  className={`
-  ${mode === 'adult' ? 'w-6 h-6 text-[10px]' : 'w-8 h-8 text-xs'}
-  sm:w-10 sm:h-10 sm:text-lg
-  bg-gray-100 dark:bg-gray-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center
-`}
-                  onClick={() => { onSelect(tooth); onClose(); }}
-                >
-                  {tooth}
-                </button>
-              ))}
+            <div className={`flex gap-2 sm:gap-2`}>
+              
+{quadrants[2].map((tooth, idx, arr) => {
+  let color = '';
+  const n = Number(tooth);
+  if (n >= 11 && n <= 18) color = 'bg-blue-200 dark:bg-blue-700';
+  else if (n >= 21 && n <= 28) color = 'bg-green-200 dark:bg-green-700';
+  else if (n >= 31 && n <= 38) color = 'bg-pink-200 dark:bg-pink-700';
+  else if (n >= 41 && n <= 48) color = 'bg-purple-200 dark:bg-purple-700';
+  else if (n >= 51 && n <= 55) color = 'bg-yellow-200 dark:bg-yellow-600';
+  else if (n >= 61 && n <= 65) color = 'bg-orange-200 dark:bg-orange-600';
+  else if (n >= 71 && n <= 75) color = 'bg-teal-200 dark:bg-teal-700';
+  else if (n >= 81 && n <= 85) color = 'bg-red-200 dark:bg-red-700';
+  // Quadrant 3: LL (pink)
+
+  // Insert gap after 31 if next is 41 (LL to LR center)
+  if (mode === 'adult' && tooth === 31 && arr[idx + 1] === 41) {
+    return [
+      <button
+        key={tooth}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+        onClick={() => { onSelect(tooth); onClose(); }}
+      >
+        {tooth}
+      </button>,
+      
+    ];
+  }
+  return (
+    <button
+      key={tooth}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
+      onClick={() => { onSelect(tooth); onClose(); }}
+    >
+      {tooth}
+    </button>
+  );
+})}
             </div> {/* END Quadrant 3 */}
           </div> {/* END inner flex justify-center ... */}
         </div> {/* END scrollable wrapper for bottom arch */}
