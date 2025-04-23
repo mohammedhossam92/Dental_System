@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useCallback } from 'react';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
+import Swal from 'sweetalert2';
 
 export function StudentsPage() {
   const { organizationId } = useAuth();
@@ -27,7 +28,7 @@ export function StudentsPage() {
     'name', 'mobile', 'university', 'city', 'working_days', 'status', 'registration'
   ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
-  
+
   // New state for sorting and filtering
   const [sortConfig, setSortConfig] = useState<{column: string | null, direction: 'asc' | 'desc' | null}>({
     column: null,
@@ -156,20 +157,20 @@ export function StudentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
-    
+
     // Validate name has at least 4 words
     const nameWords = newStudent.name.trim().split(/\s+/);
     if (nameWords.length < 4) {
       setError('Name must contain at least 4 words');
       return;
     }
-    
+
     // Validate mobile number is exactly 11 digits
     if (!/^\d{11}$/.test(newStudent.mobile)) {
       setError('Mobile number must be exactly 11 digits');
       return;
     }
-    
+
     // Check if mobile number is unique (for new students)
     if (!isEditMode) {
       const { data: existingMobile } = await supabase
@@ -178,13 +179,13 @@ export function StudentsPage() {
         .eq('mobile', newStudent.mobile)
         .eq('organization_id', organizationId)
         .maybeSingle();
-        
+
       if (existingMobile) {
         setError('Mobile number already exists');
         return;
       }
     }
-    
+
     // Continue with the rest of the function
     if (!organizationId) {
       setError('Organization not found');
@@ -294,8 +295,146 @@ export function StudentsPage() {
     setError('');
   }
 
-  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  // Add function to generate and download Excel template
+  const downloadExcelTemplate = async () => {
+    try {
+      // Fetch working days and class years for dropdown options
+      const [workingDaysResult, classYearsResult] = await Promise.all([
+        supabase
+          .from('working_days')
+          .select('id, name')
+          .eq('organization_id', organizationId)
+          .order('name', { ascending: true }),
+        supabase
+          .from('class_years')
+          .select('id, year_range')
+          .eq('organization_id', organizationId)
+          .order('year_range', { ascending: true })
+      ]);
+
+      if (workingDaysResult.error) throw workingDaysResult.error;
+      if (classYearsResult.error) throw classYearsResult.error;
+
+      const workingDaysList = workingDaysResult.data || [];
+      const classYearsList = classYearsResult.data || [];
+
+      if (workingDaysList.length === 0) {
+        Swal.fire({
+          title: 'Error!',
+          text: 'No working days found. Please create working days first.',
+          icon: 'error',
+          confirmButtonColor: '#4f46e5'
+        });
+        return;
+      }
+
+      // Create worksheet with headers
+      const headers = [
+        "Name",
+        "Mobile",
+        "City",
+        "University",
+        "University Type",
+        "Working Days",
+        "Class Year",
+        "Registration Status"
+      ];
+
+      // Create example row to guide users
+      const exampleRow = [
+        "John Doe Smith",
+        "01234567890",
+        "Cairo",
+        "Cairo University",
+        "حكومي",
+        workingDaysList[0]?.name || "",
+        classYearsList[0]?.year_range || "",
+        "registered"
+      ];
+
+      const wsData = [headers, exampleRow];
+
+      // Create workbook and worksheet
+      const wb = XLSX.utils.book_new();
+      const ws = XLSX.utils.aoa_to_sheet(wsData);
+
+      // Set column widths
+      const columnWidths = [
+        { wch: 30 }, // Name
+        { wch: 15 }, // Mobile
+        { wch: 15 }, // City
+        { wch: 25 }, // University
+        { wch: 15 }, // University Type
+        { wch: 20 }, // Working Days
+        { wch: 15 }, // Class Year
+        { wch: 15 }  // Registration Status
+      ];
+      ws['!cols'] = columnWidths;
+
+      // Note: XLSX.js doesn't directly support data validation in the browser
+      // The template will be structured but won't have dropdown validation
+      // The values will be documented in the example row
+
+      // Add the worksheet to the workbook
+      XLSX.utils.book_append_sheet(wb, ws, "Students Template");
+
+      // Generate Excel file
+      const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+
+      // Create blob and download
+      const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = 'students_template.xlsx';
+      link.click();
+
+      // Clean up
+      URL.revokeObjectURL(url);
+
+    } catch (error) {
+      console.error('Error creating Excel template:', error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to generate Excel template',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5'
+      });
+    }
+  };
+
+  // Add state for import dropdown
+  const [showImportDropdown, setShowImportDropdown] = useState(false);
+
+  // Modify the file upload handler to have an option for adding without replacing
+  async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>, shouldReplace: boolean = true) {
     if (!event.target.files?.[0]) return;
+
+    const file = event.target.files[0];
+
+    // Check file extension
+    const fileExtension = file.name.split('.').pop()?.toLowerCase();
+    if (fileExtension !== 'xlsx' && fileExtension !== 'xls') {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Please upload a valid Excel file (.xlsx or .xls)',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5'
+      });
+      event.target.value = '';
+      return;
+    }
+
+    // Show loading state
+    Swal.fire({
+      title: 'Importing...',
+      text: 'Please wait while we import the students',
+      allowOutsideClick: false,
+      showConfirmButton: false,
+      willOpen: () => {
+        Swal.showLoading();
+      }
+    });
 
     const reader = new FileReader();
     reader.onload = async (e) => {
@@ -306,50 +445,211 @@ export function StudentsPage() {
         const worksheet = workbook.Sheets[sheetName];
         const rows = XLSX.utils.sheet_to_json(worksheet) as Record<string, string>[];
 
+        // Validate if excel has required columns
+        const requiredColumns = ['Name', 'Mobile', 'City', 'University'];
+        const firstRow = rows[0];
+        const missingColumns = requiredColumns.filter(col => !(col in firstRow));
+
+        if (missingColumns.length > 0) {
+          Swal.fire({
+            title: 'Error!',
+            text: `Excel file is missing required columns: ${missingColumns.join(', ')}`,
+            icon: 'error',
+            confirmButtonColor: '#4f46e5'
+          });
+          event.target.value = '';
+          return;
+        }
+
         if (!organizationId) {
-          setError('Organization not found');
+          Swal.fire({
+            title: 'Error!',
+            text: 'Organization not found',
+            icon: 'error',
+            confirmButtonColor: '#4f46e5'
+          });
           return;
         }
 
-        // Get default working days
-        const { data: workingDaysData } = await supabase
-          .from('working_days')
-          .select('*')
-          .eq('organization_id', organizationId)
-          .limit(1);
+        // Fetch working days and class years for mapping
+        const [workingDaysResult, classYearsResult] = await Promise.all([
+          supabase.from('working_days').select('id, name').eq('organization_id', organizationId),
+          supabase.from('class_years').select('id, year_range').eq('organization_id', organizationId)
+        ]);
 
-        if (!workingDaysData?.length) {
-          setError('No working days found. Please create working days first.');
-          return;
+        if (workingDaysResult.error) throw workingDaysResult.error;
+        if (classYearsResult.error) throw classYearsResult.error;
+
+        const workingDaysMap = new Map(workingDaysResult.data.map(wd => [wd.name, wd.id]));
+        const classYearsMap = new Map(classYearsResult.data.map(cy => [cy.year_range, cy.id]));
+
+        // Prepare students data
+        const students = rows.map(row => {
+          const workingDaysName = row['Working Days'] || '';
+          const workingDaysId = workingDaysMap.get(workingDaysName) || workingDaysResult.data[0]?.id || '';
+
+          const classYearName = row['Class Year'] || '';
+          const classYearId = classYearsMap.get(classYearName) || '';
+
+          return {
+            name: row['Name'] || '',
+            mobile: row['Mobile'] || '',
+            city: row['City'] || '',
+            university: row['University'] || '',
+            university_type: row['University Type'] || 'حكومي',
+            working_days_id: workingDaysId,
+            class_year_id: classYearId,
+            organization_id: organizationId,
+            registration_status: row['Registration Status'] || 'registered',
+            registration_end_date: null
+          };
+        });
+
+        // Validate students data
+        const invalidStudents = students.filter(student =>
+          !student.name ||
+          !student.mobile ||
+          !student.city ||
+          !student.university ||
+          !student.working_days_id
+        );
+
+        if (invalidStudents.length > 0) {
+          Swal.fire({
+            title: 'Warning!',
+            text: `${invalidStudents.length} students have missing required fields and will be skipped.`,
+            icon: 'warning',
+            confirmButtonColor: '#4f46e5'
+          });
+
+          // Filter out invalid students
+          const validStudents = students.filter(student =>
+            student.name &&
+            student.mobile &&
+            student.city &&
+            student.university &&
+            student.working_days_id
+          );
+
+          if (validStudents.length === 0) {
+            event.target.value = '';
+            return;
+          }
+
+          if (shouldReplace) {
+            // Confirm before replacing all students
+            const confirmResult = await Swal.fire({
+              title: 'Replace Existing Students?',
+              text: 'This will replace all existing students. Are you sure you want to continue?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#3085d6',
+              cancelButtonColor: '#d33',
+              confirmButtonText: 'Yes, replace them!'
+            });
+
+            if (!confirmResult.isConfirmed) {
+              event.target.value = '';
+              return;
+            }
+
+            // Delete all existing students
+            const { error: deleteError } = await supabase
+              .from('students')
+              .delete()
+              .eq('organization_id', organizationId);
+
+            if (deleteError) throw deleteError;
+          }
+
+          // Insert valid students
+          const { error } = await supabase
+            .from('students')
+            .insert(validStudents);
+
+          if (error) throw error;
+
+          memoizedFetchData();
+          event.target.value = '';
+
+          Swal.fire({
+            title: 'Success!',
+            text: `Successfully ${shouldReplace ? 'replaced all students with' : 'added'} ${validStudents.length} students.`,
+            icon: 'success',
+            confirmButtonColor: '#4f46e5',
+            timer: 2000
+          });
+        } else {
+          if (shouldReplace) {
+            // Confirm before replacing all students
+            const confirmResult = await Swal.fire({
+              title: 'Replace Existing Students?',
+              text: 'This will replace all existing students. Are you sure you want to continue?',
+              icon: 'warning',
+              showCancelButton: true,
+              confirmButtonColor: '#3085d6',
+              cancelButtonColor: '#d33',
+              confirmButtonText: 'Yes, replace them!'
+            });
+
+            if (!confirmResult.isConfirmed) {
+              event.target.value = '';
+              return;
+            }
+
+            // Delete all existing students
+            const { error: deleteError } = await supabase
+              .from('students')
+              .delete()
+              .eq('organization_id', organizationId);
+
+            if (deleteError) throw deleteError;
+          }
+
+          // Insert all students
+          const { error } = await supabase
+            .from('students')
+            .insert(students);
+
+          if (error) throw error;
+
+          memoizedFetchData();
+          event.target.value = '';
+
+          Swal.fire({
+            title: 'Success!',
+            text: `Successfully ${shouldReplace ? 'replaced all students with' : 'added'} ${students.length} students.`,
+            icon: 'success',
+            confirmButtonColor: '#4f46e5',
+            timer: 2000
+          });
         }
-
-        const students = rows.map(row => ({
-          name: row['Name'] || '',
-          mobile: row['Mobile'] || '',
-          city: row['City'] || '',
-          university: row['University'] || '',
-          working_days_id: workingDaysData[0].id,
-          organization_id: organizationId,
-          registration_status: 'pending' as const,
-          class_year_id: null,
-          registration_end_date: null
-        }));
-
-        const { error } = await supabase
-          .from('students')
-          .insert(students);
-
-        if (error) throw error;
-
-        memoizedFetchData();
-        event.target.value = '';
       } catch (error) {
         console.error('Error importing students:', error);
-        setError('Failed to import students');
+
+        Swal.fire({
+          title: 'Error!',
+          text: 'Failed to import students. Please check the file format and try again.',
+          icon: 'error',
+          confirmButtonColor: '#4f46e5'
+        });
+
+        event.target.value = '';
       }
     };
 
-    reader.readAsArrayBuffer(event.target.files[0]);
+    reader.onerror = () => {
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to read the file. Please try again.',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5'
+      });
+
+      event.target.value = '';
+    };
+
+    reader.readAsArrayBuffer(file);
   }
 
   function handleSearch(e: React.ChangeEvent<HTMLInputElement>) {
@@ -364,7 +664,7 @@ export function StudentsPage() {
   // Function to handle sorting
   const handleSort = (column: string) => {
     let direction: 'asc' | 'desc' | null = 'asc';
-    
+
     if (sortConfig.column === column) {
       if (sortConfig.direction === 'asc') {
         direction = 'desc';
@@ -372,7 +672,7 @@ export function StudentsPage() {
         direction = null;
       }
     }
-    
+
     setSortConfig({ column, direction });
   };
 
@@ -399,7 +699,7 @@ export function StudentsPage() {
   // Filtered universities based on search term
   const filteredUniversities = React.useMemo(() => {
     if (!universitySearchTerm) return uniqueUniversities;
-    return uniqueUniversities.filter(university => 
+    return uniqueUniversities.filter(university =>
       university.toLowerCase().includes(universitySearchTerm.toLowerCase())
     );
   }, [uniqueUniversities, universitySearchTerm]);
@@ -407,7 +707,7 @@ export function StudentsPage() {
   // Filtered cities based on search term
   const filteredCities = React.useMemo(() => {
     if (!citySearchTerm) return uniqueCities;
-    return uniqueCities.filter(city => 
+    return uniqueCities.filter(city =>
       city.toLowerCase().includes(citySearchTerm.toLowerCase())
     );
   }, [uniqueCities, citySearchTerm]);
@@ -415,19 +715,19 @@ export function StudentsPage() {
   // Add state for city and university autocomplete
   const [showCityDropdown, setShowCityDropdown] = useState(false);
   const [showUniversityDropdown, setShowUniversityDropdown] = useState(false);
-  
+
   // Filtered cities based on input
   const filteredCitiesForInput = React.useMemo(() => {
     if (!newStudent.city) return uniqueCities;
-    return uniqueCities.filter(city => 
+    return uniqueCities.filter(city =>
       city.toLowerCase().includes(newStudent.city.toLowerCase())
     );
   }, [uniqueCities, newStudent.city]);
-  
+
   // Filtered universities based on input
   const filteredUniversitiesForInput = React.useMemo(() => {
     if (!newStudent.university) return uniqueUniversities;
-    return uniqueUniversities.filter(university => 
+    return uniqueUniversities.filter(university =>
       university.toLowerCase().includes(newStudent.university.toLowerCase())
     );
   }, [uniqueUniversities, newStudent.university]);
@@ -491,9 +791,9 @@ export function StudentsPage() {
     })
     .sort((a, b) => {
       if (!sortConfig.column || !sortConfig.direction) return 0;
-      
+
       let valueA, valueB;
-      
+
       switch (sortConfig.column) {
         case 'name':
           valueA = a.name.toLowerCase();
@@ -522,7 +822,7 @@ export function StudentsPage() {
         default:
           return 0;
       }
-      
+
       if (valueA < valueB) return sortConfig.direction === 'asc' ? -1 : 1;
       if (valueA > valueB) return sortConfig.direction === 'asc' ? 1 : -1;
       return 0;
@@ -545,19 +845,19 @@ export function StudentsPage() {
               className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
             >
               <Filter className="h-5 w-5 mr-2" />
-              {selectedClassYearFilter === 'all' 
-                ? 'All Class Years' 
+              {selectedClassYearFilter === 'all'
+                ? 'All Class Years'
                 : classYears.find(year => year.id === selectedClassYearFilter)?.year_range || 'Class Year'}
               <ChevronDown className="h-4 w-4 ml-2" />
             </button>
-            
+
             {isClassYearDropdownOpen && (
               <div className="absolute z-10 mt-1 w-56 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                 <ul className="py-1 max-h-60 overflow-auto">
-                  <li 
+                  <li
                     className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                      selectedClassYearFilter === 'all' 
-                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                      selectedClassYearFilter === 'all'
+                        ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                         : 'text-gray-900 dark:text-white'
                     }`}
                     onClick={() => {
@@ -568,11 +868,11 @@ export function StudentsPage() {
                     All Class Years
                   </li>
                   {classYears.map((year) => (
-                    <li 
+                    <li
                       key={year.id}
                       className={`px-4 py-2 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                        selectedClassYearFilter === year.id 
-                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                        selectedClassYearFilter === year.id
+                          ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                           : 'text-gray-900 dark:text-white'
                       }`}
                       onClick={() => {
@@ -588,17 +888,68 @@ export function StudentsPage() {
             )}
           </div>
 
-          {/* Existing buttons */}
-          <label className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 cursor-pointer transition-colors duration-200">
-            <Upload className="h-5 w-5 mr-2" />
-            Import Excel
-            <input
-              type="file"
-              className="hidden"
-              accept=".xlsx,.xls"
-              onChange={handleFileUpload}
-            />
-          </label>
+          {/* Replace Import Excel button with dropdown including Download Template option */}
+          <div className="relative">
+            <button
+              onClick={() => setShowImportDropdown(!showImportDropdown)}
+              className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+            >
+              <Upload className="h-5 w-5 mr-2" />
+              Import Excel
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </button>
+
+            {showImportDropdown && (
+              <div className="absolute z-10 mt-1 w-56 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0">
+                <ul className="py-1">
+                  <li className="relative">
+                    <button
+                      onClick={() => {
+                        downloadExcelTemplate();
+                        setShowImportDropdown(false);
+                      }}
+                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Download Template
+                    </button>
+                  </li>
+                  <li className="border-t border-gray-200 dark:border-gray-700"></li>
+                  <li className="relative">
+                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Replace All Students
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => {
+                          handleFileUpload(e, true);
+                          setShowImportDropdown(false);
+                        }}
+                      />
+                    </label>
+                  </li>
+                  <li className="relative">
+                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white">
+                      <Upload className="h-4 w-4 mr-2" />
+                      Add to Existing Students
+                      <input
+                        type="file"
+                        className="hidden"
+                        accept=".xlsx,.xls"
+                        onChange={(e) => {
+                          handleFileUpload(e, false);
+                          setShowImportDropdown(false);
+                        }}
+                      />
+                    </label>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+
           <button
             onClick={() => {
               resetForm();
@@ -642,7 +993,7 @@ export function StudentsPage() {
                     <div className="flex items-center">
                       <span>Name</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => handleSort('name')}
                           className="focus:outline-none mr-1"
                           title="Sort by name"
@@ -667,7 +1018,7 @@ export function StudentsPage() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                     <div className="flex items-center">
                       <span>Mobile</span>
-                      <button 
+                      <button
                         onClick={() => handleSort('mobile')}
                         className="ml-1 focus:outline-none"
                       >
@@ -691,7 +1042,7 @@ export function StudentsPage() {
                     <div className="flex items-center relative">
                       <span>City</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => handleSort('city')}
                           className="focus:outline-none mr-1"
                         >
@@ -707,14 +1058,14 @@ export function StudentsPage() {
                             <div className="h-3 w-3"></div>
                           )}
                         </button>
-                        <button 
+                        <button
                           onClick={() => toggleColumnDropdown('city')}
                           className="focus:outline-none"
                         >
                           <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
                         </button>
                       </div>
-                      
+
                       {columnDropdownOpen === 'city' && (
                         <div className="absolute z-10 mt-1 top-full left-0 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                           <div className="p-2 border-b border-gray-200 dark:border-gray-700">
@@ -731,10 +1082,10 @@ export function StudentsPage() {
                             </div>
                           </div>
                           <ul className="py-1 max-h-60 overflow-auto">
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                cityFilter === 'all' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                cityFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -746,11 +1097,11 @@ export function StudentsPage() {
                               All Cities
                             </li>
                             {filteredCities.map((city) => (
-                              <li 
+                              <li
                                 key={city}
                                 className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                  cityFilter === city 
-                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  cityFilter === city
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                     : 'text-gray-900 dark:text-white'
                                 }`}
                                 onClick={() => {
@@ -773,7 +1124,7 @@ export function StudentsPage() {
                     <div className="flex items-center relative">
                       <span>University</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => handleSort('university')}
                           className="focus:outline-none mr-1"
                         >
@@ -789,14 +1140,14 @@ export function StudentsPage() {
                             <div className="h-3 w-3"></div>
                           )}
                         </button>
-                        <button 
+                        <button
                           onClick={() => toggleColumnDropdown('university')}
                           className="focus:outline-none"
                         >
                           <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
                         </button>
                       </div>
-                      
+
                       {columnDropdownOpen === 'university' && (
                         <div className="absolute z-10 mt-1 top-full left-0 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                           <div className="p-2 border-b border-gray-200 dark:border-gray-700">
@@ -813,10 +1164,10 @@ export function StudentsPage() {
                             </div>
                           </div>
                           <ul className="py-1 max-h-60 overflow-auto">
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                universityFilter === 'all' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                universityFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -828,11 +1179,11 @@ export function StudentsPage() {
                               All Universities
                             </li>
                             {filteredUniversities.map((university) => (
-                              <li 
+                              <li
                                 key={university}
                                 className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                  universityFilter === university 
-                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  universityFilter === university
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                     : 'text-gray-900 dark:text-white'
                                 }`}
                                 onClick={() => {
@@ -855,21 +1206,21 @@ export function StudentsPage() {
                     <div className="flex items-center relative">
                       <span>Working Days</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => toggleColumnDropdown('working_days')}
                           className="focus:outline-none"
                         >
                           <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
                         </button>
                       </div>
-                      
+
                       {columnDropdownOpen === 'working_days' && (
                         <div className="absolute z-10 mt-1 top-full left-0 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                           <ul className="py-1 max-h-60 overflow-auto">
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                workingDaysFilter === 'all' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                workingDaysFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -880,11 +1231,11 @@ export function StudentsPage() {
                               All Working Days
                             </li>
                             {workingDays.map((workingDay) => (
-                              <li 
+                              <li
                                 key={workingDay.id}
                                 className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                  workingDaysFilter === workingDay.id 
-                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                  workingDaysFilter === workingDay.id
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                     : 'text-gray-900 dark:text-white'
                                 }`}
                                 onClick={() => {
@@ -906,7 +1257,7 @@ export function StudentsPage() {
                     <div className="flex items-center relative">
                       <span>Status</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => handleSort('status')}
                           className="focus:outline-none mr-1"
                         >
@@ -922,21 +1273,21 @@ export function StudentsPage() {
                             <div className="h-3 w-3"></div>
                           )}
                         </button>
-                        <button 
+                        <button
                           onClick={() => toggleColumnDropdown('status')}
                           className="focus:outline-none"
                         >
                           <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
                         </button>
                       </div>
-                      
+
                       {columnDropdownOpen === 'status' && (
                         <div className="absolute z-10 mt-1 top-full left-0 w-32 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                           <ul className="py-1">
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'all' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                statusFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -946,10 +1297,10 @@ export function StudentsPage() {
                             >
                               All
                             </li>
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'available' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                statusFilter === 'available'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -959,10 +1310,10 @@ export function StudentsPage() {
                             >
                               Available
                             </li>
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'busy' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                statusFilter === 'busy'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -983,7 +1334,7 @@ export function StudentsPage() {
                     <div className="flex items-center relative">
                       <span>Registration</span>
                       <div className="flex items-center ml-1">
-                        <button 
+                        <button
                           onClick={() => handleSort('registration')}
                           className="focus:outline-none mr-1"
                         >
@@ -999,21 +1350,21 @@ export function StudentsPage() {
                             <div className="h-3 w-3"></div>
                           )}
                         </button>
-                        <button 
+                        <button
                           onClick={() => toggleColumnDropdown('registration')}
                           className="focus:outline-none"
                         >
                           <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
                         </button>
                       </div>
-                      
+
                       {columnDropdownOpen === 'registration' && (
                         <div className="absolute z-10 mt-1 top-full left-0 w-32 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
                           <ul className="py-1">
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                registrationFilter === 'all' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                registrationFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -1023,10 +1374,10 @@ export function StudentsPage() {
                             >
                               All
                             </li>
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                registrationFilter === 'registered' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                registrationFilter === 'registered'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -1036,10 +1387,10 @@ export function StudentsPage() {
                             >
                               Registered
                             </li>
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                registrationFilter === 'unregistered' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                registrationFilter === 'unregistered'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -1049,10 +1400,10 @@ export function StudentsPage() {
                             >
                               Unregistered
                             </li>
-                            <li 
+                            <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                registrationFilter === 'pending' 
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300' 
+                                registrationFilter === 'pending'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -1101,7 +1452,7 @@ export function StudentsPage() {
                     )}
                     {selectedColumns.includes('working_days') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {(student as any).working_days?.days.join(', ')}
+                        {(student as StudentWithDetails).working_days?.days?.join(', ') || ''}
                       </td>
                     )}
                     {selectedColumns.includes('status') && (
@@ -1201,7 +1552,7 @@ export function StudentsPage() {
                   // Select all columns
                   setSelectedColumns(availableColumns.map(col => col.id));
                 }}
-                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600"
+                className="px-4 py-2 bg-gray-200 text-gray-800 rounded-md hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               >
                 Select All
               </button>
@@ -1351,7 +1702,7 @@ export function StudentsPage() {
                     </ul>
                   )}
                 </div>
-                
+
                 <div>
                   <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                     University Type
@@ -1392,7 +1743,7 @@ export function StudentsPage() {
                     Class Year
                   </label>
                   <select
-                    value={newStudent.class_year_id}
+                    value={newStudent.class_year_id || ''}
                     onChange={(e) => setNewStudent({ ...newStudent, class_year_id: e.target.value })}
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
