@@ -47,6 +47,10 @@ export interface Patient {
   end_date: string | null;
   status: 'pending' | 'in_progress' | 'completed' | 'cancelled';
   created_at: string;
+  age?: number | null;
+  treatment_id: string;
+  tooth_number: string;
+  tooth_class_id: string;
 }
 
 export interface PatientToothTreatment {

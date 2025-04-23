@@ -1,18 +1,19 @@
 import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { DentalChartPicker } from './DentalChartPicker';
-import type { Treatment, ToothClass, PatientToothTreatment } from '../types';
+import type { Treatment, ToothClass, PatientToothTreatment, Patient } from '../types';
 
 interface EditPatientTreatmentsProps {
   patientId: string;
   treatments: Treatment[];
   toothClasses: ToothClass[];
   onChange?: () => void; // callback to refresh parent if needed
+  onUpdatePatient?: (updates: Partial<Patient>) => void; // callback to update patient state in parent
 }
 
 const emptyTreatment = { treatment_id: '', tooth_number: '', tooth_class_id: '' };
 
-const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId, treatments, toothClasses, onChange }) => {
+const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId, treatments, toothClasses, onChange, onUpdatePatient }) => {
   const [toothTreatments, setToothTreatments] = useState<PatientToothTreatment[]>([]);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -64,9 +65,19 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
   async function handleSave() {
     setSaving(true);
     setError(null);
+
+    // Keep track of primary treatment (first one)
+    let primaryTreatment: PatientToothTreatment | null = null;
+
     // Save all new or edited treatments
     for (const tt of toothTreatments) {
       if (!tt.treatment_id || !tt.tooth_number || !tt.tooth_class_id) continue;
+
+      // Store the first valid treatment as primary
+      if (!primaryTreatment) {
+        primaryTreatment = tt;
+      }
+
       if (tt.id && tt.id.startsWith('temp')) {
         // Insert new
         const { error } = await supabase.from('patient_tooth_treatments').insert({
@@ -86,6 +97,27 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
         if (error) setError('Failed to update treatment');
       }
     }
+
+    // Update the main patient record with the primary treatment's tooth info
+    if (primaryTreatment) {
+      const updates = {
+        tooth_number: primaryTreatment.tooth_number,
+        tooth_class_id: primaryTreatment.tooth_class_id
+      };
+
+      const { error } = await supabase.from('patients').update(updates).eq('id', patientId);
+
+      if (error) {
+        setError('Failed to update patient tooth information');
+        console.error('Error updating patient:', error);
+      } else {
+        // Update the patient state in the parent component
+        if (onUpdatePatient) {
+          onUpdatePatient(updates);
+        }
+      }
+    }
+
     setSaving(false);
     if (onChange) onChange();
     // Do NOT reload from DB here, keep local state for new rows
@@ -113,7 +145,11 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
             <button
               type="button"
               className="mb-1 sm:mb-0 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-white hover:bg-indigo-100"
-              onClick={() => setPickerIdx(idx)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                setPickerIdx(idx);
+              }}
             >
               {tt.tooth_number ? `Tooth: ${tt.tooth_number}` : 'Choose Tooth'}
             </button>
@@ -137,7 +173,11 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
             <button
               type="button"
               className="ml-2 px-2 py-1 bg-red-500 text-white rounded hover:bg-red-600"
-              onClick={() => handleRemoveTreatment(idx, tt)}
+              onClick={(e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                handleRemoveTreatment(idx, tt);
+              }}
               disabled={saving}
             >Remove</button>
           </li>
@@ -146,13 +186,21 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
       <button
         type="button"
         className="px-4 py-2 bg-green-600 text-white rounded hover:bg-green-700 mr-2"
-        onClick={handleAddTreatment}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleAddTreatment();
+        }}
         disabled={saving}
       >Add Treatment</button>
       <button
         type="button"
         className="px-4 py-2 bg-indigo-600 text-white rounded hover:bg-indigo-700"
-        onClick={handleSave}
+        onClick={(e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          handleSave();
+        }}
         disabled={saving}
       >Save Changes</button>
     </div>

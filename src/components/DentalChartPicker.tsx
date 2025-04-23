@@ -32,6 +32,7 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
   setMode: controlledSetMode,
 }) => {
   const [uncontrolledMode, setUncontrolledMode] = useState<'adult' | 'pediatric'>('adult');
+  const [selectedTooth, setSelectedTooth] = useState<string | null>(null);
   const mode = controlledMode ?? uncontrolledMode;
   const setMode = controlledSetMode ?? setUncontrolledMode;
 
@@ -43,12 +44,29 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
     'Upper Right (1)', 'Upper Left (2)', 'Lower Right (4)', 'Lower Left (3)'
   ];
 
+  const handleToothSelect = (tooth: string) => {
+    setSelectedTooth(tooth);
+    onSelect(tooth);
+  };
+
+  const handleModalClick = (e: React.MouseEvent) => {
+    // Stop propagation to prevent accidentally submitting a parent form
+    e.stopPropagation();
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50" onClick={handleModalClick}>
       <div className={`bg-white dark:bg-gray-800 rounded-lg shadow-xl p-4 w-full ${mode === 'adult' ? 'max-w-4xl' : 'max-w-md sm:max-w-lg md:max-w-xl'}`}>
         <div className="flex justify-between items-center mb-2">
           <h2 className="text-base sm:text-lg font-bold">Select Tooth Number (ISO 3950)</h2>
-          <button type="button" onClick={onClose} className="text-gray-500 hover:text-gray-700 text-xl">✕</button>
+          <button
+            type="button"
+            onClick={(e) => {
+              e.stopPropagation();
+              onClose();
+            }}
+            className="text-gray-500 hover:text-gray-700 text-xl"
+          >✕</button>
         </div>
         <div className="flex justify-center mb-3 gap-2 sm:gap-4">
           <button type="button"
@@ -76,7 +94,7 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
           >
             <div
-              className={`flex justify-center gap-2 sm:gap-2 mt-1`}
+              className={`flex items-center ${mode === 'adult' ? 'justify-start sm:justify-center' : 'justify-center'} gap-2 sm:gap-2 mt-1`}
             >
               {/* Quadrant 1: UR (center to right) */}
               <div className="relative flex flex-row-reverse gap-2 sm:gap-2 items-center h-10 sm:h-12">
@@ -98,8 +116,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
     return [
       <button
         key={tooth}
-        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-        onClick={() => { onSelect(tooth); onClose(); }}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+        onClick={() => handleToothSelect(tooth)}
       >
         {tooth}
       </button>,
@@ -109,8 +127,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
   return (
     <button
       key={tooth}
-      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-      onClick={() => { onSelect(tooth); onClose(); }}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+      onClick={() => handleToothSelect(tooth)}
     >
       {tooth}
     </button>
@@ -118,7 +136,7 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
 })}
             </div>
             {/* Quadrant 2: UL (center to left) */}
-            <div className={`flex gap-2 sm:gap-2`}>
+            <div className={`flex items-center gap-2 sm:gap-2`}>
               {quadrants[1].map((tooth, idx, arr) => {
   let color = '';
   const n = Number(tooth);
@@ -138,8 +156,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
       <div key="gap-11-21" className="border-l-2 border-white h-8 sm:h-12 mx-2 flex-shrink-0" />,
       <button
         key={tooth}
-        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-        onClick={() => { onSelect(tooth); onClose(); }}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+        onClick={() => handleToothSelect(tooth)}
       >
         {tooth}
       </button>
@@ -148,8 +166,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
   return (
     <button
       key={tooth}
-      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-      onClick={() => { onSelect(tooth); onClose(); }}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+      onClick={() => handleToothSelect(tooth)}
     >
       {tooth}
     </button>
@@ -173,10 +191,10 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
             style={mode === 'adult' ? { WebkitOverflowScrolling: 'touch' } : {}}
           >
             <div
-              className={`flex justify-center gap-2 sm:gap-2 mt-1`}
+              className={`flex items-center ${mode === 'adult' ? 'justify-start sm:justify-center' : 'justify-center'} gap-2 sm:gap-2 mt-1`}
             >
               {/* Quadrant 4: LR (center to right, e.g. 41/81 at center) */}
-              <div className={`flex gap-2 sm:gap-2`}>
+              <div className={`flex items-center gap-2 sm:gap-2`}>
               {/* For adult, center 41, then 42-48 to the right, 48 at far right. For pediatric, 81 at center. */}
               {mode === 'adult'
                  ? quadrants[3].slice().reverse().map((tooth, idx, arr) => {
@@ -197,8 +215,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
                        return [
                          <button
                            key={tooth}
-                           className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg bg-purple-100 dark:bg-purple-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center`}
-                           onClick={() => { onSelect(tooth); onClose(); }}
+                           className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg bg-purple-100 dark:bg-purple-700 rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+                           onClick={() => handleToothSelect(tooth)}
                          >
                            {tooth}
                          </button>,
@@ -208,8 +226,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
                      return (
                        <button
                          key={tooth}
-                         className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-                         onClick={() => { onSelect(tooth); onClose(); }}
+                         className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+                         onClick={() => handleToothSelect(tooth)}
                        >
                          {tooth}
                        </button>
@@ -229,8 +247,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
                     return (
                       <button
                         key={tooth}
-                        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-                        onClick={() => { onSelect(tooth); onClose(); }}
+                        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+                        onClick={() => handleToothSelect(tooth)}
                       >
                         {tooth}
                       </button>
@@ -238,8 +256,8 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
                   })}
             </div>
             {/* Quadrant 3: LL (center to left, e.g. 31/71 at center) */}
-            <div className={`flex gap-2 sm:gap-2`}>
-              
+            <div className={`flex items-center gap-2 sm:gap-2`}>
+
 {quadrants[2].map((tooth, idx, arr) => {
   let color = '';
   const n = Number(tooth);
@@ -258,19 +276,19 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
     return [
       <button
         key={tooth}
-        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-        onClick={() => { onSelect(tooth); onClose(); }}
+        className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+        onClick={() => handleToothSelect(tooth)}
       >
         {tooth}
       </button>,
-      
+
     ];
   }
   return (
     <button
       key={tooth}
-      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color}`}
-      onClick={() => { onSelect(tooth); onClose(); }}
+      className={`w-6 h-6 text-[10px] sm:w-10 sm:h-10 sm:text-lg rounded hover:bg-indigo-200 dark:hover:bg-indigo-600 focus:outline-none font-semibold flex items-center justify-center ${color} ${selectedTooth === tooth ? 'ring-2 ring-indigo-600' : ''}`}
+      onClick={() => handleToothSelect(tooth)}
     >
       {tooth}
     </button>
@@ -280,6 +298,14 @@ export const DentalChartPicker: React.FC<DentalChartPickerProps> = ({
           </div> {/* END inner flex justify-center ... */}
         </div> {/* END scrollable wrapper for bottom arch */}
           </div>
+        </div>
+        <div className="flex justify-end mt-4">
+          <button
+            type="button"
+            disabled={!selectedTooth}
+            className={`px-4 py-2 rounded bg-indigo-600 text-white disabled:opacity-50`}
+            onClick={() => { if (selectedTooth) { handleToothSelect(selectedTooth); onClose(); } }}
+          >OK</button>
         </div>
       </div>
     </div>
