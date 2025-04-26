@@ -424,7 +424,7 @@ export function PatientsPage() {
         confirmButtonColor: '#4f46e5'
       });
     }
-  };
+  }
 
   async function handleDeletePatient(patientId: string) {
     // Use SweetAlert for confirmation instead of window.confirm
@@ -441,12 +441,29 @@ export function PatientsPage() {
     if (!result.isConfirmed) return;
 
     try {
-      const { error } = await supabase
+      // 1. Fetch the patient to get the student_id
+      const { data: patient, error: fetchError } = await supabase
+        .from('patients')
+        .select('student_id')
+        .eq('id', patientId)
+        .single();
+      if (fetchError) throw fetchError;
+
+      // 2. Delete the patient
+      const { error: deleteError } = await supabase
         .from('patients')
         .delete()
         .eq('id', patientId);
+      if (deleteError) throw deleteError;
 
-      if (error) throw error;
+      // 3. Update the student's availability
+      if (patient && patient.student_id) {
+        const { error: updateError } = await supabase
+          .from('students')
+          .update({ is_available: true })
+          .eq('id', patient.student_id);
+        if (updateError) throw updateError;
+      }
 
       fetchData();
 

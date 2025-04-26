@@ -43,7 +43,7 @@ export function StudentsPage() {
   const [citySearchTerm, setCitySearchTerm] = useState<string>('');
   const [workingDaysFilter, setWorkingDaysFilter] = useState<string>('all');
 
-  const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'is_available' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
+  const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
     name: '',
     mobile: '',
     city: '',
@@ -53,7 +53,8 @@ export function StudentsPage() {
     class_year_id: '',
     organization_id: '',
     registration_status: 'pending',
-    registration_end_date: null
+    registration_end_date: null,
+    is_available: true // Add status field to state
   });
 
   const availableColumns = [
@@ -203,7 +204,8 @@ export function StudentsPage() {
     const studentData = {
       ...newStudent,
       organization_id: organizationId,
-      registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null
+      registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null,
+      is_available: newStudent.is_available
     };
 
     try {
@@ -266,14 +268,15 @@ export function StudentsPage() {
       mobile: student.mobile,
       city: student.city,
       university: student.university,
-      university_type: student.university_type || 'حكومي', // Add default if not present
+      university_type: student.university_type || 'حكومي',
       working_days_id: student.working_days_id,
       class_year_id: student.class_year_id || '',
       organization_id: student.organization_id,
       registration_status: student.registration_status,
-      registration_end_date: student.registration_end_date
+      registration_end_date: student.registration_end_date,
+      is_available: student.is_available // Set status for editing
     });
-    setSelectedStudent(student); // Ensure correct student is set for editing
+    setSelectedStudent(student);
     setIsEditMode(true);
     setIsModalOpen(true);
   }
@@ -289,7 +292,8 @@ export function StudentsPage() {
       class_year_id: '',
       organization_id: organizationId || '',
       registration_status: 'pending',
-      registration_end_date: null
+      registration_end_date: null,
+      is_available: true
     });
     setIsEditMode(false);
     setSelectedStudent(null);
@@ -1792,6 +1796,23 @@ export function StudentsPage() {
                     />
                   </div>
                 )}
+
+                {/* Student Status Toggle */}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Status
+                  </label>
+                  <select
+                    value={newStudent.is_available ? 'available' : 'busy'}
+                    onChange={e => setNewStudent({ ...newStudent, is_available: e.target.value === 'available' })}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
+                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
+                  >
+                    <option value="available">Available</option>
+                    <option value="busy">Busy</option>
+                  </select>
+                </div>
+
               </div>
 
               <div className="flex flex-col sm:flex-row justify-end gap-2 sm:gap-3 mt-6 pt-4 border-t dark:border-gray-700">
