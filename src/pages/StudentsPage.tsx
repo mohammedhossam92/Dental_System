@@ -273,6 +273,7 @@ export function StudentsPage() {
       registration_status: student.registration_status,
       registration_end_date: student.registration_end_date
     });
+    setSelectedStudent(student); // Ensure correct student is set for editing
     setIsEditMode(true);
     setIsModalOpen(true);
   }
