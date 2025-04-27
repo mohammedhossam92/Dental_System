@@ -262,24 +262,41 @@ export function StudentsPage() {
     }
   }
 
-  function handleEdit(student: Student) {
-    setNewStudent({
-      name: student.name,
-      mobile: student.mobile,
-      city: student.city,
-      university: student.university,
-      university_type: student.university_type || 'حكومي',
-      working_days_id: student.working_days_id,
-      class_year_id: student.class_year_id || '',
-      organization_id: student.organization_id,
-      registration_status: student.registration_status,
-      registration_end_date: student.registration_end_date,
-      is_available: student.is_available // Set status for editing
-    });
-    setSelectedStudent(student);
-    setIsEditMode(true);
-    setIsModalOpen(true);
+  async function handleEdit(student: Student) {
+  let latestStudentData = student;
+  // Fetch the latest student data from the students table
+  if (student.id) {
+    const { data: studentData, error: studentError } = await supabase
+      .from('students')
+      .select('*')
+      .eq('id', student.id)
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!studentError && studentData) {
+      latestStudentData = studentData;
+    }
+    // Note: registration_end_date intentionally not fetched or set
   }
+  setNewStudent({
+    name: latestStudentData.name,
+    mobile: latestStudentData.mobile,
+    city: latestStudentData.city,
+    university: latestStudentData.university,
+    university_type: latestStudentData.university_type || 'حكومي',
+    working_days_id: latestStudentData.working_days_id,
+    class_year_id: latestStudentData.class_year_id || '',
+    organization_id: latestStudentData.organization_id,
+    registration_status: latestStudentData.registration_status,
+    registration_end_date: latestStudentData.registration_status === 'registered' && latestStudentData.registration_end_date
+      ? new Date(latestStudentData.registration_end_date).toISOString().split('T')[0]
+      : null,
+    is_available: latestStudentData.is_available
+  });
+  setSelectedStudent(latestStudentData);
+  setIsEditMode(true);
+  setIsModalOpen(true);
+}
 
   function resetForm() {
     setNewStudent({
