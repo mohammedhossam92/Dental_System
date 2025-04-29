@@ -25,7 +25,7 @@ export function StudentsPage() {
   const [error, setError] = useState('');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'name', 'mobile', 'university', 'city', 'working_days', 'status', 'registration'
+    'name', 'mobile', 'working_days', 'status', 'registration'
   ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
@@ -42,6 +42,14 @@ export function StudentsPage() {
   const [cityFilter, setCityFilter] = useState<string>('all');
   const [citySearchTerm, setCitySearchTerm] = useState<string>('');
   const [workingDaysFilter, setWorkingDaysFilter] = useState<string>('all');
+  const [registrationEndDateFilter, setRegistrationEndDateFilter] = useState<string>('all');
+  const uniqueRegistrationEndDates = React.useMemo(() => {
+    const dates = students
+      .map(s => s.registration_end_date)
+      .filter((date): date is string => Boolean(date))
+      .map(date => new Date(date).toISOString().split('T')[0]);
+    return Array.from(new Set(dates)).sort();
+  }, [students]);
 
   const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
     name: '',
@@ -60,11 +68,12 @@ export function StudentsPage() {
   const availableColumns = [
     { id: 'name', label: 'Name' },
     { id: 'mobile', label: 'Mobile' },
-    { id: 'university', label: 'University' },
     { id: 'city', label: 'City' },
+    { id: 'university', label: 'University' },
     { id: 'working_days', label: 'Working Days' },
     { id: 'status', label: 'Status' },
-    { id: 'registration', label: 'Registration' }
+    { id: 'registration', label: 'Registration' },
+    { id: 'registration_end_date', label: 'Registration End Date' }, // <-- Added
   ];
 
   const memoizedFetchData = useCallback(async () => {
@@ -788,6 +797,14 @@ export function StudentsPage() {
         return false;
       }
 
+      if (
+        registrationEndDateFilter !== 'all' &&
+        (!student.registration_end_date ||
+          new Date(student.registration_end_date).toISOString().split('T')[0] !== registrationEndDateFilter)
+      ) {
+        return false;
+      }
+
       // Then apply search term filter
       if (!searchTerm) return true;
 
@@ -1441,6 +1458,54 @@ export function StudentsPage() {
                     </div>
                   </th>
                 )}
+                {selectedColumns.includes('registration_end_date') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    <div className="flex items-center relative">
+                      <span>Registration End Date</span>
+                      <button
+                        onClick={() => toggleColumnDropdown('registration_end_date')}
+                        className="focus:outline-none ml-1"
+                      >
+                        <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                      </button>
+                      {columnDropdownOpen === 'registration_end_date' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-48 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <ul className="py-1 max-h-60 overflow-auto">
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationEndDateFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationEndDateFilter('all');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All Dates
+                            </li>
+                            {uniqueRegistrationEndDates.map(date => (
+                              <li
+                                key={date}
+                                className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                  registrationEndDateFilter === date
+                                    ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                    : 'text-gray-900 dark:text-white'
+                                }`}
+                                onClick={() => {
+                                  setRegistrationEndDateFilter(date);
+                                  toggleColumnDropdown(null);
+                                }}
+                              >
+                                {date}
+                              </li>
+                            ))}
+                          </ul>
+                        </div>
+                      )}
+                    </div>
+                  </th>
+                )}
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -1499,6 +1564,11 @@ export function StudentsPage() {
                         }`}>
                           {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
                         </span>
+                      </td>
+                    )}
+                    {selectedColumns.includes('registration_end_date') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString() : 'N/A'}
                       </td>
                     )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
