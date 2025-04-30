@@ -4,7 +4,7 @@ import PatientTreatmentsList from '../components/PatientTreatmentsList';
 import EditPatientTreatments from '../components/EditPatientTreatments';
 import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Patient, Student, Treatment, ToothClass, ClassYear } from '../types';
+import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } from '../types';
 import Swal from 'sweetalert2';
 
 export function PatientsPage() {
@@ -13,6 +13,7 @@ export function PatientsPage() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
+  const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [loading, setLoading] = useState(true);
   const [searchTerm, setSearchTerm] = useState('');
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -21,7 +22,6 @@ export function PatientsPage() {
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
   const [selectedPatient, setSelectedPatient] = useState<Patient | null>(null);
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
-  const [selectedClassYear, setSelectedClassYear] = useState<string>('');
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isDeliberateSubmit, setIsDeliberateSubmit] = useState(false);
@@ -65,11 +65,12 @@ export function PatientsPage() {
     return match ? match.id : '';
   };
 
-  const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'> & { age?: number }>({
+  const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'> & { age?: number, working_days_id?: string }>({
     ticket_number: '',
     name: '',
     mobile: null,
     class_year_id: getDefaultClassYearId(),
+    working_days_id: '',
     student_id: '',
     status: 'pending',
     age: undefined,
@@ -107,6 +108,7 @@ export function PatientsPage() {
 
   useEffect(() => {
     fetchData();
+    fetchWorkingDays();
   }, []);
 
   async function fetchData() {
@@ -140,6 +142,16 @@ export function PatientsPage() {
       console.error('Error fetching data:', error);
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function fetchWorkingDays() {
+    try {
+      const { data, error } = await supabase.from('working_days').select('*');
+      if (error) throw error;
+      setWorkingDays(data || []);
+    } catch (error) {
+      console.error('Error fetching working days:', error);
     }
   }
 
@@ -216,6 +228,7 @@ export function PatientsPage() {
         name: '',
         mobile: null,
         class_year_id: getDefaultClassYearId(),
+        working_days_id: '',
         student_id: '',
         status: 'pending',
         age: undefined,
@@ -224,7 +237,6 @@ export function PatientsPage() {
         tooth_class_id: ''
       });
       setToothTreatments([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
-      setSelectedClassYear('');
       setStudentSearchTerm('');
 
       // Show success message
@@ -503,25 +515,15 @@ export function PatientsPage() {
 
   // Filter students based on class year and search term
   const filteredStudents = useMemo(() => {
-    // Start with all students
     let filtered = students;
-
-    // Filter to only include registered students
     filtered = filtered.filter(student => student.registration_status === 'registered');
-
-    // Filter to only include available students
     filtered = filtered.filter(student => student.is_available);
-
-    // Filter by selected class year if one is selected
-    if (selectedClassYear) {
-      filtered = filtered.filter(student => student.class_year_id === selectedClassYear);
-    } else if (newPatient.class_year_id) {
-      // If no class year is explicitly selected but the form has a class year,
-      // filter to match that class year
+    if (newPatient.class_year_id) {
       filtered = filtered.filter(student => student.class_year_id === newPatient.class_year_id);
     }
-
-    // Filter by search term if one is entered
+    if (newPatient.working_days_id) {
+      filtered = filtered.filter(student => student.working_days_id === newPatient.working_days_id);
+    }
     if (studentSearchTerm) {
       const searchTermLower = studentSearchTerm.toLowerCase();
       filtered = filtered.filter(student =>
@@ -529,9 +531,8 @@ export function PatientsPage() {
         (student.mobile && student.mobile.toLowerCase().includes(searchTermLower))
       );
     }
-
     return filtered;
-  }, [students, selectedClassYear, studentSearchTerm, newPatient.class_year_id]);
+  }, [students, newPatient.class_year_id, newPatient.working_days_id, studentSearchTerm]);
 
   const openInfoModal = (patient: Patient) => {
     setSelectedPatient(patient);
@@ -804,8 +805,8 @@ export function PatientsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-5">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Mobile Number
                     </label>
@@ -813,7 +814,6 @@ export function PatientsPage() {
                       type="text"
                       value={newPatient.mobile === null ? '' : newPatient.mobile}
                       onChange={(e) => {
-                        // Validate for exactly 11 digits if not empty
                         const value = e.target.value;
                         if (value === '' || /^\d{0,11}$/.test(value)) {
                           setNewPatient({ ...newPatient, mobile: value || null });
@@ -825,8 +825,26 @@ export function PatientsPage() {
                     />
                     <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits if provided</p>
                   </div>
-
-                  <div className="md:col-span-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Working Days
+                    </label>
+                    <select
+                      value={newPatient.working_days_id || ''}
+                      onChange={(e) => {
+                        setNewPatient({ ...newPatient, working_days_id: e.target.value, student_id: '' });
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    >
+                      <option value="">Select working days</option>
+                      {workingDays.map((wd) => (
+                        <option key={wd.id} value={wd.id}>
+                          {wd.name} ({wd.days && Array.isArray(wd.days) ? wd.days.join(', ') : ''})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Class Year
                     </label>
@@ -835,7 +853,6 @@ export function PatientsPage() {
                       onChange={(e) => {
                         const selectedValue = e.target.value;
                         setNewPatient({ ...newPatient, class_year_id: selectedValue || null, student_id: '' });
-                        setSelectedClassYear(selectedValue);
                       }}
                       className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
                     >
@@ -847,8 +864,7 @@ export function PatientsPage() {
                       ))}
                     </select>
                   </div>
-
-                  <div className="md:col-span-3">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Age (Optional)
                     </label>
@@ -903,7 +919,7 @@ export function PatientsPage() {
                           filteredStudents.map((student) => (
                             <div
                               key={student.id}
-                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+                              className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-white"
                               onClick={() => {
                                 setNewPatient({ ...newPatient, student_id: student.id });
                                 setStudentSearchTerm(student.name);
@@ -1066,8 +1082,8 @@ export function PatientsPage() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-                  <div className="md:col-span-5">
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Mobile Number
                     </label>
@@ -1088,29 +1104,7 @@ export function PatientsPage() {
                     <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits if provided</p>
                   </div>
 
-                  <div className="md:col-span-4">
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Class Year
-                    </label>
-                    <select
-                      value={editPatient.class_year_id || ''}
-                      onChange={(e) => {
-                        const selectedValue = e.target.value;
-                        setEditPatient({ ...editPatient, class_year_id: selectedValue || null, student_id: '' });
-                        setSelectedClassYear(selectedValue);
-                      }}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                    >
-                      <option value="">Select class year</option>
-                      {classYears.map((classYear) => (
-                        <option key={classYear.id} value={classYear.id}>
-                          {classYear.year_range}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  <div className="md:col-span-3">
+                  <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Age (Optional)
                     </label>
@@ -1178,7 +1172,7 @@ export function PatientsPage() {
                             filteredStudents.map((student) => (
                               <div
                                 key={student.id}
-                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer"
+                                className="p-2 hover:bg-gray-100 dark:hover:bg-gray-600 cursor-pointer text-white"
                                 onClick={() => {
                                   setEditPatient({ ...editPatient, student_id: student.id });
                                   setStudentSearchTerm(student.name);
