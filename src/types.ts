@@ -51,6 +51,7 @@ export interface Patient {
   treatment_id: string;
   tooth_number: string;
   tooth_class_id: string;
+  working_days_id?: string | null;
 }
 
 export interface PatientToothTreatment {

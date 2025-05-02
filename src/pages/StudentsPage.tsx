@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear, StudentWithDetails } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
+import { DentalChartPicker } from '../components/DentalChartPicker';
 
 export function StudentsPage() {
   const { organizationId } = useAuth();
@@ -872,6 +873,145 @@ export function StudentsPage() {
     setIsInfoModalOpen(true);
   }
 
+  // Add state for Add Patient modal and form
+  const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
+  const [addPatientStudent, setAddPatientStudent] = useState<Student | null>(null);
+  const [addPatientForm, setAddPatientForm] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'> & { age?: number }>({
+    ticket_number: '',
+    name: '',
+    mobile: null,
+    class_year_id: '',
+    working_days_id: '',
+    student_id: '',
+    status: 'pending',
+    age: undefined,
+    treatment_id: '',
+    tooth_number: '',
+    tooth_class_id: ''
+  });
+  const [addPatientTreatments, setAddPatientTreatments] = useState<{
+    treatment_id: string;
+    tooth_number: string;
+    tooth_class_id: string;
+  }[]>([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
+  const [addPatientError, setAddPatientError] = useState('');
+  const [treatments, setTreatments] = useState<Treatment[]>([]);
+  const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
+  // Add state for tooth chart picker in Add Patient modal
+  const [addPatientToothChartModal, setAddPatientToothChartModal] = useState<{ open: boolean; idx: number | null }>({ open: false, idx: null });
+
+  // Fetch treatments and tooth classes for the modal
+  useEffect(() => {
+    if (isAddPatientModalOpen) {
+      (async () => {
+        const [treatmentsResult, toothClassesResult] = await Promise.all([
+          supabase.from('treatments').select('*'),
+          supabase.from('tooth_classes').select('*'),
+        ]);
+        if (!treatmentsResult.error) setTreatments(treatmentsResult.data || []);
+        if (!toothClassesResult.error) setToothClasses(toothClassesResult.data || []);
+      })();
+    }
+  }, [isAddPatientModalOpen]);
+
+  function openAddPatientModal(student: Student) {
+    setAddPatientStudent(student);
+    setAddPatientForm({
+      ticket_number: '',
+      name: '',
+      mobile: '',
+      class_year_id: student.class_year_id || '',
+      working_days_id: student.working_days_id || '',
+      student_id: student.id,
+      status: 'pending',
+      age: undefined,
+      treatment_id: '',
+      tooth_number: '',
+      tooth_class_id: ''
+    });
+    setAddPatientTreatments([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
+    setAddPatientError('');
+    setIsAddPatientModalOpen(true);
+  }
+
+  async function handleAddPatientFromStudent(e: React.FormEvent) {
+    e.preventDefault();
+    setAddPatientError('');
+    if (!addPatientForm.ticket_number || !addPatientForm.name || !addPatientForm.class_year_id || !addPatientForm.student_id) {
+      setAddPatientError('Please fill in all required fields');
+      return;
+    }
+    if (addPatientTreatments.some(tt => !tt.treatment_id || !tt.tooth_class_id || (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric'))) {
+      setAddPatientError('Please fill in all tooth treatment fields');
+      return;
+    }
+    if (addPatientForm.mobile && addPatientForm.mobile.length !== 11) {
+      setAddPatientError('Mobile number must be exactly 11 digits');
+      return;
+    }
+    const { data: existingTicket, error: ticketError } = await supabase
+      .from('patients')
+      .select('id')
+      .eq('ticket_number', addPatientForm.ticket_number)
+      .maybeSingle();
+    if (ticketError) {
+      setAddPatientError('Failed to check ticket number');
+      return;
+    }
+    if (existingTicket) {
+      setAddPatientError('Ticket number already exists');
+      return;
+    }
+    try {
+      const mainTreatment = addPatientTreatments[0];
+      const { data: patientInsertData, error: insertError } = await supabase
+        .from('patients')
+        .insert([{
+          ...addPatientForm,
+          age: addPatientForm.age ?? null,
+          treatment_id: mainTreatment.treatment_id,
+          tooth_number: mainTreatment.tooth_number,
+          tooth_class_id: mainTreatment.tooth_class_id
+        }])
+        .select('id')
+        .maybeSingle();
+      if (insertError) throw insertError;
+      const patientId = patientInsertData?.id;
+      for (const tt of addPatientTreatments) {
+        const { error: ttError } = await supabase
+          .from('patient_tooth_treatments')
+          .insert({
+            patient_id: patientId,
+            treatment_id: tt.treatment_id,
+            tooth_number: tt.tooth_number,
+            tooth_class_id: tt.tooth_class_id
+          });
+        if (ttError) throw ttError;
+      }
+      await supabase
+        .from('students')
+        .update({ is_available: false })
+        .eq('id', addPatientForm.student_id);
+      setIsAddPatientModalOpen(false);
+      Swal.fire({
+        title: 'Success!',
+        text: 'Patient added successfully',
+        icon: 'success',
+        confirmButtonColor: '#4f46e5',
+        timer: 2000
+      });
+      memoizedFetchData();
+    } catch {
+      setAddPatientError('Failed to add patient');
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to add patient',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5'
+      });
+    }
+  }
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1599,6 +1739,15 @@ export function StudentsPage() {
                         >
                           <Info className="h-5 w-5" />
                         </button>
+                        {student.registration_status === 'registered' && student.is_available && (
+                          <button
+                            onClick={() => openAddPatientModal(student)}
+                            className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors duration-200"
+                            title="Add Patient"
+                          >
+                            <Plus className="h-5 w-5" />
+                          </button>
+                        )}
                       </div>
                     </td>
                   </tr>
@@ -2062,6 +2211,223 @@ export function StudentsPage() {
               >
                 Close
               </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {isAddPatientModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="p-6">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">Add New Patient</h2>
+                <button
+                  onClick={() => setIsAddPatientModalOpen(false)}
+                  className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
+                >
+                  <X size={24} />
+                </button>
+              </div>
+              {addPatientError && (
+                <div className="mb-4 p-3 bg-red-100 dark:bg-red-900 text-red-700 dark:text-red-200 rounded-md">
+                  {addPatientError}
+                </div>
+              )}
+              <form onSubmit={handleAddPatientFromStudent} className="space-y-4">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Ticket Number
+                    </label>
+                    <input
+                      type="text"
+                      value={addPatientForm.ticket_number}
+                      onChange={(e) => setAddPatientForm({ ...addPatientForm, ticket_number: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter ticket number"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Patient Name
+                    </label>
+                    <input
+                      type="text"
+                      value={addPatientForm.name}
+                      onChange={(e) => setAddPatientForm({ ...addPatientForm, name: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter patient name"
+                    />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Mobile Number
+                    </label>
+                    <input
+                      type="text"
+                      value={addPatientForm.mobile === null ? '' : addPatientForm.mobile}
+                      onChange={(e) => {
+                        const value = e.target.value;
+                        if (value === '' || /^\d{0,11}$/.test(value)) {
+                          setAddPatientForm({ ...addPatientForm, mobile: value || null });
+                        }
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Enter mobile number (optional)"
+                      maxLength={11}
+                    />
+                    <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits if provided</p>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Working Days
+                    </label>
+                    <select
+                      value={addPatientForm.working_days_id || ''}
+                      onChange={(e) => setAddPatientForm({ ...addPatientForm, working_days_id: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      disabled
+                    >
+                      <option value="">Select working days</option>
+                      {workingDays.map((wd) => (
+                        <option key={wd.id} value={wd.id}>
+                          {wd.name} ({wd.days && Array.isArray(wd.days) ? wd.days.join(', ') : ''})
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Class Year
+                    </label>
+                    <select
+                      value={addPatientForm.class_year_id || ''}
+                      onChange={(e) => setAddPatientForm({ ...addPatientForm, class_year_id: e.target.value })}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      disabled
+                    >
+                      <option value="">Select class year</option>
+                      {classYears.map((classYear) => (
+                        <option key={classYear.id} value={classYear.id}>
+                          {classYear.year_range}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Age (Optional)
+                    </label>
+                    <input
+                      type="number"
+                      value={addPatientForm.age === undefined ? '' : addPatientForm.age}
+                      onChange={(e) => {
+                        const value = e.target.value ? parseInt(e.target.value) : undefined;
+                        setAddPatientForm({ ...addPatientForm, age: value });
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      placeholder="Age"
+                      min="0"
+                    />
+                  </div>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Assigned Student
+                  </label>
+                  <input
+                    type="text"
+                    value={addPatientStudent?.name || ''}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-gray-100 dark:bg-gray-700 cursor-not-allowed"
+                    disabled
+                  />
+                </div>
+                {/* Tooth Treatments Section */}
+                <div className="space-y-4">
+                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
+                    Tooth Treatments
+                  </label>
+                  {addPatientTreatments.map((tt, idx) => (
+                    <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Treatment</label>
+                        <select
+                          value={tt.treatment_id}
+                          onChange={e => setAddPatientTreatments(tts => tts.map((t, i) => i === idx ? { ...t, treatment_id: e.target.value } : t))}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                        >
+                          <option value="">Select treatment</option>
+                          {treatments.map(t => (
+                            <option key={t.id} value={t.id}>{t.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tooth Number</label>
+                        <button
+                          type="button"
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-white hover:bg-indigo-50 dark:hover:bg-indigo-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                          onClick={() => setAddPatientToothChartModal({ open: true, idx })}
+                        >
+                          {tt.tooth_number ? `Tooth: ${tt.tooth_number}` : 'Select tooth number'}
+                        </button>
+                        {addPatientToothChartModal.open && addPatientToothChartModal.idx === idx && (
+                          <DentalChartPicker
+                            open={addPatientToothChartModal.open}
+                            onClose={() => setAddPatientToothChartModal({ open: false, idx: null })}
+                            onSelect={tooth => {
+                              setAddPatientTreatments(tts => tts.map((t, i) => i === idx ? { ...t, tooth_number: tooth } : t));
+                              setAddPatientToothChartModal({ open: false, idx: null });
+                            }}
+                          />
+                        )}
+                      </div>
+                      <div>
+                        <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">Tooth Class</label>
+                        <select
+                          value={tt.tooth_class_id}
+                          onChange={e => setAddPatientTreatments(tts => tts.map((t, i) => i === idx ? { ...t, tooth_class_id: e.target.value } : t))}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                        >
+                          <option value="">Select tooth class</option>
+                          {toothClasses.map(tc => (
+                            <option key={tc.id} value={tc.id}>{tc.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="flex items-center">
+                        <button
+                          type="button"
+                          onClick={() => setAddPatientTreatments(tts => tts.filter((_, i) => i !== idx))}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
+                        >
+                          <Trash2 className="h-5 w-5" />
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                  <button
+                    type="button"
+                    onClick={() => setAddPatientTreatments(tts => [...tts, { treatment_id: '', tooth_number: '', tooth_class_id: '' }])}
+                    className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Treatment
+                  </button>
+                </div>
+                <div className="flex justify-end">
+                  <button
+                    type="submit"
+                    className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+                  >
+                    <Plus className="h-5 w-5 mr-2" />
+                    Add Patient
+                  </button>
+                </div>
+              </form>
             </div>
           </div>
         </div>
