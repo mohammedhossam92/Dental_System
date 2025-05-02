@@ -35,7 +35,7 @@ export function StudentsPage() {
     direction: null
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy'>('all');
-  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered' | 'pending'>('all');
+  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered' | 'pending'>('registered');
   const [columnDropdownOpen, setColumnDropdownOpen] = useState<string | null>(null);
   const [universityFilter, setUniversityFilter] = useState<string>('all');
   const [universitySearchTerm, setUniversitySearchTerm] = useState<string>('');
