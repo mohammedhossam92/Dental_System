@@ -609,7 +609,9 @@ export function PatientsPage() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Ticket #</th>
                 )}
                 {selectedColumns.includes('name') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Patient Name</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Patient Name                       <span className="ml-2 text-xs font-semibold text-indigo-600 dark:text-indigo-300">
+                  ({filteredPatients.length})
+                </span></th>
                 )}
                 {selectedColumns.includes('mobile') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
