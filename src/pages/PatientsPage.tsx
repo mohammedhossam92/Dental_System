@@ -25,6 +25,7 @@ export function PatientsPage() {
   const [studentSearchTerm, setStudentSearchTerm] = useState('');
   const [isStudentDropdownOpen, setIsStudentDropdownOpen] = useState(false);
   const [isDeliberateSubmit, setIsDeliberateSubmit] = useState(false);
+  const [dateRange, setDateRange] = useState<{ start: string; end: string }>({ start: '', end: '' });
 
   // Column visibility state
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
@@ -503,6 +504,16 @@ export function PatientsPage() {
 
   const filteredPatients = useMemo(() => {
     return patients.filter(patient => {
+      // Date range filter
+      let inDateRange = true;
+      if (dateRange.start) {
+        inDateRange = typeof patient.start_date === 'string' && patient.start_date >= dateRange.start;
+      }
+      if (inDateRange && dateRange.end) {
+        inDateRange = typeof patient.start_date === 'string' && patient.start_date <= dateRange.end;
+      }
+      if (!inDateRange) return false;
+      // Search filter
       const searchTermLower = searchTerm.toLowerCase();
       return (
         patient.name.toLowerCase().includes(searchTermLower) ||
@@ -511,7 +522,7 @@ export function PatientsPage() {
         (patient.student?.name && patient.student.name.toLowerCase().includes(searchTermLower))
       );
     });
-  }, [patients, searchTerm]);
+  }, [patients, searchTerm, dateRange]);
 
   // Filter students based on class year and search term
   const filteredStudents = useMemo(() => {
@@ -543,7 +554,24 @@ export function PatientsPage() {
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Patients Management</h1>
-        <div className="flex flex-col sm:flex-row gap-2">
+        <div className="flex flex-col sm:flex-row gap-2 items-center">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-md px-2 py-1">
+            <label className="text-xs text-gray-700 dark:text-gray-300 mr-1">From</label>
+            <input
+              type="date"
+              value={dateRange.start}
+              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
+              className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+            />
+            <label className="text-xs text-gray-700 dark:text-gray-300 mx-1">To</label>
+            <input
+              type="date"
+              value={dateRange.end}
+              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
+              className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+            />
+          </div>
           <button
             onClick={() => setIsFilterModalOpen(true)}
             className="flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
@@ -587,13 +615,13 @@ export function PatientsPage() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Mobile</th>
                 )}
                 {selectedColumns.includes('doctor') && (
-                  <th className="hidden sm:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Doctor</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Doctor</th>
                 )}
                 {selectedColumns.includes('class_year') && (
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Class Year</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Class Year</th>
                 )}
                 {selectedColumns.includes('treatment') && (
-                  <th className="hidden md:table-cell px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Treatment</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Treatment</th>
                 )}
                 {selectedColumns.includes('tooth_number') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tooth Number</th>
@@ -642,17 +670,17 @@ export function PatientsPage() {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{patient.mobile}</td>
                     )}
                     {selectedColumns.includes('doctor') && (
-                      <td className="hidden sm:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {patient.student?.name || 'Unassigned'}
                       </td>
                     )}
                     {selectedColumns.includes('class_year') && (
-                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {classYears.find(cy => cy.id === patient.class_year_id)?.name}
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {classYears.find(cy => cy.id === patient.class_year_id)?.year_range}
                       </td>
                     )}
                     {selectedColumns.includes('treatment') && (
-                      <td className="hidden md:table-cell px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {treatments.find(t => t.id === patient.treatment_id)?.name}
                       </td>
                     )}
@@ -1391,6 +1419,18 @@ export function PatientsPage() {
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Doctor</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {selectedPatient.student?.name || 'Unassigned'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Working Days Group</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {(() => {
+                      const student = students.find(s => s.id === selectedPatient.student?.id);
+                      if (!student) return 'N/A';
+                      const wd = workingDays.find(wd => wd.id === student.working_days_id);
+                      return wd ? wd.name : 'N/A';
+                    })()}
                   </p>
                 </div>
 
