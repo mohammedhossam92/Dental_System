@@ -106,3 +106,13 @@ export function useAuth() {
   }
   return context;
 }
+export { AuthContext };
+
+type User = {
+  user_metadata: {
+    name?: string;
+    username?: string;
+    role?: string;
+    organization_id?: string;
+  };
+};

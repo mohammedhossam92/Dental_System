@@ -1,5 +1,6 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useContext } from 'react';
 import { DentalChartPicker } from '../components/DentalChartPicker';
+import { AuthContext } from '../context/AuthContext';
 import PatientTreatmentsList from '../components/PatientTreatmentsList';
 import EditPatientTreatments from '../components/EditPatientTreatments';
 import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from 'lucide-react';
@@ -9,6 +10,110 @@ import Swal from 'sweetalert2';
 
 export function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
+  const { user } = useContext(AuthContext); // assumes user object has a 'username' property
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [notes, setNotes] = useState<any[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const [newNote, setNewNote] = useState('');
+  const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+
+  const handleEditNote = (note: any) => {
+    setEditingNoteId(note.id);
+    setEditingContent(note.content);
+  };
+
+  const handleSaveEditNote = async (noteId: string) => {
+    setNotesError('');
+    try {
+      const now = new Date().toISOString();
+      const { error, data } = await supabase
+        .from('patient_notes')
+        .update({ content: editingContent, edited_at: now })
+        .eq('id', noteId)
+        .select()
+        .single();
+      if (error) throw error;
+      setNotes(notes.map(n => n.id === noteId ? { ...n, content: editingContent, edited_at: now } : n));
+      setEditingNoteId(null);
+      setEditingContent('');
+    } catch (err) {
+      setNotesError('Failed to update note');
+    }
+  };
+
+
+  const handleCancelEdit = () => {
+    setEditingNoteId(null);
+    setEditingContent('');
+  };
+
+  // Fetch notes for a patient
+  const openNotesModal = async (patient: Patient) => {
+    setNotesPatient(patient);
+    setIsNotesModalOpen(true);
+    setNotesLoading(true);
+    setNotesError('');
+    try {
+      const { data, error } = await supabase
+        .from('patient_notes')
+        .select('*')
+        .eq('patient_id', patient.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setNotes(data || []);
+    } catch (err) {
+      setNotesError('Failed to load notes');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const closeNotesModal = () => {
+    setIsNotesModalOpen(false);
+    setNotes([]);
+    setNewNote('');
+    setNotesPatient(null);
+    setNotesError('');
+  };
+
+  const handleAddNote = async () => {
+    if (!newNote.trim() || !notesPatient) return;
+    setNotesError('');
+    try {
+      const { error, data } = await supabase
+        .from('patient_notes')
+        .insert({
+          patient_id: notesPatient.id,
+          content: newNote,
+          created_by: user?.user_metadata?.name || user?.user_metadata?.username || user?.email || 'Unknown',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setNotes([data, ...notes]);
+      setNewNote('');
+    } catch (err) {
+      setNotesError('Failed to add note');
+    }
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    setNotesError('');
+    try {
+      const { error } = await supabase
+        .from('patient_notes')
+        .delete()
+        .eq('id', noteId);
+      if (error) throw error;
+      setNotes(notes.filter(n => n.id !== noteId));
+    } catch (err) {
+      setNotesError('Failed to delete note');
+    }
+  };
+
   const [students, setStudents] = useState<Student[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
@@ -764,6 +869,13 @@ export function PatientsPage() {
                           <Info className="h-5 w-5" />
                         </button>
                         <button
+                          onClick={() => openNotesModal(patient)}
+                          className="inline-flex items-center px-1 py-0.5 text-indigo-500 hover:text-indigo-700 rounded-md transition-colors focus:outline-none focus:ring-2 focus:ring-indigo-400"
+                          title="View Notes"
+                        >
+                          <span className="text-lg">📝</span>
+                        </button>
+                        <button
                           onClick={() => openEditModal(patient)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200"
                         >
@@ -1509,6 +1621,90 @@ export function PatientsPage() {
           </div>
         </div>
       )}
-    </div>
+    {/* Notes Modal */}
+    {isNotesModalOpen && (
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative text-white">
+          <button
+            className="absolute top-2 right-2 text-gray-300 hover:text-gray-100"
+            onClick={closeNotesModal}
+          >
+            <span aria-hidden="true">&times;</span>
+          </button>
+          <h2 className="text-lg font-bold mb-4">
+            Notes for <span className="text-blue-400">{notesPatient?.name}</span>
+          </h2>
+          {notesLoading ? (
+            <div>Loading...</div>
+          ) : notesError ? (
+            <div className="text-red-400">{notesError}</div>
+          ) : (
+            <ul className="mb-4 max-h-40 overflow-y-auto">
+              {notes.length === 0 && <li className="text-gray-300">No notes yet.</li>}
+              {notes.map(note => (
+            <div key={note.id} className="flex items-center justify-between py-2 border-b border-gray-700">
+              <div className="flex-1 min-w-0">
+                {editingNoteId === note.id ? (
+                  <>
+                    <textarea
+                      className="text-sm text-black rounded p-1 w-full"
+                      value={editingContent}
+                      onChange={e => setEditingContent(e.target.value)}
+                    />
+                    <div className="flex gap-2 mt-1">
+                      <button className="text-green-400 hover:text-green-600 text-xs" onClick={() => handleSaveEditNote(note.id)}>Save</button>
+                      <button className="text-gray-400 hover:text-gray-600 text-xs" onClick={handleCancelEdit}>Cancel</button>
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <div className="text-sm text-white">{note.content}</div>
+                    <div className="text-xs text-gray-400 mt-1">
+                      Added by: {note.created_by || 'Unknown'} |
+                      {note.edited_at
+                        ? ` Edited at: ${new Date(note.edited_at).toLocaleString('en-GB')}`
+                        : ` Created at: ${new Date(note.created_at).toLocaleString('en-GB')}`}
+                    </div>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2 ml-2">
+                {editingNoteId !== note.id && (
+                  <button
+                    className="text-indigo-400 hover:text-indigo-600 transition-colors text-xs"
+                    onClick={() => handleEditNote(note)}
+                    title="Edit Note"
+                  >Edit</button>
+                )}
+                <button
+                  className="text-red-400 hover:text-red-600 transition-colors text-xs"
+                  onClick={() => handleDeleteNote(note.id)}
+                  title="Delete Note"
+                >Delete</button>
+              </div>
+            </div>
+          ))}
+            </ul>
+          )}
+          <div className="flex gap-2">
+            <input
+              type="text"
+              className="flex-1 border rounded-md px-2 py-1 text-sm dark:bg-gray-700 dark:text-white bg-gray-900 text-white"
+              placeholder="Add a note..."
+              value={newNote}
+              onChange={e => setNewNote(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') handleAddNote(); }}
+            />
+            <button
+              className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
+              onClick={handleAddNote}
+            >
+              Add
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+  </div>
   );
 }
