@@ -108,22 +108,16 @@ export function Dashboard() {
           subtitle="Students with registered status"
         />
         <DashboardCard
+          icon={<UserPlus className="h-6 sm:h-8 w-6 sm:w-8 text-cyan-500" />}
+          title="Available Students"
+          value={stats.availableStudents.toString()}
+          subtitle="Ready for new cases"
+        />
+        <DashboardCard
           icon={<Stethoscope className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />}
           title="Cases Today"
           value={stats.casesToday.toString()}
           subtitle="New cases today"
-        />
-        <DashboardCard
-          icon={<UserCheck className="h-6 sm:h-8 w-6 sm:w-8 text-indigo-500" />}
-          title="Attendance Rate"
-          value={`${stats.attendanceRate}%`}
-          subtitle="Present today"
-        />
-        <DashboardCard
-          icon={<Clock className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />}
-          title="Pending Cases"
-          value={stats.pendingCases.toString()}
-          subtitle="Awaiting assignment"
         />
         <DashboardCard
           icon={<CheckCircle className="h-6 sm:h-8 w-6 sm:w-8 text-emerald-500" />}
@@ -131,12 +125,20 @@ export function Dashboard() {
           value={stats.totalCasesDone.toString()}
           subtitle="Successfully completed"
         />
+        {/* <DashboardCard
+          icon={<UserCheck className="h-6 sm:h-8 w-6 sm:w-8 text-indigo-500" />}
+          title="Attendance Rate"
+          value={`${stats.attendanceRate}%`}
+          subtitle="Present today"
+        /> */}
         <DashboardCard
-          icon={<UserPlus className="h-6 sm:h-8 w-6 sm:w-8 text-cyan-500" />}
-          title="Available Students"
-          value={stats.availableStudents.toString()}
-          subtitle="Ready for new cases"
+          icon={<Clock className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />}
+          title="Pending Cases"
+          value={stats.pendingCases.toString()}
+          subtitle="Awaiting assignment"
         />
+
+
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
