@@ -1689,13 +1689,19 @@ export function StudentsPage() {
                     )}
                     {selectedColumns.includes('status') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
-                          student.is_available
-                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                        }`}>
-                          {student.is_available ? 'Available' : 'Busy'}
-                        </span>
+                        {student.registration_status === 'unregistered' ? (
+                          <span className="inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                            -
+                          </span>
+                        ) : (
+                          <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
+                            student.is_available
+                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                          }`}>
+                            {student.is_available ? 'Available' : 'Busy'}
+                          </span>
+                        )}
                       </td>
                     )}
                     {selectedColumns.includes('registration') && (
@@ -2009,11 +2015,15 @@ export function StudentsPage() {
                   </label>
                   <select
                     value={newStudent.registration_status}
-                    onChange={(e) => setNewStudent({
-                      ...newStudent,
-                      registration_status: e.target.value as typeof newStudent.registration_status,
-                      registration_end_date: e.target.value !== 'registered' ? null : newStudent.registration_end_date
-                    })}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as typeof newStudent.registration_status;
+                      setNewStudent({
+                        ...newStudent,
+                        registration_status: newStatus,
+                        registration_end_date: newStatus !== 'registered' ? null : newStudent.registration_end_date,
+                        // No need to set is_available here as the Status dropdown will handle it
+                      });
+                    }}
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
                   >
@@ -2044,14 +2054,31 @@ export function StudentsPage() {
                     Status
                   </label>
                   <select
-                    value={newStudent.is_available ? 'available' : 'busy'}
-                    onChange={e => setNewStudent({ ...newStudent, is_available: e.target.value === 'available' })}
+                    value={newStudent.registration_status === 'unregistered' ? '-' : (newStudent.is_available ? 'available' : 'busy')}
+                    onChange={e => {
+                      // Only update is_available if the student is not unregistered
+                      if (newStudent.registration_status !== 'unregistered') {
+                        setNewStudent({ ...newStudent, is_available: e.target.value === 'available' });
+                      }
+                    }}
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
                     style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
+                    disabled={newStudent.registration_status === 'unregistered'}
                   >
-                    <option value="available">Available</option>
-                    <option value="busy">Busy</option>
+                    {newStudent.registration_status === 'unregistered' ? (
+                      <option value="-">-</option>
+                    ) : (
+                      <>
+                        <option value="available">Available</option>
+                        <option value="busy">Busy</option>
+                      </>
+                    )}
                   </select>
+                  {newStudent.registration_status === 'unregistered' && (
+                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
+                      Unregistered students have status "-"
+                    </p>
+                  )}
                 </div>
 
               </div>

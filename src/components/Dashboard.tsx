@@ -12,6 +12,7 @@ export function Dashboard() {
     totalCasesDone: 0,
     availableStudents: 0
   });
+  const [registeredStudents, setRegisteredStudents] = useState(0);
   const [recentCases, setRecentCases] = useState<Patient[]>([]);
   const [todayAttendance, setTodayAttendance] = useState<Student[]>([]);
   const [loading, setLoading] = useState(true);
@@ -55,7 +56,8 @@ export function Dashboard() {
 
       // Calculate stats
       const totalStudents = studentsResult.data?.length || 0;
-      const availableStudents = studentsResult.data?.filter(s => s.is_available).length || 0;
+      // Update this line to filter for both registered and available students
+      const availableStudents = studentsResult.data?.filter(s => s.is_available && s.registration_status === 'registered').length || 0;
       const casesToday = casesTodayResult.data?.length || 0;
       const pendingCases = pendingCasesResult.data?.length || 0;
       const totalCasesDone = completedCasesResult.data?.length || 0;
@@ -70,7 +72,8 @@ export function Dashboard() {
         totalCasesDone,
         availableStudents
       });
-
+      // Fix this line to use registration_status instead of status:
+      setRegisteredStudents(studentsResult.data?.filter(s => s.registration_status === 'registered').length || 0);
       setRecentCases(recentCasesResult.data || []);
       setTodayAttendance(studentsResult.data?.slice(0, 5) || []);
     } catch (error) {
@@ -91,13 +94,18 @@ export function Dashboard() {
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 dark:text-white">Dashboard</h1>
-      
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
         <DashboardCard
           icon={<Users className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />}
           title="Total Students"
           value={stats.totalStudents.toString()}
-          subtitle="Active students"
+          subtitle="Total students in system"
+        />
+        <DashboardCard
+          icon={<Users className="h-6 sm:h-8 w-6 sm:w-8 text-orange-500" />}
+          title="Currently Registered Students"
+          value={registeredStudents.toString()}
+          subtitle="Students with registered status"
         />
         <DashboardCard
           icon={<Stethoscope className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />}
