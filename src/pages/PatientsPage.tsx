@@ -19,6 +19,8 @@ export function PatientsPage() {
   const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
   const [editingContent, setEditingContent] = useState('');
+  // Track patients with notes
+  const [patientsWithNotes, setPatientsWithNotes] = useState<Set<string>>(new Set());
 
   const handleEditNote = (note: any) => {
     setEditingNoteId(note.id);
@@ -95,6 +97,9 @@ export function PatientsPage() {
       if (error) throw error;
       setNotes([data, ...notes]);
       setNewNote('');
+      
+      // Update patientsWithNotes
+      setPatientsWithNotes(prev => new Set(prev).add(notesPatient.id));
     } catch (err) {
       setNotesError('Failed to add note');
     }
@@ -108,7 +113,16 @@ export function PatientsPage() {
         .delete()
         .eq('id', noteId);
       if (error) throw error;
-      setNotes(notes.filter(n => n.id !== noteId));
+      
+      const updatedNotes = notes.filter(n => n.id !== noteId);
+      setNotes(updatedNotes);
+      
+      // If this was the last note for this patient, update patientsWithNotes
+      if (updatedNotes.length === 0 && notesPatient) {
+        const newSet = new Set(patientsWithNotes);
+        newSet.delete(notesPatient.id);
+        setPatientsWithNotes(newSet);
+      }
     } catch (err) {
       setNotesError('Failed to delete note');
     }
@@ -215,7 +229,26 @@ export function PatientsPage() {
   useEffect(() => {
     fetchData();
     fetchWorkingDays();
+    fetchPatientsWithNotes();
   }, []);
+
+  // Fetch patients with notes
+  async function fetchPatientsWithNotes() {
+    try {
+      const { data, error } = await supabase
+        .from('patient_notes')
+        .select('patient_id')
+        .order('created_at', { ascending: false });
+      
+      if (error) throw error;
+      
+      // Create a Set of patient IDs that have notes
+      const patientIdsWithNotes = new Set(data.map(note => note.patient_id));
+      setPatientsWithNotes(patientIdsWithNotes);
+    } catch (err) {
+      console.error('Failed to load patients with notes:', err);
+    }
+  }
 
   async function fetchData() {
     try {
@@ -771,7 +804,19 @@ export function PatientsPage() {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{patient.ticket_number}</td>
                     )}
                     {selectedColumns.includes('name') && (
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">{patient.name}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        <div className="flex items-center">
+                          {patient.name}
+                          {patientsWithNotes.has(patient.id) && (
+                            <span 
+                              className="ml-2 text-yellow-500" 
+                              title="This patient has notes"
+                            >
+                              📝
+                            </span>
+                          )}
+                        </div>
+                      </td>
                     )}
                     {selectedColumns.includes('mobile') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{patient.mobile}</td>
