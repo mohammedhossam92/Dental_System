@@ -493,26 +493,27 @@ export function PatientsPage() {
       const studentUpdates = [];
 
       // Case 1: Student was reassigned
-      if (previousStudentId !== editPatient.student_id) {
-        // Make the previous student available if there was one
-        if (previousStudentId) {
-          studentUpdates.push(
-            supabase
-              .from('students')
-              .update({ is_available: true })
-              .eq('id', previousStudentId)
-          );
-        }
+                if (previousStudentId !== editPatient.student_id) {
+                  // Make the previous student available if there was one
+                  if (previousStudentId) {
+                    studentUpdates.push(
+                      supabase
+                        .from('students')
+                        .update({ is_available: true })
+                        .eq('id', previousStudentId)
+                    );
+                  }
 
-        // Make the new student busy if the status is in_progress
-        if (editPatient.student_id && editPatient.status === 'in_progress') {
-          studentUpdates.push(
-            supabase
-              .from('students')
-              .update({ is_available: false })
-              .eq('id', editPatient.student_id)
-          );
-        }
+                  // Make the new student busy if a student is assigned, regardless of status
+                  // (except for completed status which should keep the student available)
+                  if (editPatient.student_id && editPatient.status !== 'completed') {
+                    studentUpdates.push(
+                      supabase
+                        .from('students')
+                        .update({ is_available: false })
+                        .eq('id', editPatient.student_id)
+                    );
+                  }
       }
       // Case 2: Status changed with the same student
       else if (previousStatus !== editPatient.status && editPatient.student_id) {
