@@ -469,23 +469,20 @@ export function PatientsPage() {
       const previousStudentId = originalPatient.student_id;
 
       // First update the patient
-      const { error } = await supabase
-        .from('patients')
-        .update({
-          ticket_number: editPatient.ticket_number,
-          name: editPatient.name,
-          mobile: editPatient.mobile,
-          class_year_id: editPatient.class_year_id,
-          student_id: editPatient.student_id,
-          treatment_id: editPatient.treatment_id,
-          tooth_number: editPatient.tooth_number,
-          tooth_class_id: editPatient.tooth_class_id,
-          start_date: editPatient.start_date,
-          end_date: editPatient.end_date,
-          status: editPatient.status,
-          age: editPatient.age
-        })
-        .eq('id', editPatient.id);
+                const { error } = await supabase
+                  .from('patients')
+                  .update({
+                    ticket_number: editPatient.ticket_number,
+                    name: editPatient.name,
+                    mobile: editPatient.mobile,
+                    class_year_id: editPatient.class_year_id,
+                    student_id: editPatient.student_id,
+                    start_date: editPatient.start_date,
+                    end_date: editPatient.end_date,
+                    status: editPatient.status,
+                    age: editPatient.age
+                  })
+                  .eq('id', editPatient.id);
 
       if (error) throw error;
 
@@ -1396,24 +1393,6 @@ export function PatientsPage() {
                       <option value="in_progress">In Progress</option>
                       <option value="completed">Completed</option>
                       <option value="cancelled">Cancelled</option>
-                    </select>
-                  </div>
-
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Treatment
-                    </label>
-                    <select
-                      value={editPatient.treatment_id || ''}
-                      onChange={(e) => setEditPatient({ ...editPatient, treatment_id: e.target.value })}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                    >
-                      <option value="">Select treatment</option>
-                      {treatments.map((treatment) => (
-                        <option key={treatment.id} value={treatment.id}>
-                          {treatment.name}
-                        </option>
-                      ))}
                     </select>
                   </div>
                 </div>

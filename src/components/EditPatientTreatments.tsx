@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { supabase } from '../lib/supabase';
 import { DentalChartPicker } from './DentalChartPicker';
 import type { Treatment, ToothClass, PatientToothTreatment, Patient } from '../types';
+import Swal from 'sweetalert2'; // Add this import
 
 interface EditPatientTreatmentsProps {
   patientId: string;
@@ -101,12 +102,13 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
     // Update the main patient record with the primary treatment's tooth info
     if (primaryTreatment) {
       const updates = {
+        treatment_id: primaryTreatment.treatment_id,
         tooth_number: primaryTreatment.tooth_number,
         tooth_class_id: primaryTreatment.tooth_class_id
       };
-
+    
       const { error } = await supabase.from('patients').update(updates).eq('id', patientId);
-
+    
       if (error) {
         setError('Failed to update patient tooth information');
         console.error('Error updating patient:', error);
@@ -120,6 +122,18 @@ const EditPatientTreatments: React.FC<EditPatientTreatmentsProps> = ({ patientId
 
     setSaving(false);
     if (onChange) onChange();
+    
+    // Show success message if no errors occurred
+    if (!error) {
+      Swal.fire({
+        title: 'Success!',
+        text: 'Treatment changes saved successfully',
+        icon: 'success',
+        confirmButtonColor: '#4f46e5',
+        timer: 2000
+      });
+    }
+    
     // Do NOT reload from DB here, keep local state for new rows
     // fetchToothTreatments();
   }
