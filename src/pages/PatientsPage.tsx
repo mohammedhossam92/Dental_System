@@ -7,6 +7,7 @@ import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from
 import { supabase } from '../lib/supabase';
 import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } from '../types';
 import Swal from 'sweetalert2';
+import { PatientCard } from '../components/PatientCard';
 
 // If you have a type for patient notes, use it here. Otherwise, fallback to any.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -36,7 +37,7 @@ export function PatientsPage() {
     setNotesError('');
     try {
       const now = new Date().toISOString();
-      const { error, data } = await supabase
+      const { error } = await supabase
         .from('patient_notes')
         .update({ content: editingContent, edited_at: now })
         .eq('id', noteId);
@@ -705,6 +706,38 @@ export function PatientsPage() {
     setIsInfoModalOpen(true);
   };
 
+  // Responsive check for mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Add state for mobile filter modal
+  const [isMobileFilterModalOpen, setIsMobileFilterModalOpen] = useState(false);
+
+  // Pagination state for desktop
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(10); // desktop default 10
+  const totalPages = Math.ceil(filteredPatients.length / rowsPerPage);
+  const paginatedPatients = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredPatients.slice(start, start + rowsPerPage);
+  }, [filteredPatients, currentPage, rowsPerPage]);
+  useEffect(() => { setCurrentPage(1); }, [filteredPatients, rowsPerPage]);
+
+  // Pagination state for mobile
+  const [mobileCurrentPage, setMobileCurrentPage] = useState(1);
+  const [mobileRowsPerPage, setMobileRowsPerPage] = useState(5); // mobile default 5
+  const mobileTotalPages = Math.ceil(filteredPatients.length / mobileRowsPerPage);
+  const paginatedMobilePatients = useMemo(() => {
+    const start = (mobileCurrentPage - 1) * mobileRowsPerPage;
+    return filteredPatients.slice(start, start + mobileRowsPerPage);
+  }, [filteredPatients, mobileCurrentPage, mobileRowsPerPage]);
+  useEffect(() => { setMobileCurrentPage(1); }, [filteredPatients, mobileRowsPerPage]);
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -729,7 +762,7 @@ export function PatientsPage() {
           </div>
           <button
             onClick={() => setIsFilterModalOpen(true)}
-            className="flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+            className="hidden sm:flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
           >
             <Filter className="h-5 w-5 mr-2" />
             Filter Columns
@@ -785,7 +818,8 @@ export function PatientsPage() {
         />
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+      {/* DESKTOP TABLE VIEW */}
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden hidden sm:block">
         <div className="overflow-x-auto">
           <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
@@ -838,14 +872,14 @@ export function PatientsPage() {
                     Loading...
                   </td>
                 </tr>
-              ) : filteredPatients.length === 0 ? (
+              ) : paginatedPatients.length === 0 ? (
                 <tr>
                   <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No patients found
                   </td>
                 </tr>
               ) : (
-                filteredPatients.map((patient) => (
+                paginatedPatients.map((patient) => (
                   <tr key={patient.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                     {selectedColumns.includes('ticket') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{patient.ticket_number}</td>
@@ -987,7 +1021,210 @@ export function PatientsPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls for Desktop */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={e => setRowsPerPage(Number(e.target.value))}
+                className="rounded-md border-gray-300 text-sm dark:bg-gray-700 dark:text-white"
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
+      {/* MOBILE FILTER BAR */}
+      {isMobile && (
+        <div className="sm:hidden flex justify-between items-center mb-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+            Showing <span className="font-bold text-indigo-600 dark:text-indigo-400">{filteredPatients.length}</span> patient{filteredPatients.length !== 1 ? 's' : ''}
+          </div>
+          <button
+            onClick={() => setIsMobileFilterModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full shadow hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <Filter className="h-5 w-5" />
+            Filters
+          </button>
+        </div>
+      )}
+      {/* Mobile Filter Modal */}
+      {isMobile && isMobileFilterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md mx-2 relative">
+            <button
+              onClick={() => setIsMobileFilterModalOpen(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+              <Filter className="h-5 w-5" /> Filters
+            </h2>
+            <div className="space-y-3">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="all">All Status</option>
+                  <option value="pending">Pending</option>
+                  <option value="in_progress">In Progress</option>
+                  <option value="completed">Completed</option>
+                  <option value="cancelled">Cancelled</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Class Year</label>
+                <select
+                  value={classYearFilter}
+                  onChange={e => setClassYearFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="all">All Class Years</option>
+                  {classYears.map(cy => (
+                    <option key={cy.id} value={cy.id}>{cy.year_range}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Working Days</label>
+                <select
+                  value={workingDaysFilter}
+                  onChange={e => setWorkingDaysFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="all">All Working Days</option>
+                  {workingDays.map(wd => (
+                    <option key={wd.id} value={wd.id}>{wd.name}</option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Treatment</label>
+                <select
+                  value={treatmentFilter}
+                  onChange={e => setTreatmentFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+                >
+                  <option value="all">All Treatments</option>
+                  {treatments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-between gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setStatusFilter('all');
+                  setClassYearFilter('all');
+                  setWorkingDaysFilter('all');
+                  setTreatmentFilter('all');
+                  setIsMobileFilterModalOpen(false);
+                }}
+                className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Clear Filters
+              </button>
+              <button
+                onClick={() => setIsMobileFilterModalOpen(false)}
+                className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* MOBILE CARD LIST VIEW */}
+      {isMobile && (
+        <div className="sm:hidden">
+          {paginatedMobilePatients.length === 0 && !loading ? (
+            <div className="text-center py-8 text-gray-500">No patients found</div>
+          ) : (
+            paginatedMobilePatients.map((patient) => (
+              <PatientCard
+                key={patient.id}
+                patient={patient}
+                doctorName={students.find(s => s.id === patient.student_id)?.name || 'Unassigned'}
+                classYear={classYears.find(cy => cy.id === patient.class_year_id)?.year_range}
+                treatmentName={treatments.find(t => t.id === patient.treatment_id)?.name}
+                toothClassName={toothClasses.find(tc => tc.id === patient.tooth_class_id)?.name}
+                onEdit={openEditModal}
+                onDelete={handleDeletePatient}
+                onInfo={openInfoModal}
+                onNotes={openNotesModal}
+                hasNotes={patientsWithNotes.has(patient.id)}
+                onStatusChange={handleStatusChange}
+              />
+            ))
+          )}
+          {/* Pagination Controls for Mobile */}
+          {mobileTotalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMobileCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={mobileCurrentPage === 1}
+                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {mobileCurrentPage} of {mobileTotalPages}
+                </span>
+                <button
+                  onClick={() => setMobileCurrentPage(p => Math.min(mobileTotalPages, p + 1))}
+                  disabled={mobileCurrentPage === mobileTotalPages}
+                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 dark:text-gray-300">Cards per page:</span>
+                <select
+                  value={mobileRowsPerPage}
+                  onChange={e => setMobileRowsPerPage(Number(e.target.value))}
+                  className="rounded-md border-gray-300 text-sm dark:bg-gray-700 dark:text-white"
+                >
+                  {[3, 5, 10, 20].map(size => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {/* Add Patient Modal */}
       {isModalOpen && (

@@ -6,7 +6,6 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
-import InfiniteScroll from 'react-infinite-scroll-component';
 
 // StudentCard component OUTSIDE StudentsPage
 function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal }: {
@@ -1060,29 +1059,6 @@ export function StudentsPage() {
     }
   }
 
-  // Add state for infinite scroll
-  const [visibleStudents, setVisibleStudents] = useState<Student[]>([]);
-  const [hasMore, setHasMore] = useState(true);
-  const PAGE_SIZE = 20;
-
-  // On students/filter change, reset visibleStudents
-  useEffect(() => {
-    setVisibleStudents(filteredStudents.slice(0, PAGE_SIZE));
-    setHasMore(filteredStudents.length > PAGE_SIZE);
-  }, [filteredStudents]);
-
-  // Function to load more students
-  const fetchMoreStudents = () => {
-    if (visibleStudents.length >= filteredStudents.length) {
-      setHasMore(false);
-      return;
-    }
-    const next = filteredStudents.slice(visibleStudents.length, visibleStudents.length + PAGE_SIZE);
-    const newVisible = [...visibleStudents, ...next];
-    setVisibleStudents(newVisible);
-    setHasMore(newVisible.length < filteredStudents.length);
-  };
-
   // Responsive check for mobile
   const [isMobile, setIsMobile] = useState(false);
   useEffect(() => {
@@ -1103,6 +1079,34 @@ export function StudentsPage() {
     // Do not add setRegistrationFilter to deps to avoid infinite loop
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isMobile]);
+
+  // Pagination state for desktop
+  const [currentPage, setCurrentPage] = useState(1);
+  const [rowsPerPage, setRowsPerPage] = useState(20);
+  const totalPages = Math.ceil(filteredStudents.length / rowsPerPage);
+  const paginatedStudents = useMemo(() => {
+    const start = (currentPage - 1) * rowsPerPage;
+    return filteredStudents.slice(start, start + rowsPerPage);
+  }, [filteredStudents, currentPage, rowsPerPage]);
+
+  // Reset to first page when filters/search change
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [filteredStudents, rowsPerPage]);
+
+  // Pagination state for mobile
+  const [mobileCurrentPage, setMobileCurrentPage] = useState(1);
+  const [mobileRowsPerPage, setMobileRowsPerPage] = useState(5);
+  const mobileTotalPages = Math.ceil(filteredStudents.length / mobileRowsPerPage);
+  const paginatedMobileStudents = useMemo(() => {
+    const start = (mobileCurrentPage - 1) * mobileRowsPerPage;
+    return filteredStudents.slice(start, start + mobileRowsPerPage);
+  }, [filteredStudents, mobileCurrentPage, mobileRowsPerPage]);
+
+  // Reset to first page when filters/search change (mobile)
+  useEffect(() => {
+    setMobileCurrentPage(1);
+  }, [filteredStudents, mobileRowsPerPage]);
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
@@ -1259,7 +1263,7 @@ export function StudentsPage() {
       {isMobile && (
         <div className="sm:hidden flex justify-between items-center mb-4">
           <div className="text-sm text-gray-500 dark:text-gray-400 ml-2">
-            Showing <span className="font-bold text-indigo-600 dark:text-indigo-400">{visibleStudents.length}</span> student{visibleStudents.length !== 1 ? 's' : ''}
+            Showing <span className="font-bold text-indigo-600 dark:text-indigo-400">{filteredStudents.length}</span> student{filteredStudents.length !== 1 ? 's' : ''}
           </div>
           <button
             onClick={() => setIsMobileFilterModalOpen(true)}
@@ -1771,14 +1775,14 @@ export function StudentsPage() {
                     Loading...
                   </td>
                 </tr>
-              ) : filteredStudents.length === 0 ? (
+              ) : paginatedStudents.length === 0 ? (
                 <tr>
                   <td colSpan={selectedColumns.length + 1} className="px-6 py-4 text-center text-gray-500 dark:text-gray-400">
                     No students found
                   </td>
                 </tr>
               ) : (
-                filteredStudents.map((student) => (
+                paginatedStudents.map((student) => (
                   <tr key={student.id} className="hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors duration-200">
                     {selectedColumns.includes('name') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
@@ -1872,6 +1876,42 @@ export function StudentsPage() {
             </tbody>
           </table>
         </div>
+        {/* Pagination Controls */}
+        {totalPages > 1 && (
+          <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700">
+            <div className="flex items-center gap-2">
+              <button
+                onClick={() => setCurrentPage(p => Math.max(1, p - 1))}
+                disabled={currentPage === 1}
+                className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Previous
+              </button>
+              <span className="text-sm text-gray-700 dark:text-gray-300">
+                Page {currentPage} of {totalPages}
+              </span>
+              <button
+                onClick={() => setCurrentPage(p => Math.min(totalPages, p + 1))}
+                disabled={currentPage === totalPages}
+                className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+              >
+                Next
+              </button>
+            </div>
+            <div className="flex items-center gap-2">
+              <span className="text-sm text-gray-700 dark:text-gray-300">Rows per page:</span>
+              <select
+                value={rowsPerPage}
+                onChange={e => setRowsPerPage(Number(e.target.value))}
+                className="rounded-md border-gray-300 text-sm dark:bg-gray-700 dark:text-white"
+              >
+                {[10, 20, 50, 100].map(size => (
+                  <option key={size} value={size}>{size}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Filter Columns Modal */}
@@ -2711,17 +2751,11 @@ export function StudentsPage() {
 
       {/* MOBILE CARD LIST VIEW */}
       {isMobile && (
-        <InfiniteScroll
-          dataLength={visibleStudents.length}
-          next={fetchMoreStudents}
-          hasMore={hasMore}
-          loader={<div className="text-center py-4 text-gray-500">Loading...</div>}
-          endMessage={<div className="text-center py-4 text-gray-400">No more students</div>}
-        >
-          {visibleStudents.length === 0 && !loading ? (
+        <div className="sm:hidden">
+          {paginatedMobileStudents.length === 0 && !loading ? (
             <div className="text-center py-8 text-gray-500">No students found</div>
           ) : (
-            visibleStudents.map((student) => (
+            paginatedMobileStudents.map((student) => (
               <StudentCard
                 key={student.id}
                 student={student}
@@ -2734,7 +2768,43 @@ export function StudentsPage() {
               />
             ))
           )}
-        </InfiniteScroll>
+          {/* Pagination Controls for Mobile */}
+          {mobileTotalPages > 1 && (
+            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-2">
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setMobileCurrentPage(p => Math.max(1, p - 1))}
+                  disabled={mobileCurrentPage === 1}
+                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Previous
+                </button>
+                <span className="text-sm text-gray-700 dark:text-gray-300">
+                  Page {mobileCurrentPage} of {mobileTotalPages}
+                </span>
+                <button
+                  onClick={() => setMobileCurrentPage(p => Math.min(mobileTotalPages, p + 1))}
+                  disabled={mobileCurrentPage === mobileTotalPages}
+                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                >
+                  Next
+                </button>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-gray-700 dark:text-gray-300">Cards per page:</span>
+                <select
+                  value={mobileRowsPerPage}
+                  onChange={e => setMobileRowsPerPage(Number(e.target.value))}
+                  className="rounded-md border-gray-300 text-sm dark:bg-gray-700 dark:text-white"
+                >
+                  {[3, 5, 10, 20].map(size => (
+                    <option key={size} value={size}>{size}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+          )}
+        </div>
       )}
     </div>
   );
