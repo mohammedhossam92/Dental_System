@@ -748,6 +748,34 @@ export function PatientsPage() {
     }
   }, [mobileCurrentPage, mobileRowsPerPage]);
 
+  // State for month filter
+  const [monthFilter, setMonthFilter] = useState('');
+
+  // Helper to get start and end date of a month
+  function getMonthRange(month: string) {
+    if (!month) return { start: '', end: '' };
+    const year = new Date().getFullYear();
+    const monthIndex = [
+      'January', 'February', 'March', 'April', 'May', 'June',
+      'July', 'August', 'September', 'October', 'November', 'December'
+    ].indexOf(month);
+    if (monthIndex === -1) return { start: '', end: '' };
+    const start = new Date(year, monthIndex, 1);
+    const end = new Date(year, monthIndex + 1, 0);
+    return {
+      start: start.toISOString().split('T')[0],
+      end: end.toISOString().split('T')[0]
+    };
+  }
+
+  // When monthFilter changes, update dateRange
+  useEffect(() => {
+    if (monthFilter) {
+      const { start, end } = getMonthRange(monthFilter);
+      setDateRange({ start, end });
+    }
+  }, [monthFilter]);
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -759,29 +787,49 @@ export function PatientsPage() {
             <input
               type="date"
               value={dateRange.start}
-              onChange={e => setDateRange(r => ({ ...r, start: e.target.value }))}
+              onChange={e => {
+                setDateRange(r => ({ ...r, start: e.target.value }));
+                setMonthFilter(''); // Clear month filter if manual date is picked
+              }}
               className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
             />
             <label className="text-xs text-gray-700 dark:text-gray-300 mx-1">To</label>
             <input
               type="date"
               value={dateRange.end}
-              onChange={e => setDateRange(r => ({ ...r, end: e.target.value }))}
+              onChange={e => {
+                setDateRange(r => ({ ...r, end: e.target.value }));
+                setMonthFilter(''); // Clear month filter if manual date is picked
+              }}
               className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
             />
           </div>
+          {/* Or filter by month */}
+          <div className="flex items-center gap-3 mt-2">
+            <span className="text-base font-semibold text-indigo-700 dark:text-indigo-300 sm:mr-4">or filter by month</span>
+            <select
+              value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-base font-semibold sm:mr-4"
+            >
+              <option value="">Select month</option>
+              {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={() => setIsFilterModalOpen(true)}
-            className="hidden sm:flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200"
+            className="hidden sm:flex items-center justify-center px-5 py-3 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 text-base font-semibold"
           >
             <Filter className="h-5 w-5 mr-2" />
             Filter Columns
           </button>
           <button
             onClick={() => setIsModalOpen(true)}
-            className="flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+            className="flex items-center justify-center w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow"
           >
-            <Plus className="h-5 w-5 mr-2" />
+            <Plus className="h-6 w-6 mr-3" />
             Add Patient
           </button>
         </div>
