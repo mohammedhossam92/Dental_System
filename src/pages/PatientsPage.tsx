@@ -797,39 +797,43 @@ export function PatientsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
         <div className="flex flex-col sm:flex-row sm:items-center gap-4">
           {/* Date Range Filter */}
-          <div className="flex items-center gap-2">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Date Range:</span>
-            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-md px-3 py-2 border border-gray-300 dark:border-gray-600">
-              <label className="text-xs text-gray-700 dark:text-gray-300">From</label>
-              <input
-                type="date"
-                value={dateRange.start}
-                onChange={e => {
-                  setDateRange(r => ({ ...r, start: e.target.value }));
-                  setMonthFilter(''); // Clear month filter if manual date is picked
-                }}
-                className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-              />
-              <label className="text-xs text-gray-700 dark:text-gray-300 mx-1">To</label>
-              <input
-                type="date"
-                value={dateRange.end}
-                onChange={e => {
-                  setDateRange(r => ({ ...r, end: e.target.value }));
-                  setMonthFilter(''); // Clear month filter if manual date is picked
-                }}
-                className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-              />
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-2 bg-white dark:bg-gray-700 rounded-md px-3 py-2 border border-gray-300 dark:border-gray-600 w-full sm:w-auto">
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">From</label>
+                <input
+                  type="date"
+                  value={dateRange.start}
+                  onChange={e => {
+                    setDateRange(r => ({ ...r, start: e.target.value }));
+                    setMonthFilter(''); // Clear month filter if manual date is picked
+                  }}
+                  className="flex-1 sm:flex-none p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 min-w-0"
+                />
+              </div>
+              <div className="flex items-center gap-2 w-full sm:w-auto">
+                <label className="text-xs text-gray-700 dark:text-gray-300 whitespace-nowrap">To</label>
+                <input
+                  type="date"
+                  value={dateRange.end}
+                  onChange={e => {
+                    setDateRange(r => ({ ...r, end: e.target.value }));
+                    setMonthFilter(''); // Clear month filter if manual date is picked
+                  }}
+                  className="flex-1 sm:flex-none p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200 min-w-0"
+                />
+              </div>
             </div>
           </div>
           
           {/* Or filter by month */}
-          <div className="flex items-center gap-2">
-            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Or by month:</span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-2">
+            <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 sm:text-gray-700 sm:dark:text-gray-300">Or by month:</span>
             <select
               value={monthFilter}
               onChange={e => setMonthFilter(e.target.value)}
-              className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+              className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm w-full sm:w-auto"
             >
               <option value="">Select month</option>
               {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => (
@@ -849,7 +853,7 @@ export function PatientsPage() {
         </button>
       </div>
 
-      {/* Search Bar with Filter Button - Resized to fill row with spacing */}
+      {/* Search Bar - Remove duplicate filter button for mobile */}
       <div className="flex gap-4 items-center">
         <div className="relative flex-1">
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
@@ -862,10 +866,10 @@ export function PatientsPage() {
           />
         </div>
         
-        {/* Filter Button with proper sizing */}
+        {/* Filter Button - Only show on desktop, mobile has its own */}
         <button
           onClick={() => setIsFiltersModalOpen(true)}
-          className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 text-sm font-medium border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+          className="hidden sm:flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 text-sm font-medium border border-gray-300 dark:border-gray-600 whitespace-nowrap"
         >
           <Filter className="h-4 w-4 mr-2" />
           Filters
