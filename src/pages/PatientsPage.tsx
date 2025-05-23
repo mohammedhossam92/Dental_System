@@ -717,6 +717,8 @@ export function PatientsPage() {
 
   // Add state for mobile filter modal
   const [isMobileFilterModalOpen, setIsMobileFilterModalOpen] = useState(false);
+  // Add state for the filters modal
+  const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
 
   // Pagination state for desktop
   const [currentPage, setCurrentPage] = useState(1);
@@ -781,50 +783,6 @@ export function PatientsPage() {
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
         <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Patients Management</h1>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
-          {/* Date Range Filter */}
-          <div className="flex items-center gap-2 bg-gray-100 dark:bg-gray-700 rounded-md px-2 py-1">
-            <label className="text-xs text-gray-700 dark:text-gray-300 mr-1">From</label>
-            <input
-              type="date"
-              value={dateRange.start}
-              onChange={e => {
-                setDateRange(r => ({ ...r, start: e.target.value }));
-                setMonthFilter(''); // Clear month filter if manual date is picked
-              }}
-              className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-            />
-            <label className="text-xs text-gray-700 dark:text-gray-300 mx-1">To</label>
-            <input
-              type="date"
-              value={dateRange.end}
-              onChange={e => {
-                setDateRange(r => ({ ...r, end: e.target.value }));
-                setMonthFilter(''); // Clear month filter if manual date is picked
-              }}
-              className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-            />
-          </div>
-          {/* Or filter by month */}
-          <div className="flex items-center gap-3 mt-2">
-            <span className="text-base font-semibold text-indigo-700 dark:text-indigo-300 sm:mr-4">or filter by month</span>
-            <select
-              value={monthFilter}
-              onChange={e => setMonthFilter(e.target.value)}
-              className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-base font-semibold sm:mr-4"
-            >
-              <option value="">Select month</option>
-              {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => (
-                <option key={m} value={m}>{m}</option>
-              ))}
-            </select>
-          </div>
-          <button
-            onClick={() => setIsFilterModalOpen(true)}
-            className="hidden sm:flex items-center justify-center px-5 py-3 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 text-base font-semibold"
-          >
-            <Filter className="h-5 w-5 mr-2" />
-            Filter Columns
-          </button>
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center justify-center w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow"
@@ -835,45 +793,88 @@ export function PatientsPage() {
         </div>
       </div>
 
-      {/* Add filter bar above the table (desktop only) */}
-      <div className="hidden sm:flex flex-wrap gap-2 mb-4 items-center">
-        <Filter className="h-5 w-5 text-gray-400 mr-1" />
-        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
-          <option value="all">All Status</option>
-          <option value="pending">Pending</option>
-          <option value="in_progress">In Progress</option>
-          <option value="completed">Completed</option>
-          <option value="cancelled">Cancelled</option>
-        </select>
-        <select value={classYearFilter} onChange={e => setClassYearFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
-          <option value="all">All Class Years</option>
-          {classYears.map(cy => (
-            <option key={cy.id} value={cy.id}>{cy.year_range}</option>
-          ))}
-        </select>
-        <select value={workingDaysFilter} onChange={e => setWorkingDaysFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
-          <option value="all">All Working Days</option>
-          {workingDays.map(wd => (
-            <option key={wd.id} value={wd.id}>{wd.name}</option>
-          ))}
-        </select>
-        <select value={treatmentFilter} onChange={e => setTreatmentFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
-          <option value="all">All Treatments</option>
-          {treatments.map(t => (
-            <option key={t.id} value={t.id}>{t.name}</option>
-          ))}
-        </select>
+      {/* Date Range and Month Filter Section - Updated layout */}
+      <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 bg-gray-50 dark:bg-gray-800 p-4 rounded-lg">
+        <div className="flex flex-col sm:flex-row sm:items-center gap-4">
+          {/* Date Range Filter */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300 mr-2">Date Range:</span>
+            <div className="flex items-center gap-2 bg-white dark:bg-gray-700 rounded-md px-3 py-2 border border-gray-300 dark:border-gray-600">
+              <label className="text-xs text-gray-700 dark:text-gray-300">From</label>
+              <input
+                type="date"
+                value={dateRange.start}
+                onChange={e => {
+                  setDateRange(r => ({ ...r, start: e.target.value }));
+                  setMonthFilter(''); // Clear month filter if manual date is picked
+                }}
+                className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              />
+              <label className="text-xs text-gray-700 dark:text-gray-300 mx-1">To</label>
+              <input
+                type="date"
+                value={dateRange.end}
+                onChange={e => {
+                  setDateRange(r => ({ ...r, end: e.target.value }));
+                  setMonthFilter(''); // Clear month filter if manual date is picked
+                }}
+                className="p-1 border rounded-md text-xs dark:bg-gray-800 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+              />
+            </div>
+          </div>
+          
+          {/* Or filter by month */}
+          <div className="flex items-center gap-2">
+            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">Or by month:</span>
+            <select
+              value={monthFilter}
+              onChange={e => setMonthFilter(e.target.value)}
+              className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
+            >
+              <option value="">Select month</option>
+              {['January','February','March','April','May','June','July','August','September','October','November','December'].map(m => (
+                <option key={m} value={m}>{m}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        
+        {/* Filter Columns button moved to the end */}
+        <button
+          onClick={() => setIsFilterModalOpen(true)}
+          className="hidden sm:flex items-center justify-center px-4 py-2 bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors duration-200 text-sm font-medium whitespace-nowrap"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filter Columns
+        </button>
       </div>
 
-      <div className="relative">
-        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search by name, ticket number, mobile or doctor..."
-          className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-        />
+      {/* Search Bar with Filter Button - Resized to fill row with spacing */}
+      <div className="flex gap-4 items-center">
+        <div className="relative flex-1">
+          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+          <input
+            type="text"
+            placeholder="Search by name, ticket number, mobile or doctor..."
+            className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200 text-sm"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
+          />
+        </div>
+        
+        {/* Filter Button with proper sizing */}
+        <button
+          onClick={() => setIsFiltersModalOpen(true)}
+          className="flex items-center justify-center px-4 py-2 bg-gray-100 text-gray-700 dark:bg-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200 text-sm font-medium border border-gray-300 dark:border-gray-600 whitespace-nowrap"
+        >
+          <Filter className="h-4 w-4 mr-2" />
+          Filters
+          {(statusFilter !== 'in_progress' || classYearFilter !== 'all' || workingDaysFilter !== 'all' || treatmentFilter !== 'all') && (
+            <span className="ml-2 bg-indigo-600 text-white text-xs px-1.5 py-0.5 rounded-full">
+              {[statusFilter !== 'in_progress', classYearFilter !== 'all', workingDaysFilter !== 'all', treatmentFilter !== 'all'].filter(Boolean).length}
+            </span>
+          )}
+        </button>
       </div>
 
       {/* DESKTOP TABLE VIEW */}
@@ -2075,6 +2076,114 @@ export function PatientsPage() {
               onClick={handleAddNote}
             >
               Add
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* Filters Modal */}
+    {isFiltersModalOpen && (
+      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Patients</h3>
+            <button
+              onClick={() => setIsFiltersModalOpen(false)}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+            >
+              <X className="h-6 w-6" />
+            </button>
+          </div>
+          
+          <div className="space-y-4">
+            {/* Status Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Status
+              </label>
+              <select 
+                value={statusFilter} 
+                onChange={e => setStatusFilter(e.target.value)} 
+                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Status</option>
+                <option value="pending">Pending</option>
+                <option value="in_progress">In Progress</option>
+                <option value="completed">Completed</option>
+                <option value="cancelled">Cancelled</option>
+              </select>
+            </div>
+
+            {/* Class Year Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Class Year
+              </label>
+              <select 
+                value={classYearFilter} 
+                onChange={e => setClassYearFilter(e.target.value)} 
+                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Class Years</option>
+                {classYears.map(cy => (
+                  <option key={cy.id} value={cy.id}>{cy.year_range}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Working Days Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Working Days
+              </label>
+              <select 
+                value={workingDaysFilter} 
+                onChange={e => setWorkingDaysFilter(e.target.value)} 
+                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Working Days</option>
+                {workingDays.map(wd => (
+                  <option key={wd.id} value={wd.id}>{wd.name}</option>
+                ))}
+              </select>
+            </div>
+
+            {/* Treatment Filter */}
+            <div>
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                Treatment
+              </label>
+              <select 
+                value={treatmentFilter} 
+                onChange={e => setTreatmentFilter(e.target.value)} 
+                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+              >
+                <option value="all">All Treatments</option>
+                {treatments.map(t => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div className="flex justify-between mt-6">
+            <button
+              onClick={() => {
+                setStatusFilter('in_progress');
+                setClassYearFilter('all');
+                setWorkingDaysFilter('all');
+                setTreatmentFilter('all');
+              }}
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors duration-200"
+            >
+              Reset Filters
+            </button>
+            <button
+              onClick={() => setIsFiltersModalOpen(false)}
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors duration-200"
+            >
+              Apply Filters
             </button>
           </div>
         </div>
