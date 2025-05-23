@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass } from '../types';
@@ -6,6 +6,63 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
+import InfiniteScroll from 'react-infinite-scroll-component';
+
+// StudentCard component OUTSIDE StudentsPage
+function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal }: {
+  student: Student,
+  workingDays: WorkingDays[],
+  classYears: ClassYear[],
+  handleEdit: (student: Student) => void,
+  handleDelete: (id: string) => void,
+  openInfoModal: (student: Student) => void,
+  openAddPatientModal: (student: Student) => void,
+}) {
+  const [showMore, setShowMore] = React.useState(false);
+  return (
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-3 mx-1 border border-gray-200 dark:border-gray-700">
+      <div className="flex justify-between items-center">
+        <div>
+          <div className="font-bold text-lg text-gray-900 dark:text-white">{student.name}</div>
+          <div className="text-sm text-gray-500 dark:text-gray-300">{student.mobile}</div>
+          <div className="text-xs text-gray-400">{student.university} | {student.city}</div>
+        </div>
+        <div className="flex flex-col gap-2 items-end">
+          <button onClick={() => handleEdit(student)} title="Edit" className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"><Edit className="h-5 w-5" /></button>
+          <button onClick={() => handleDelete(student.id)} title="Delete" className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"><Trash2 className="h-5 w-5" /></button>
+          <button onClick={() => openInfoModal(student)} title="Info" className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"><Info className="h-5 w-5" /></button>
+          {student.registration_status === 'registered' && student.is_available && (
+            <button onClick={() => openAddPatientModal(student)} title="Add Patient" className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"><Plus className="h-5 w-5" /></button>
+          )}
+        </div>
+      </div>
+      <div className="flex items-center gap-2 mt-2">
+        <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${student.registration_status === 'registered' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : student.registration_status === 'unregistered' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>{student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}</span>
+        <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${student.is_available ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{student.is_available ? 'Available' : 'Busy'}</span>
+      </div>
+      <button className="mt-2 text-xs text-indigo-600 dark:text-indigo-300 underline" onClick={() => setShowMore(m => !m)}>{showMore ? 'Show Less' : 'Show More'}</button>
+      {showMore && (
+        <div className="mt-2 text-sm text-gray-700 dark:text-gray-200 space-y-1">
+          <div>
+            <span className="font-semibold">Working Days:</span> <span className="font-bold text-blue-600 dark:text-blue-400">{workingDays.find(wd => wd.id === student.working_days_id)?.name || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Class Year:</span> <span className="font-bold text-purple-600 dark:text-purple-400">{classYears.find(cy => cy.id === student.class_year_id)?.year_range || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Registration End:</span> <span className="font-bold text-orange-600 dark:text-orange-400">{student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Patients in Progress:</span> <span className="font-bold text-indigo-600 dark:text-indigo-400">{student.patients_in_progress}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Patients Completed:</span> <span className="font-bold text-green-600 dark:text-green-400">{student.patients_completed}</span>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
 
 export function StudentsPage() {
   const { organizationId } = useAuth();
@@ -765,108 +822,99 @@ export function StudentsPage() {
   }, [uniqueUniversities, newStudent.university]);
 
   // Modify the filteredStudents logic to include class year filtering, sorting, and column-specific filtering
-  const filteredStudents = students
-    .filter(student => {
-      // First apply class year filter
-      if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
-        return false;
-      }
-
-      // Apply status filter
-      if (statusFilter !== 'all') {
-        if (statusFilter === 'available' && !student.is_available) return false;
-        if (statusFilter === 'busy' && student.is_available) return false;
-      }
-
-      // Apply registration filter
-      if (registrationFilter !== 'all' && student.registration_status !== registrationFilter) {
-        return false;
-      }
-
-      // Apply university filter
-      if (universityFilter !== 'all' && student.university !== universityFilter) {
-        return false;
-      }
-
-      // Apply city filter
-      if (cityFilter !== 'all' && student.city !== cityFilter) {
-        return false;
-      }
-
-      // Apply working days filter
-      if (workingDaysFilter !== 'all' && student.working_days_id !== workingDaysFilter) {
-        return false;
-      }
-
-      if (
-        registrationEndDateFilter !== 'all' &&
-        (!student.registration_end_date ||
-          new Date(student.registration_end_date).toISOString().split('T')[0] !== registrationEndDateFilter)
-      ) {
-        return false;
-      }
-
-      // Then apply search term filter
-      if (!searchTerm) return true;
-
-      const searchTermLower = searchTerm.toLowerCase();
-      return selectedColumns.some(column => {
-        switch (column) {
-          case 'name':
-            return student.name.toLowerCase().includes(searchTermLower);
-          case 'mobile':
-            return student.mobile.includes(searchTerm);
-          case 'university':
-            return student.university.toLowerCase().includes(searchTermLower);
-          case 'city':
-            return student.city.toLowerCase().includes(searchTermLower);
-          case 'status':
-            return (student.is_available ? 'available' : 'busy').includes(searchTermLower);
-          case 'registration':
-            return student.registration_status.toLowerCase().includes(searchTermLower);
-          default:
-            return false;
+  const filteredStudents = useMemo(() => {
+    return students
+      .filter(student => {
+        // First apply class year filter
+        if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
+          return false;
         }
+        // Apply status filter
+        if (statusFilter !== 'all') {
+          if (statusFilter === 'available' && !student.is_available) return false;
+          if (statusFilter === 'busy' && student.is_available) return false;
+        }
+        // Apply registration filter
+        if (registrationFilter !== 'all' && student.registration_status !== registrationFilter) {
+          return false;
+        }
+        // Apply university filter
+        if (universityFilter !== 'all' && student.university !== universityFilter) {
+          return false;
+        }
+        // Apply city filter
+        if (cityFilter !== 'all' && student.city !== cityFilter) {
+          return false;
+        }
+        // Apply working days filter
+        if (workingDaysFilter !== 'all' && student.working_days_id !== workingDaysFilter) {
+          return false;
+        }
+        if (
+          registrationEndDateFilter !== 'all' &&
+          (!student.registration_end_date ||
+            new Date(student.registration_end_date).toISOString().split('T')[0] !== registrationEndDateFilter)
+        ) {
+          return false;
+        }
+        // Then apply search term filter
+        if (!searchTerm) return true;
+        const searchTermLower = searchTerm.toLowerCase();
+        return selectedColumns.some(column => {
+          switch (column) {
+            case 'name':
+              return student.name.toLowerCase().includes(searchTermLower);
+            case 'mobile':
+              return student.mobile.includes(searchTerm);
+            case 'university':
+              return student.university.toLowerCase().includes(searchTermLower);
+            case 'city':
+              return student.city.toLowerCase().includes(searchTermLower);
+            case 'status':
+              return (student.is_available ? 'available' : 'busy').includes(searchTermLower);
+            case 'registration':
+              return student.registration_status.toLowerCase().includes(searchTermLower);
+            default:
+              return false;
+          }
+        });
+      })
+      .sort((a, b) => {
+        if (!sortConfig.column || !sortConfig.direction) return 0;
+        let valueA, valueB;
+        switch (sortConfig.column) {
+          case 'name':
+            valueA = a.name.toLowerCase();
+            valueB = b.name.toLowerCase();
+            break;
+          case 'mobile':
+            valueA = a.mobile;
+            valueB = b.mobile;
+            break;
+          case 'university':
+            valueA = a.university.toLowerCase();
+            valueB = b.university.toLowerCase();
+            break;
+          case 'city':
+            valueA = a.city.toLowerCase();
+            valueB = b.city.toLowerCase();
+            break;
+          case 'status':
+            valueA = a.is_available ? 'available' : 'busy';
+            valueB = b.is_available ? 'available' : 'busy';
+            break;
+          case 'registration':
+            valueA = a.registration_status;
+            valueB = b.registration_status;
+            break;
+          default:
+            return 0;
+        }
+        if (valueA < valueB) return sortConfig.direction === 'asc' ? -1 : 1;
+        if (valueA > valueB) return sortConfig.direction === 'asc' ? 1 : -1;
+        return 0;
       });
-    })
-    .sort((a, b) => {
-      if (!sortConfig.column || !sortConfig.direction) return 0;
-
-      let valueA, valueB;
-
-      switch (sortConfig.column) {
-        case 'name':
-          valueA = a.name.toLowerCase();
-          valueB = b.name.toLowerCase();
-          break;
-        case 'mobile':
-          valueA = a.mobile;
-          valueB = b.mobile;
-          break;
-        case 'university':
-          valueA = a.university.toLowerCase();
-          valueB = b.university.toLowerCase();
-          break;
-        case 'city':
-          valueA = a.city.toLowerCase();
-          valueB = b.city.toLowerCase();
-          break;
-        case 'status':
-          valueA = a.is_available ? 'available' : 'busy';
-          valueB = b.is_available ? 'available' : 'busy';
-          break;
-        case 'registration':
-          valueA = a.registration_status;
-          valueB = b.registration_status;
-          break;
-        default:
-          return 0;
-      }
-
-      if (valueA < valueB) return sortConfig.direction === 'asc' ? -1 : 1;
-      if (valueA > valueB) return sortConfig.direction === 'asc' ? 1 : -1;
-      return 0;
-    });
+  }, [students, selectedClassYearFilter, statusFilter, registrationFilter, universityFilter, cityFilter, workingDaysFilter, registrationEndDateFilter, searchTerm, selectedColumns, sortConfig]);
 
   function openInfoModal(student: Student) {
     setSelectedStudent(student);
@@ -1012,6 +1060,50 @@ export function StudentsPage() {
     }
   }
 
+  // Add state for infinite scroll
+  const [visibleStudents, setVisibleStudents] = useState<Student[]>([]);
+  const [hasMore, setHasMore] = useState(true);
+  const PAGE_SIZE = 20;
+
+  // On students/filter change, reset visibleStudents
+  useEffect(() => {
+    setVisibleStudents(filteredStudents.slice(0, PAGE_SIZE));
+    setHasMore(filteredStudents.length > PAGE_SIZE);
+  }, [filteredStudents]);
+
+  // Function to load more students
+  const fetchMoreStudents = () => {
+    if (visibleStudents.length >= filteredStudents.length) {
+      setHasMore(false);
+      return;
+    }
+    const next = filteredStudents.slice(visibleStudents.length, visibleStudents.length + PAGE_SIZE);
+    const newVisible = [...visibleStudents, ...next];
+    setVisibleStudents(newVisible);
+    setHasMore(newVisible.length < filteredStudents.length);
+  };
+
+  // Responsive check for mobile
+  const [isMobile, setIsMobile] = useState(false);
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < 640);
+    checkMobile();
+    window.addEventListener('resize', checkMobile);
+    return () => window.removeEventListener('resize', checkMobile);
+  }, []);
+
+  // Add state for mobile filter modal
+  const [isMobileFilterModalOpen, setIsMobileFilterModalOpen] = useState(false);
+
+  // Set registrationFilter to 'registered' by default on mobile
+  useEffect(() => {
+    if (isMobile) {
+      setRegistrationFilter('registered');
+    }
+    // Do not add setRegistrationFilter to deps to avoid infinite loop
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isMobile]);
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -1153,16 +1245,34 @@ export function StudentsPage() {
             onChange={handleSearch}
           />
         </div>
+        {/* Only show Filter Columns button on desktop */}
         <button
           onClick={() => setIsFilterModalOpen(true)}
-          className="flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
+          className="hidden sm:flex items-center justify-center px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors duration-200"
         >
           <Filter className="h-5 w-5 mr-2" />
           Filter Columns
         </button>
       </div>
 
-      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden">
+      {/* MOBILE FILTER BAR */}
+      {isMobile && (
+        <div className="sm:hidden flex justify-between items-center mb-4">
+          <div className="text-sm text-gray-500 dark:text-gray-400 ml-2">
+            Showing <span className="font-bold text-indigo-600 dark:text-indigo-400">{visibleStudents.length}</span> student{visibleStudents.length !== 1 ? 's' : ''}
+          </div>
+          <button
+            onClick={() => setIsMobileFilterModalOpen(true)}
+            className="flex items-center gap-2 px-4 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-full shadow hover:bg-gray-200 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-indigo-500"
+          >
+            <Filter className="h-5 w-5" />
+            Filters
+          </button>
+        </div>
+      )}
+
+      {/* DESKTOP TABLE VIEW */}
+      <div className="bg-white dark:bg-gray-800 shadow-lg rounded-lg overflow-hidden hidden sm:block">
         <div className="overflow-x-auto relative">
           <table className="w-full divide-y divide-gray-200 dark:divide-gray-700">
             <thead className="bg-gray-50 dark:bg-gray-900">
@@ -1719,7 +1829,7 @@ export function StudentsPage() {
                     )}
                     {selectedColumns.includes('registration_end_date') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString() : 'N/A'}
+                        {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
                       </td>
                     )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
@@ -2198,7 +2308,7 @@ export function StudentsPage() {
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration End Date</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
-                    {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString() : 'N/A'}
+                    {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
                   </p>
                 </div>
 
@@ -2458,6 +2568,173 @@ export function StudentsPage() {
             </div>
           </div>
         </div>
+      )}
+
+      {isMobileFilterModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md mx-2 relative">
+            <button
+              onClick={() => setIsMobileFilterModalOpen(false)}
+              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
+            >
+              <X className="h-6 w-6" />
+            </button>
+            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
+              <Filter className="h-5 w-5" /> Filters
+            </h2>
+            <div className="space-y-3">
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                <select
+                  value={statusFilter}
+                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Status</option>
+                  <option value="available">Available</option>
+                  <option value="busy">Busy</option>
+                </select>
+              </div>
+              {/* Registration Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Registration</label>
+                <select
+                  value={registrationFilter}
+                  onChange={e => setRegistrationFilter(e.target.value as typeof registrationFilter)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Registration</option>
+                  <option value="registered">Registered</option>
+                  <option value="unregistered">Unregistered</option>
+                  <option value="pending">Pending</option>
+                </select>
+              </div>
+              {/* Working Days Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Working Days</label>
+                <select
+                  value={workingDaysFilter}
+                  onChange={e => setWorkingDaysFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Working Days</option>
+                  {workingDays.map(wd => (
+                    <option key={wd.id} value={wd.id}>{wd.name} ({wd.days.join(', ')})</option>
+                  ))}
+                </select>
+              </div>
+              {/* Registration End Date Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Registration End Date</label>
+                <select
+                  value={registrationEndDateFilter}
+                  onChange={e => setRegistrationEndDateFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All End Dates</option>
+                  {uniqueRegistrationEndDates.map(date => (
+                    <option key={date} value={date}>{date}</option>
+                  ))}
+                </select>
+              </div>
+              {/* University Filter with search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">University</label>
+                <input
+                  type="text"
+                  value={universitySearchTerm}
+                  onChange={e => setUniversitySearchTerm(e.target.value)}
+                  placeholder="Search university..."
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm mb-1 focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={universityFilter}
+                  onChange={e => setUniversityFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Universities</option>
+                  {filteredUniversities.map(university => (
+                    <option key={university} value={university}>{university}</option>
+                  ))}
+                </select>
+              </div>
+              {/* City Filter with search */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                <input
+                  type="text"
+                  value={citySearchTerm}
+                  onChange={e => setCitySearchTerm(e.target.value)}
+                  placeholder="Search city..."
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm mb-1 focus:ring-2 focus:ring-indigo-500"
+                />
+                <select
+                  value={cityFilter}
+                  onChange={e => setCityFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
+                >
+                  <option value="all">All Cities</option>
+                  {filteredCities.map(city => (
+                    <option key={city} value={city}>{city}</option>
+                  ))}
+                </select>
+              </div>
+            </div>
+            <div className="flex justify-between gap-2 mt-6">
+              <button
+                onClick={() => {
+                  setStatusFilter('all');
+                  setRegistrationFilter('all');
+                  setWorkingDaysFilter('all');
+                  setRegistrationEndDateFilter('all');
+                  setUniversityFilter('all');
+                  setUniversitySearchTerm('');
+                  setCityFilter('all');
+                  setCitySearchTerm('');
+                  setIsMobileFilterModalOpen(false);
+                }}
+                className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
+              >
+                Clear Filters
+              </button>
+              <button
+                onClick={() => setIsMobileFilterModalOpen(false)}
+                className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
+              >
+                Apply Filters
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* MOBILE CARD LIST VIEW */}
+      {isMobile && (
+        <InfiniteScroll
+          dataLength={visibleStudents.length}
+          next={fetchMoreStudents}
+          hasMore={hasMore}
+          loader={<div className="text-center py-4 text-gray-500">Loading...</div>}
+          endMessage={<div className="text-center py-4 text-gray-400">No more students</div>}
+        >
+          {visibleStudents.length === 0 && !loading ? (
+            <div className="text-center py-8 text-gray-500">No students found</div>
+          ) : (
+            visibleStudents.map((student) => (
+              <StudentCard
+                key={student.id}
+                student={student}
+                workingDays={workingDays}
+                classYears={classYears}
+                handleEdit={handleEdit}
+                handleDelete={handleDelete}
+                openInfoModal={openInfoModal}
+                openAddPatientModal={openAddPatientModal}
+              />
+            ))
+          )}
+        </InfiniteScroll>
       )}
     </div>
   );

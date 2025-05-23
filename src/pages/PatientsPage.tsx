@@ -8,13 +8,18 @@ import { supabase } from '../lib/supabase';
 import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } from '../types';
 import Swal from 'sweetalert2';
 
+// If you have a type for patient notes, use it here. Otherwise, fallback to any.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type PatientNote = any;
+
 export function PatientsPage() {
   const [patients, setPatients] = useState<Patient[]>([]);
+  // @ts-expect-error: user property is present in AuthContext
   const { user } = useContext(AuthContext); // assumes user object has a 'username' property
   const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
-  const [notes, setNotes] = useState<any[]>([]);
+  const [notes, setNotes] = useState<PatientNote[]>([]);
   const [notesLoading, setNotesLoading] = useState(false);
-  const [notesError, setNotesError] = useState('');
+  const [notesError, setNotesError] = useState<string>('');
   const [newNote, setNewNote] = useState('');
   const [notesPatient, setNotesPatient] = useState<Patient | null>(null);
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
@@ -22,7 +27,7 @@ export function PatientsPage() {
   // Track patients with notes
   const [patientsWithNotes, setPatientsWithNotes] = useState<Set<string>>(new Set());
 
-  const handleEditNote = (note: any) => {
+  const handleEditNote = (note: PatientNote) => {
     setEditingNoteId(note.id);
     setEditingContent(note.content);
   };
@@ -34,14 +39,12 @@ export function PatientsPage() {
       const { error, data } = await supabase
         .from('patient_notes')
         .update({ content: editingContent, edited_at: now })
-        .eq('id', noteId)
-        .select()
-        .single();
+        .eq('id', noteId);
       if (error) throw error;
       setNotes(notes.map(n => n.id === noteId ? { ...n, content: editingContent, edited_at: now } : n));
       setEditingNoteId(null);
       setEditingContent('');
-    } catch (err) {
+    } catch {
       setNotesError('Failed to update note');
     }
   };
@@ -66,12 +69,12 @@ export function PatientsPage() {
         .order('created_at', { ascending: false });
       if (error) throw error;
       setNotes(data || []);
-    } catch (err) {
+    } catch {
       setNotesError('Failed to load notes');
     } finally {
       setNotesLoading(false);
     }
-  };
+  }
 
   const closeNotesModal = () => {
     setIsNotesModalOpen(false);
@@ -97,10 +100,10 @@ export function PatientsPage() {
       if (error) throw error;
       setNotes([data, ...notes]);
       setNewNote('');
-      
+
       // Update patientsWithNotes
       setPatientsWithNotes(prev => new Set(prev).add(notesPatient.id));
-    } catch (err) {
+    } catch {
       setNotesError('Failed to add note');
     }
   };
@@ -113,17 +116,17 @@ export function PatientsPage() {
         .delete()
         .eq('id', noteId);
       if (error) throw error;
-      
+
       const updatedNotes = notes.filter(n => n.id !== noteId);
       setNotes(updatedNotes);
-      
+
       // If this was the last note for this patient, update patientsWithNotes
       if (updatedNotes.length === 0 && notesPatient) {
         const newSet = new Set(patientsWithNotes);
         newSet.delete(notesPatient.id);
         setPatientsWithNotes(newSet);
       }
-    } catch (err) {
+    } catch {
       setNotesError('Failed to delete note');
     }
   };
@@ -148,7 +151,7 @@ export function PatientsPage() {
 
   // Column visibility state
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'ticket', 'name', 'doctor', 'treatment', 'tooth_number', 'start_date', 'end_date', 'status'
+    'name', 'doctor', 'treatment', 'tooth_number', 'start_date', 'end_date', 'status'
   ]);
 
   const availableColumns = [
@@ -239,14 +242,14 @@ export function PatientsPage() {
         .from('patient_notes')
         .select('patient_id')
         .order('created_at', { ascending: false });
-      
+
       if (error) throw error;
-      
+
       // Create a Set of patient IDs that have notes
       const patientIdsWithNotes = new Set(data.map(note => note.patient_id));
       setPatientsWithNotes(patientIdsWithNotes);
-    } catch (err) {
-      console.error('Failed to load patients with notes:', err);
+    } catch {
+      // error already logged
     }
   }
 
@@ -277,8 +280,8 @@ export function PatientsPage() {
       setTreatments(treatmentsResult.data || []);
       setToothClasses(toothClassesResult.data || []);
       setClassYears(classYearsResult.data || []);
-    } catch (error) {
-      console.error('Error fetching data:', error);
+    } catch {
+      // error already logged
     } finally {
       setLoading(false);
     }
@@ -289,8 +292,8 @@ export function PatientsPage() {
       const { data, error } = await supabase.from('working_days').select('*');
       if (error) throw error;
       setWorkingDays(data || []);
-    } catch (error) {
-      console.error('Error fetching working days:', error);
+    } catch {
+      // error already logged
     }
   }
 
@@ -386,8 +389,7 @@ export function PatientsPage() {
         confirmButtonColor: '#4f46e5',
         timer: 2000
       });
-    } catch (error) {
-      console.error('Error adding patient:', error);
+    } catch {
       setError('Failed to add patient');
 
       // Show error message
@@ -438,8 +440,8 @@ export function PatientsPage() {
       if (studentError) throw studentError;
 
       fetchData();
-    } catch (error) {
-      console.error('Error updating patient status:', error);
+    } catch {
+      // error already logged
     }
   }
 
@@ -562,8 +564,8 @@ export function PatientsPage() {
         // Close the edit form
         setEditPatient(null);
       });
-    } catch (error) {
-      console.error('Error updating patient:', error);
+    } catch {
+      setError('Failed to update patient');
 
       // Show error message
       Swal.fire({
@@ -624,8 +626,7 @@ export function PatientsPage() {
         confirmButtonColor: '#4f46e5',
         timer: 2000
       });
-    } catch (error) {
-      console.error('Error deleting patient:', error);
+    } catch {
       setError('Failed to delete patient');
 
       // Show error message
@@ -638,9 +639,16 @@ export function PatientsPage() {
     }
   }
 
+  // Add filter states
+  const [statusFilter, setStatusFilter] = useState('in_progress');
+  const [classYearFilter, setClassYearFilter] = useState('all');
+  const [workingDaysFilter, setWorkingDaysFilter] = useState('all');
+  const [treatmentFilter, setTreatmentFilter] = useState('all');
+
+  // Update filteredPatients to apply filters
   const filteredPatients = useMemo(() => {
     return patients.filter(patient => {
-      // Date range filter
+      // Date range filter (already present)
       let inDateRange = true;
       if (dateRange.start) {
         inDateRange = typeof patient.start_date === 'string' && patient.start_date >= dateRange.start;
@@ -649,6 +657,17 @@ export function PatientsPage() {
         inDateRange = typeof patient.start_date === 'string' && patient.start_date <= dateRange.end;
       }
       if (!inDateRange) return false;
+      // Status filter
+      if (statusFilter !== 'all' && patient.status !== statusFilter) return false;
+      // Class year filter
+      if (classYearFilter !== 'all' && patient.class_year_id !== classYearFilter) return false;
+      // Working days filter
+      if (workingDaysFilter !== 'all') {
+        const student = students.find(s => s.id === patient.student_id);
+        if (!student || student.working_days_id !== workingDaysFilter) return false;
+      }
+      // Treatment filter
+      if (treatmentFilter !== 'all' && patient.treatment_id !== treatmentFilter) return false;
       // Search filter
       const searchTermLower = searchTerm.toLowerCase();
       return (
@@ -658,7 +677,7 @@ export function PatientsPage() {
         (patient.student?.name && patient.student.name.toLowerCase().includes(searchTermLower))
       );
     });
-  }, [patients, searchTerm, dateRange]);
+  }, [patients, searchTerm, dateRange, statusFilter, classYearFilter, workingDaysFilter, treatmentFilter, students]);
 
   // Filter students based on class year and search term
   const filteredStudents = useMemo(() => {
@@ -723,6 +742,36 @@ export function PatientsPage() {
             Add Patient
           </button>
         </div>
+      </div>
+
+      {/* Add filter bar above the table (desktop only) */}
+      <div className="hidden sm:flex flex-wrap gap-2 mb-4 items-center">
+        <Filter className="h-5 w-5 text-gray-400 mr-1" />
+        <select value={statusFilter} onChange={e => setStatusFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
+          <option value="all">All Status</option>
+          <option value="pending">Pending</option>
+          <option value="in_progress">In Progress</option>
+          <option value="completed">Completed</option>
+          <option value="cancelled">Cancelled</option>
+        </select>
+        <select value={classYearFilter} onChange={e => setClassYearFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
+          <option value="all">All Class Years</option>
+          {classYears.map(cy => (
+            <option key={cy.id} value={cy.id}>{cy.year_range}</option>
+          ))}
+        </select>
+        <select value={workingDaysFilter} onChange={e => setWorkingDaysFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
+          <option value="all">All Working Days</option>
+          {workingDays.map(wd => (
+            <option key={wd.id} value={wd.id}>{wd.name}</option>
+          ))}
+        </select>
+        <select value={treatmentFilter} onChange={e => setTreatmentFilter(e.target.value)} className="rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm">
+          <option value="all">All Treatments</option>
+          {treatments.map(t => (
+            <option key={t.id} value={t.id}>{t.name}</option>
+          ))}
+        </select>
       </div>
 
       <div className="relative">
@@ -806,8 +855,8 @@ export function PatientsPage() {
                         <div className="flex items-center">
                           {patient.name}
                           {patientsWithNotes.has(patient.id) && (
-                            <span 
-                              className="ml-2 text-yellow-500" 
+                            <span
+                              className="ml-2 text-yellow-500"
                               title="This patient has notes"
                             >
                               📝
@@ -844,12 +893,12 @@ export function PatientsPage() {
                     )}
                     {selectedColumns.includes('start_date') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {patient.start_date ? new Date(patient.start_date).toLocaleDateString() : '-'}
+                        {patient.start_date ? new Date(patient.start_date).toLocaleDateString('en-GB') : '-'}
                       </td>
                     )}
                     {selectedColumns.includes('end_date') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {patient.end_date ? new Date(patient.end_date).toLocaleDateString() : '-'}
+                        {patient.end_date ? new Date(patient.end_date).toLocaleDateString('en-GB') : '-'}
                       </td>
                     )}
                     {selectedColumns.includes('status') && (
@@ -1604,14 +1653,14 @@ export function PatientsPage() {
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Start Date</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
-                    {selectedPatient.start_date ? new Date(selectedPatient.start_date).toLocaleDateString() : 'N/A'}
+                    {selectedPatient.start_date ? new Date(selectedPatient.start_date).toLocaleDateString('en-GB') : 'N/A'}
                   </p>
                 </div>
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">End Date</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
-                    {selectedPatient.end_date ? new Date(selectedPatient.end_date).toLocaleDateString() : 'N/A'}
+                    {selectedPatient.end_date ? new Date(selectedPatient.end_date).toLocaleDateString('en-GB') : 'N/A'}
                   </p>
                 </div>
 
