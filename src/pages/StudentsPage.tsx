@@ -1108,6 +1108,16 @@ export function StudentsPage() {
     setMobileCurrentPage(1);
   }, [filteredStudents, mobileRowsPerPage]);
 
+  // Ref for mobile card list container
+  const mobileCardListRef = React.useRef<HTMLDivElement>(null);
+
+  // Scroll to card list on mobile page change
+  useEffect(() => {
+    if (isMobile && mobileCardListRef.current) {
+      mobileCardListRef.current.scrollIntoView({ behavior: 'smooth' });
+    }
+  }, [mobileCurrentPage, mobileRowsPerPage]);
+
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
@@ -2751,7 +2761,7 @@ export function StudentsPage() {
 
       {/* MOBILE CARD LIST VIEW */}
       {isMobile && (
-        <div className="sm:hidden">
+        <div className="sm:hidden" ref={mobileCardListRef}>
           {paginatedMobileStudents.length === 0 && !loading ? (
             <div className="text-center py-8 text-gray-500">No students found</div>
           ) : (
@@ -2770,32 +2780,38 @@ export function StudentsPage() {
           )}
           {/* Pagination Controls for Mobile */}
           {mobileTotalPages > 1 && (
-            <div className="flex items-center justify-between px-4 py-3 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-2">
-              <div className="flex items-center gap-2">
+            <div className="flex flex-col gap-4 items-center justify-between px-4 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-4 rounded-lg shadow-sm">
+              <div className="flex items-center gap-4 w-full justify-center">
                 <button
-                  onClick={() => setMobileCurrentPage(p => Math.max(1, p - 1))}
+                  onClick={() => setMobileCurrentPage(p => {
+                    const next = Math.max(1, p - 1);
+                    return next;
+                  })}
                   disabled={mobileCurrentPage === 1}
-                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
                 >
                   Previous
                 </button>
-                <span className="text-sm text-gray-700 dark:text-gray-300">
+                <span className="text-base text-gray-700 dark:text-gray-300 font-semibold">
                   Page {mobileCurrentPage} of {mobileTotalPages}
                 </span>
                 <button
-                  onClick={() => setMobileCurrentPage(p => Math.min(mobileTotalPages, p + 1))}
+                  onClick={() => setMobileCurrentPage(p => {
+                    const next = Math.min(mobileTotalPages, p + 1);
+                    return next;
+                  })}
                   disabled={mobileCurrentPage === mobileTotalPages}
-                  className="px-3 py-1 rounded-md bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50"
+                  className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
                 >
                   Next
                 </button>
               </div>
-              <div className="flex items-center gap-2">
-                <span className="text-sm text-gray-700 dark:text-gray-300">Cards per page:</span>
+              <div className="flex items-center gap-3 w-full justify-center">
+                <span className="text-base text-gray-700 dark:text-gray-300 font-medium">Cards per page:</span>
                 <select
                   value={mobileRowsPerPage}
                   onChange={e => setMobileRowsPerPage(Number(e.target.value))}
-                  className="rounded-md border-gray-300 text-sm dark:bg-gray-700 dark:text-white"
+                  className="rounded-lg border-gray-300 text-base dark:bg-gray-700 dark:text-white px-3 py-2"
                 >
                   {[3, 5, 10, 20].map(size => (
                     <option key={size} value={size}>{size}</option>
