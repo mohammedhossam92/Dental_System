@@ -546,7 +546,7 @@ export function StudentsPage() {
             title: 'Error!',
             text: `Excel file is missing required columns: ${missingColumns.join(', ')}`,
             icon: 'error',
-            confirmButtonColor: '#4f46e5'
+            confirmButtonColor: '#4f46e5',
           });
           event.target.value = '';
           return;
@@ -557,7 +557,7 @@ export function StudentsPage() {
             title: 'Error!',
             text: 'Organization not found',
             icon: 'error',
-            confirmButtonColor: '#4f46e5'
+            confirmButtonColor: '#4f46e5',
           });
           return;
         }
@@ -1208,6 +1208,70 @@ export function StudentsPage() {
       mobileCardListRef.current.scrollIntoView({ behavior: 'smooth' });
     }
   }, [mobileCurrentPage, mobileRowsPerPage]);
+
+  // Function to handle editing a student
+  const handleEdit = (student: Student) => {
+    setNewStudent({
+      name: student.name,
+      mobile: student.mobile,
+      city: student.city,
+      university: student.university,
+      university_type: student.university_type || 'حكومي',
+      working_days_id: student.working_days_id || '',
+      class_year_id: student.class_year_id || '',
+      organization_id: organizationId || '',
+      registration_status: student.registration_status || 'pending',
+      registration_end_date: student.registration_end_date,
+      is_available: student.is_available ?? true
+    });
+    setSelectedStudent(student);
+    setIsEditMode(true);
+    setIsModalOpen(true);
+  };
+
+  // Function to handle deleting a student
+  const handleDelete = async (id: string) => {
+    const result = await Swal.fire({
+      title: 'Are you sure?',
+      text: "You won't be able to revert this!",
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Yes, delete it!',
+      cancelButtonText: 'Cancel'
+    });
+
+    if (result.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('students')
+          .delete()
+          .eq('id', id);
+
+        if (error) throw error;
+
+        // Remove the student from the local state
+        setStudents(prevStudents => prevStudents.filter(student => student.id !== id));
+        
+        await Swal.fire({
+          title: 'Deleted!',
+          text: 'Student has been deleted.',
+          icon: 'success',
+          confirmButtonColor: '#4f46e5',
+          timer: 1500
+        });
+      } catch (error) {
+        console.error('Error deleting student:', error);
+        await Swal.fire({
+          title: 'Error!',
+          text: 'Failed to delete student',
+          icon: 'error',
+          confirmButtonColor: '#4f46e5'
+        });
+      }
+    }
+  };
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
