@@ -961,7 +961,7 @@ export function StudentsPage() {
     }
   }, [isAddPatientModalOpen]);
 
-  function openAddPatientModal(student: Student) {
+  async function openAddPatientModal(student: Student) {
     setAddPatientStudent(student);
     setAddPatientForm({
       ticket_number: '',
@@ -984,31 +984,119 @@ export function StudentsPage() {
   async function handleAddPatientFromStudent(e: React.FormEvent) {
     e.preventDefault();
     setAddPatientError('');
-    if (!addPatientForm.ticket_number || !addPatientForm.name || !addPatientForm.class_year_id || !addPatientForm.student_id) {
-      setAddPatientError('Please fill in all required fields');
+
+    // Validate required fields
+    if (!addPatientForm.ticket_number) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Ticket number is required',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
-    if (addPatientTreatments.some(tt => !tt.treatment_id || !tt.tooth_class_id || (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric'))) {
-      setAddPatientError('Please fill in all tooth treatment fields');
+    
+    if (!addPatientForm.name) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Patient name is required',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
+    if (!addPatientForm.class_year_id) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Class year is required',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    if (!addPatientForm.student_id) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Student assignment is required',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    // Validate tooth treatments
+    for (let i = 0; i < addPatientTreatments.length; i++) {
+      const tt = addPatientTreatments[i];
+      if (!tt.treatment_id) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Treatment is required for tooth #${i + 1}`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+      if (!tt.tooth_class_id) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Tooth class is required for tooth #${i + 1}`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+      if (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric') {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Tooth number is required for non-pediatric cases (tooth #${i + 1})`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+    }
+
+    // Validate mobile number format if provided
     if (addPatientForm.mobile && addPatientForm.mobile.length !== 11) {
-      setAddPatientError('Mobile number must be exactly 11 digits');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Mobile',
+        text: 'Mobile number must be exactly 11 digits',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
+    // Check for duplicate ticket number
     const { data: existingTicket, error: ticketError } = await supabase
       .from('patients')
       .select('id')
       .eq('ticket_number', addPatientForm.ticket_number)
       .maybeSingle();
+      
     if (ticketError) {
-      setAddPatientError('Failed to check ticket number');
+      console.error('Error checking ticket number:', ticketError);
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to check ticket number',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+    
     if (existingTicket) {
-      setAddPatientError('Ticket number already exists');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Ticket',
+        text: 'This ticket number is already in use',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
     try {
       const mainTreatment = addPatientTreatments[0];
       const { data: patientInsertData, error: insertError } = await supabase
@@ -1254,7 +1342,7 @@ export function StudentsPage() {
           <input
             type="text"
             placeholder={`Search by ${selectedColumns.join(', ')}...`}
-            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200"
+            className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             value={searchTerm}
             onChange={handleSearch}
           />

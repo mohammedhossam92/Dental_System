@@ -303,33 +303,118 @@ export function PatientsPage() {
     e.preventDefault();
     setError('');
 
-    if (!newPatient.ticket_number || !newPatient.name || !newPatient.class_year_id || !newPatient.student_id) {
-      setError('Please fill in all required fields');
+    // Validate required fields
+    if (!newPatient.ticket_number) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Ticket number is required',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
-    // Only require tooth_number if mode is adult; for pediatric, allow empty tooth_number
-    if (toothTreatments.some(tt => !tt.treatment_id || !tt.tooth_class_id || (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric'))) {
-      setError('Please fill in all tooth treatment fields');
+    
+    if (!newPatient.name) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Patient name is required',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
+    if (!newPatient.class_year_id) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Class year is required',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    if (!newPatient.student_id) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Please assign a student',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    // Validate tooth treatments
+    for (let i = 0; i < toothTreatments.length; i++) {
+      const tt = toothTreatments[i];
+      if (!tt.treatment_id) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Treatment is required for tooth #${i + 1}`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+      if (!tt.tooth_class_id) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Tooth class is required for tooth #${i + 1}`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+      if (tt.tooth_number === '' && tt.tooth_class_id !== 'pediatric') {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `Tooth number is required for non-pediatric cases (tooth #${i + 1})`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+    }
+
+    // Validate mobile number format if provided
     if (newPatient.mobile && newPatient.mobile.length !== 11) {
-      setError('Mobile number must be exactly 11 digits');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Mobile',
+        text: 'Mobile number must be exactly 11 digits',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
+    // Check for duplicate ticket number
     const { data: existingTicket, error: ticketError } = await supabase
       .from('patients')
       .select('id')
       .eq('ticket_number', newPatient.ticket_number)
       .maybeSingle();
+      
     if (ticketError) {
       console.error('Error checking ticket number:', ticketError);
-      setError('Failed to check ticket number');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Failed to check ticket number',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+    
     if (existingTicket) {
-      setError('Ticket number already exists');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Duplicate Ticket',
+        text: 'This ticket number is already in use',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
+
     try {
       // Insert the new patient
       // Use the first tooth treatment for the main patient fields
@@ -1482,9 +1567,6 @@ export function PatientsPage() {
 
                 {/* Tooth Treatments Section */}
                 <div className="space-y-4">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
-                    Tooth Treatments
-                  </label>
                   {toothTreatments.map((tt, idx) => (
                     <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                       <div>
@@ -1905,7 +1987,7 @@ export function PatientsPage() {
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Class Year</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
-                    {classYears.find(cy => cy.id === selectedPatient.class_year_id)?.year_range || 'N/A'}
+                    {classYears.find(cy => cy.id === selectedPatient.class_year_id)?.year_range}
                   </p>
                 </div>
 
@@ -1993,7 +2075,7 @@ export function PatientsPage() {
             <div className="flex justify-end mt-6 pt-4 border-t dark:border-gray-700">
               <button
                 onClick={() => setIsInfoModalOpen(false)}
-                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200 flex items-center text-sm sm:text-base"
+                className="px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
               >
                 Close
               </button>
