@@ -8,6 +8,7 @@ import { supabase } from '../lib/supabase';
 import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } from '../types';
 import Swal from 'sweetalert2';
 import { PatientCard } from '../components/PatientCard';
+import { updateStudentPatientCounts, handlePatientStatusChange } from '../utils/studentUtils';
 
 // If you have a type for patient notes, use it here. Otherwise, fallback to any.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -403,48 +404,47 @@ export function PatientsPage() {
     }
   }
 
-  async function handleStatusChange(patientId: string, newStatus: Patient['status']) {
+  const handleStatusChange = async (patientId: string, newStatus: string) => {
     try {
-      const updates: Partial<Patient> = { status: newStatus };
+      const patient = patients.find(p => p.id === patientId);
+      if (!patient) return;
 
-      if (newStatus === 'in_progress') {
-        updates.start_date = updates.start_date || new Date().toISOString();
-        updates.end_date = null;
-      } else if (newStatus === 'completed') {
-        updates.end_date = new Date().toISOString();
-      } else if (newStatus === 'pending') {
-        updates.start_date = null;
-        updates.end_date = null;
-      }
+      await handlePatientStatusChange(patientId, newStatus, {
+        ...patient,
+        previousStudentId: patient.student_id
+      });
 
-      const { error: patientError } = await supabase
-        .from('patients')
-        .update(updates)
-        .eq('id', patientId);
+      // Update the local state
+      setPatients(prevPatients =>
+        prevPatients.map(p =>
+          p.id === patientId
+            ? {
+                ...p,
+                status: newStatus,
+                end_date: newStatus === 'completed' ? new Date().toISOString() : p.end_date
+              }
+            : p
+        )
+      );
 
-      if (patientError) throw patientError;
-
-      const { data: patientData, error: fetchError } = await supabase
-        .from('patients')
-        .select('student_id')
-        .eq('id', patientId)
-        .single();
-
-      if (fetchError) throw fetchError;
-
-      const isAvailable = newStatus === 'completed';
-      const { error: studentError } = await supabase
-        .from('students')
-        .update({ is_available: isAvailable })
-        .eq('id', patientData.student_id);
-
-      if (studentError) throw studentError;
-
-      fetchData();
-    } catch {
-      // error already logged
+      // Show success message
+      Swal.fire({
+        title: 'Success!',
+        text: `Patient status updated to ${newStatus.replace('_', ' ')}`,
+        icon: 'success',
+        confirmButtonColor: '#4f46e5',
+        timer: 2000
+      });
+    } catch (error) {
+      console.error('Error updating patient status:', error);
+      Swal.fire({
+        title: 'Error!',
+        text: 'Failed to update patient status',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5'
+      });
     }
-  }
+  };
 
   const openEditModal = (patient: Patient) => {
     setEditPatient(patient);
@@ -826,7 +826,7 @@ export function PatientsPage() {
               </div>
             </div>
           </div>
-          
+
           {/* Or filter by month */}
           <div className="flex flex-col sm:flex-row sm:items-center gap-2">
             <span className="text-sm font-medium text-indigo-600 dark:text-indigo-400 sm:text-gray-700 sm:dark:text-gray-300">Or by month:</span>
@@ -842,7 +842,7 @@ export function PatientsPage() {
             </select>
           </div>
         </div>
-        
+
         {/* Filter Columns button moved to the end */}
         <button
           onClick={() => setIsFilterModalOpen(true)}
@@ -865,7 +865,7 @@ export function PatientsPage() {
             onChange={(e) => setSearchTerm(e.target.value)}
           />
         </div>
-        
+
         {/* Filter Button - Only show on desktop, mobile has its own */}
         <button
           onClick={() => setIsFiltersModalOpen(true)}
@@ -1820,10 +1820,10 @@ export function PatientsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">Filter Columns</h2>
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Columns</h3>
               <button
                 onClick={() => setIsFilterModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200"
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
               >
                 <X className="h-6 w-6" />
               </button>
@@ -2099,16 +2099,16 @@ export function PatientsPage() {
               <X className="h-6 w-6" />
             </button>
           </div>
-          
+
           <div className="space-y-4">
             {/* Status Filter */}
             <div>
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
-              <select 
-                value={statusFilter} 
-                onChange={e => setStatusFilter(e.target.value)} 
+              <select
+                value={statusFilter}
+                onChange={e => setStatusFilter(e.target.value)}
                 className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Status</option>
@@ -2124,9 +2124,9 @@ export function PatientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Class Year
               </label>
-              <select 
-                value={classYearFilter} 
-                onChange={e => setClassYearFilter(e.target.value)} 
+              <select
+                value={classYearFilter}
+                onChange={e => setClassYearFilter(e.target.value)}
                 className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Class Years</option>
@@ -2141,9 +2141,9 @@ export function PatientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Working Days
               </label>
-              <select 
-                value={workingDaysFilter} 
-                onChange={e => setWorkingDaysFilter(e.target.value)} 
+              <select
+                value={workingDaysFilter}
+                onChange={e => setWorkingDaysFilter(e.target.value)}
                 className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Working Days</option>
@@ -2158,9 +2158,9 @@ export function PatientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Treatment
               </label>
-              <select 
-                value={treatmentFilter} 
-                onChange={e => setTreatmentFilter(e.target.value)} 
+              <select
+                value={treatmentFilter}
+                onChange={e => setTreatmentFilter(e.target.value)}
                 className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
               >
                 <option value="all">All Treatments</option>
@@ -2179,13 +2179,13 @@ export function PatientsPage() {
                 setWorkingDaysFilter('all');
                 setTreatmentFilter('all');
               }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600 rounded-md transition-colors duration-200"
+              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
             >
               Reset Filters
             </button>
             <button
               onClick={() => setIsFiltersModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700 rounded-md transition-colors duration-200"
+              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
             >
               Apply Filters
             </button>

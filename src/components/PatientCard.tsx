@@ -50,7 +50,10 @@ export function PatientCard({
             {/* Status-changing buttons (icons only) */}
             {onStatusChange && patient.status === 'pending' && (
               <button
-                onClick={() => onStatusChange(patient.id, 'in_progress')}
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(patient.id, 'in_progress');
+                }}
                 title="Start Treatment"
                 className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
               >
@@ -60,15 +63,21 @@ export function PatientCard({
             {onStatusChange && patient.status === 'in_progress' && (
               <>
                 <button
-                  onClick={() => onStatusChange(patient.id, 'completed')}
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStatusChange(patient.id, 'completed');
+                  }}
                   title="Complete Treatment"
                   className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"
                 >
                   <RotateCw className="h-5 w-5" />
                 </button>
                 <button
-                  onClick={() => onStatusChange(patient.id, 'pending')}
-                  title="Rewind to Pending"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onStatusChange(patient.id, 'pending');
+                  }}
+                  title="Mark as Pending"
                   className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
                 >
                   <RotateCcw className="h-5 w-5" />
@@ -77,8 +86,11 @@ export function PatientCard({
             )}
             {onStatusChange && patient.status === 'completed' && (
               <button
-                onClick={() => onStatusChange(patient.id, 'in_progress')}
-                title="Rewind to In Progress"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onStatusChange(patient.id, 'in_progress');
+                }}
+                title="Reopen Treatment"
                 className="text-yellow-600 hover:text-yellow-900 dark:text-yellow-400 dark:hover:text-yellow-300"
               >
                 <RotateCcw className="h-5 w-5" />
