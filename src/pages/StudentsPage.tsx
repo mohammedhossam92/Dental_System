@@ -141,7 +141,7 @@ export function StudentsPage() {
         return;
       }
 
-      console.log('Organization ID:', organizationId);
+    
 
       const [studentsResult, workingDaysResult, classYearsResult] = await Promise.all([
         supabase
