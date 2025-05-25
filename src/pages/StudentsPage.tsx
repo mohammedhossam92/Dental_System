@@ -224,17 +224,28 @@ export function StudentsPage() {
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
+    setError('');
 
     // Validate name has at least 4 words
     const nameWords = newStudent.name.trim().split(/\s+/);
     if (nameWords.length < 4) {
-      setError('Name must contain at least 4 words');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Name',
+        text: 'Name must contain at least 4 words',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
 
     // Validate mobile number is exactly 11 digits
     if (!/^\d{11}$/.test(newStudent.mobile)) {
-      setError('Mobile number must be exactly 11 digits');
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid Mobile',
+        text: 'Mobile number must be exactly 11 digits',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
 
@@ -248,22 +259,57 @@ export function StudentsPage() {
         .maybeSingle();
 
       if (existingMobile) {
-        setError('Mobile number already exists');
+        await Swal.fire({
+          icon: 'error',
+          title: 'Duplicate Mobile',
+          text: 'This mobile number is already registered',
+          confirmButtonColor: '#4f46e5',
+        });
         return;
       }
     }
 
-    // Continue with the rest of the function
-    if (!organizationId) {
-      setError('Organization not found');
+    // Validate required fields
+    const requiredFields = [
+      { field: 'name', label: 'Name' },
+      { field: 'mobile', label: 'Mobile' },
+      { field: 'city', label: 'City' },
+      { field: 'university', label: 'University' },
+      { field: 'working_days_id', label: 'Working Days' },
+    ];
+
+    for (const { field, label } of requiredFields) {
+      // @ts-ignore
+      if (!newStudent[field]) {
+        await Swal.fire({
+          icon: 'error',
+          title: 'Missing Field',
+          text: `${label} is required`,
+          confirmButtonColor: '#4f46e5',
+        });
+        return;
+      }
+    }
+
+    // Validate university type
+    if (newStudent.university_type !== 'حكومي' && newStudent.university_type !== 'خاص') {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Invalid University Type',
+        text: 'Please select a valid university type',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
 
-    const requiredFields = ['name', 'mobile', 'city', 'university', 'working_days_id'];
-    const missingFields = requiredFields.filter(field => !newStudent[field as keyof typeof newStudent]);
-
-    if (missingFields.length > 0) {
-      setError(`Please fill in all required fields: ${missingFields.join(', ')}`);
+    // Continue with the rest of the function
+    if (!organizationId) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Error',
+        text: 'Organization not found',
+        confirmButtonColor: '#4f46e5',
+      });
       return;
     }
 
@@ -283,12 +329,28 @@ export function StudentsPage() {
           .eq('organization_id', organizationId);
 
         if (error) throw error;
+
+        await Swal.fire({
+          title: 'Success!',
+          text: 'Student updated successfully',
+          icon: 'success',
+          confirmButtonColor: '#4f46e5',
+          timer: 2000
+        });
       } else {
         const { error } = await supabase
           .from('students')
           .insert([studentData]);
 
         if (error) throw error;
+
+        await Swal.fire({
+          title: 'Success!',
+          text: 'Student added successfully',
+          icon: 'success',
+          confirmButtonColor: '#4f46e5',
+          timer: 2000
+        });
       }
 
       memoizedFetchData();
@@ -296,73 +358,14 @@ export function StudentsPage() {
       resetForm();
     } catch (error) {
       console.error('Error saving student:', error);
-      setError('Failed to save student');
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to save student',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5',
+      });
     }
   }
-
-  async function handleDelete(id: string) {
-    if (!window.confirm('Are you sure you want to delete this student?')) return;
-
-    try {
-      // First, delete related records in patients table
-      const { error: patientsError } = await supabase
-        .from('patients')
-        .delete()
-        .eq('student_id', id);
-
-      if (patientsError) throw patientsError;
-
-      // Then delete the student
-      const { error } = await supabase
-        .from('students')
-        .delete()
-        .eq('id', id)
-        .eq('organization_id', organizationId);
-
-      if (error) throw error;
-
-      memoizedFetchData();
-    } catch (error) {
-      console.error('Error deleting student:', error);
-      setError('Failed to delete student');
-    }
-  }
-
-  async function handleEdit(student: Student) {
-  let latestStudentData = student;
-  // Fetch the latest student data from the students table
-  if (student.id) {
-    const { data: studentData, error: studentError } = await supabase
-      .from('students')
-      .select('*')
-      .eq('id', student.id)
-      .order('created_at', { ascending: false })
-      .limit(1)
-      .maybeSingle();
-    if (!studentError && studentData) {
-      latestStudentData = studentData;
-    }
-    // Note: registration_end_date intentionally not fetched or set
-  }
-  setNewStudent({
-    name: latestStudentData.name,
-    mobile: latestStudentData.mobile,
-    city: latestStudentData.city,
-    university: latestStudentData.university,
-    university_type: latestStudentData.university_type || 'حكومي',
-    working_days_id: latestStudentData.working_days_id,
-    class_year_id: latestStudentData.class_year_id || '',
-    organization_id: latestStudentData.organization_id,
-    registration_status: latestStudentData.registration_status,
-    registration_end_date: latestStudentData.registration_status === 'registered' && latestStudentData.registration_end_date
-      ? new Date(latestStudentData.registration_end_date).toISOString().split('T')[0]
-      : null,
-    is_available: latestStudentData.is_available
-  });
-  setSelectedStudent(latestStudentData);
-  setIsEditMode(true);
-  setIsModalOpen(true);
-}
 
   function resetForm() {
     setNewStudent({
@@ -2072,7 +2075,7 @@ export function StudentsPage() {
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-2 sm:p-4 z-50 overflow-y-auto">
           <div className="bg-white dark:bg-gray-800 rounded-lg p-4 sm:p-6 w-full max-w-2xl mx-auto my-4 sm:my-8">
             <div className="flex justify-between items-center mb-4">
-              <h2 className="text-lg sm:text-xl font-semibold text-gray-900 dark:text-white">
+              <h2 className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white">
                 {isEditMode ? 'Edit Student' : 'Add New Student'}
               </h2>
               <button
@@ -2362,7 +2365,7 @@ export function StudentsPage() {
               <h2 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">Student Profile</h2>
               <button
                 onClick={() => setIsInfoModalOpen(false)}
-                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors duration-200 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 p-1 sm:p-2"
+                className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
                 aria-label="Close"
               >
                 <X className="h-5 w-5 sm:h-6 sm:w-6" />
@@ -2708,145 +2711,6 @@ export function StudentsPage() {
         </div>
       )}
 
-      {isMobileFilterModalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md mx-2 relative">
-            <button
-              onClick={() => setIsMobileFilterModalOpen(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-gray-700 dark:hover:text-gray-200"
-            >
-              <X className="h-6 w-6" />
-            </button>
-            <h2 className="text-lg font-bold mb-4 text-gray-900 dark:text-white flex items-center gap-2">
-              <Filter className="h-5 w-5" /> Filters
-            </h2>
-            <div className="space-y-3">
-              {/* Status Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value as typeof statusFilter)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Status</option>
-                  <option value="available">Available</option>
-                  <option value="busy">Busy</option>
-                </select>
-              </div>
-              {/* Registration Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Registration</label>
-                <select
-                  value={registrationFilter}
-                  onChange={e => setRegistrationFilter(e.target.value as typeof registrationFilter)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Registration</option>
-                  <option value="registered">Registered</option>
-                  <option value="unregistered">Unregistered</option>
-                  <option value="pending">Pending</option>
-                </select>
-              </div>
-              {/* Working Days Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Working Days</label>
-                <select
-                  value={workingDaysFilter}
-                  onChange={e => setWorkingDaysFilter(e.target.value)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Working Days</option>
-                  {workingDays.map(wd => (
-                    <option key={wd.id} value={wd.id}>{wd.name} ({wd.days.join(', ')})</option>
-                  ))}
-                </select>
-              </div>
-              {/* Registration End Date Filter */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Registration End Date</label>
-                <select
-                  value={registrationEndDateFilter}
-                  onChange={e => setRegistrationEndDateFilter(e.target.value)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All End Dates</option>
-                  {uniqueRegistrationEndDates.map(date => (
-                    <option key={date} value={date}>{date}</option>
-                  ))}
-                </select>
-              </div>
-              {/* University Filter with search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">University</label>
-                <input
-                  type="text"
-                  value={universitySearchTerm}
-                  onChange={e => setUniversitySearchTerm(e.target.value)}
-                  placeholder="Search university..."
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm mb-1 focus:ring-2 focus:ring-indigo-500"
-                />
-                <select
-                  value={universityFilter}
-                  onChange={e => setUniversityFilter(e.target.value)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Universities</option>
-                  {filteredUniversities.map(university => (
-                    <option key={university} value={university}>{university}</option>
-                  ))}
-                </select>
-              </div>
-              {/* City Filter with search */}
-              <div>
-                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
-                <input
-                  type="text"
-                  value={citySearchTerm}
-                  onChange={e => setCitySearchTerm(e.target.value)}
-                  placeholder="Search city..."
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm mb-1 focus:ring-2 focus:ring-indigo-500"
-                />
-                <select
-                  value={cityFilter}
-                  onChange={e => setCityFilter(e.target.value)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white shadow text-sm focus:ring-2 focus:ring-indigo-500"
-                >
-                  <option value="all">All Cities</option>
-                  {filteredCities.map(city => (
-                    <option key={city} value={city}>{city}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-            <div className="flex justify-between gap-2 mt-6">
-              <button
-                onClick={() => {
-                  setStatusFilter('all');
-                  setRegistrationFilter('all');
-                  setWorkingDaysFilter('all');
-                  setRegistrationEndDateFilter('all');
-                  setUniversityFilter('all');
-                  setUniversitySearchTerm('');
-                  setCityFilter('all');
-                  setCitySearchTerm('');
-                  setIsMobileFilterModalOpen(false);
-                }}
-                className="px-4 py-2 rounded-md bg-gray-200 text-gray-800 hover:bg-gray-300 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-              >
-                Clear Filters
-              </button>
-              <button
-                onClick={() => setIsMobileFilterModalOpen(false)}
-                className="px-4 py-2 rounded-md bg-indigo-600 text-white hover:bg-indigo-700"
-              >
-                Apply Filters
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* MOBILE CARD LIST VIEW */}
       {isMobile && (
         <div className="sm:hidden" ref={mobileCardListRef}>
@@ -2899,7 +2763,7 @@ export function StudentsPage() {
                 <select
                   value={mobileRowsPerPage}
                   onChange={e => setMobileRowsPerPage(Number(e.target.value))}
-                  className="rounded-lg border-gray-300 text-base dark:bg-gray-700 dark:text-white px-3 py-2"
+                  className="rounded-lg border-gray-300 text-base dark:bg-gray-700 dark:text-white"
                 >
                   {[3, 5, 10, 20].map(size => (
                     <option key={size} value={size}>{size}</option>
