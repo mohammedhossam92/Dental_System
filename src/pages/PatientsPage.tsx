@@ -313,7 +313,7 @@ export function PatientsPage() {
       });
       return;
     }
-    
+
     if (!newPatient.name) {
       await Swal.fire({
         icon: 'error',
@@ -393,7 +393,7 @@ export function PatientsPage() {
       .select('id')
       .eq('ticket_number', newPatient.ticket_number)
       .maybeSingle();
-      
+
     if (ticketError) {
       console.error('Error checking ticket number:', ticketError);
       await Swal.fire({
@@ -404,7 +404,7 @@ export function PatientsPage() {
       });
       return;
     }
-    
+
     if (existingTicket) {
       await Swal.fire({
         icon: 'error',
@@ -504,8 +504,9 @@ export function PatientsPage() {
         prevPatients.map(p => {
           if (p.id === patientId) {
             let updates: any = { status: newStatus };
-            if (newStatus === 'in_progress' && p.status === 'pending') {
-              updates.start_date = new Date().toISOString();
+            if (newStatus === 'in_progress') {
+              updates.start_date = p.start_date || new Date().toISOString();
+              updates.end_date = null; // <-- always clear end_date when in_progress
             } else if (newStatus === 'pending') {
               updates.start_date = null;
             }
@@ -1675,7 +1676,7 @@ export function PatientsPage() {
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white bg-white hover:bg-indigo-50 dark:hover:bg-indigo-800 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
                           onClick={() => setToothChartModal({ open: true, idx })}
                         >
-                          {tt.tooth_number ? `Tooth: ${tt.tooth_number}` : 'Select tooth number'}
+                                                   {tt.tooth_number ? `Tooth: ${tt.tooth_number}` : 'Select tooth number'}
                         </button>
                         {toothChartModal.open && toothChartModal.idx === idx && (
                           <DentalChartPicker
