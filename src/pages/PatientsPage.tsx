@@ -3,7 +3,7 @@ import { DentalChartPicker } from '../components/DentalChartPicker';
 import { AuthContext } from '../context/AuthContext';
 import PatientTreatmentsList from '../components/PatientTreatmentsList';
 import EditPatientTreatments from '../components/EditPatientTreatments';
-import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info } from 'lucide-react';
+import { Plus, Search, X, Edit, Trash2, RotateCcw, RotateCw, Filter, Info, ArrowUp, ArrowDown } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } from '../types';
 import Swal from 'sweetalert2';
@@ -501,15 +501,21 @@ export function PatientsPage() {
 
       // Update the local state
       setPatients(prevPatients =>
-        prevPatients.map(p =>
-          p.id === patientId
-            ? {
-                ...p,
-                status: newStatus,
-                end_date: newStatus === 'completed' ? new Date().toISOString() : p.end_date
-              }
-            : p
-        )
+        prevPatients.map(p => {
+          if (p.id === patientId) {
+            let updates: any = { status: newStatus };
+            if (newStatus === 'in_progress' && p.status === 'pending') {
+              updates.start_date = new Date().toISOString();
+            } else if (newStatus === 'pending') {
+              updates.start_date = null;
+            }
+            if (newStatus === 'completed') {
+              updates.end_date = new Date().toISOString();
+            }
+            return { ...p, ...updates };
+          }
+          return p;
+        })
       );
 
       // Show success message
@@ -805,14 +811,39 @@ export function PatientsPage() {
   // Add state for the filters modal
   const [isFiltersModalOpen, setIsFiltersModalOpen] = useState(false);
 
+  // Add state for sorting
+  const [sortConfig, setSortConfig] = useState<{column: string | null, direction: 'asc' | 'desc' | null}>({
+    column: null,
+    direction: null
+  });
+
   // Pagination state for desktop
   const [currentPage, setCurrentPage] = useState(1);
   const [rowsPerPage, setRowsPerPage] = useState(10); // desktop default 10
   const totalPages = Math.ceil(filteredPatients.length / rowsPerPage);
+
+  // Update filteredPatients to apply sorting
+  const sortedPatients = useMemo(() => {
+    let sorted = [...filteredPatients];
+    if (sortConfig.column === 'start_date' && sortConfig.direction) {
+      sorted.sort((a, b) => {
+        if (!a.start_date) return 1;
+        if (!b.start_date) return -1;
+        if (sortConfig.direction === 'asc') {
+          return a.start_date.localeCompare(b.start_date);
+        } else {
+          return b.start_date.localeCompare(a.start_date);
+        }
+      });
+    }
+    return sorted;
+  }, [filteredPatients, sortConfig]);
+
+  // Use sortedPatients instead of filteredPatients for rendering
   const paginatedPatients = useMemo(() => {
     const start = (currentPage - 1) * rowsPerPage;
-    return filteredPatients.slice(start, start + rowsPerPage);
-  }, [filteredPatients, currentPage, rowsPerPage]);
+    return sortedPatients.slice(start, start + rowsPerPage);
+  }, [sortedPatients, currentPage, rowsPerPage]);
   useEffect(() => { setCurrentPage(1); }, [filteredPatients, rowsPerPage]);
 
   // Ref for mobile card list container
@@ -822,10 +853,26 @@ export function PatientsPage() {
   const [mobileCurrentPage, setMobileCurrentPage] = useState(1);
   const [mobileRowsPerPage, setMobileRowsPerPage] = useState(5); // mobile default 5
   const mobileTotalPages = Math.ceil(filteredPatients.length / mobileRowsPerPage);
+  // Mobile sorting
+  const sortedMobilePatients = useMemo(() => {
+    let sorted = [...filteredPatients];
+    if (sortConfig.column === 'start_date' && sortConfig.direction) {
+      sorted.sort((a, b) => {
+        if (!a.start_date) return 1;
+        if (!b.start_date) return -1;
+        if (sortConfig.direction === 'asc') {
+          return a.start_date.localeCompare(b.start_date);
+        } else {
+          return b.start_date.localeCompare(a.start_date);
+        }
+      });
+    }
+    return sorted;
+  }, [filteredPatients, sortConfig]);
   const paginatedMobilePatients = useMemo(() => {
     const start = (mobileCurrentPage - 1) * mobileRowsPerPage;
-    return filteredPatients.slice(start, start + mobileRowsPerPage);
-  }, [filteredPatients, mobileCurrentPage, mobileRowsPerPage]);
+    return sortedMobilePatients.slice(start, start + mobileRowsPerPage);
+  }, [sortedMobilePatients, mobileCurrentPage, mobileRowsPerPage]);
   useEffect(() => { setMobileCurrentPage(1); }, [filteredPatients, mobileRowsPerPage]);
 
   // Scroll to card list on mobile page change
@@ -999,7 +1046,17 @@ export function PatientsPage() {
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Tooth Class</th>
                 )}
                 {selectedColumns.includes('start_date') && (
-                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">Start Date</th>
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider cursor-pointer" onClick={() => {
+                    setSortConfig(config => ({
+                      column: 'start_date',
+                      direction: config.direction === 'asc' ? 'desc' : 'asc'
+                    }));
+                  }}>
+                    Start Date
+                    {sortConfig.column === 'start_date' && (
+                      sortConfig.direction === 'asc' ? <ArrowUp className="inline h-4 w-4 ml-1" /> : <ArrowDown className="inline h-4 w-4 ml-1" />
+                    )}
+                  </th>
                 )}
                 {selectedColumns.includes('end_date') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider">End Date</th>
@@ -1327,70 +1384,86 @@ export function PatientsPage() {
       )}
       {/* MOBILE CARD LIST VIEW */}
       {isMobile && (
-        <div className="sm:hidden" ref={mobileCardListRef}>
-          {paginatedMobilePatients.length === 0 && !loading ? (
-            <div className="text-center py-8 text-gray-500">No patients found</div>
-          ) : (
-            paginatedMobilePatients.map((patient) => (
-              <PatientCard
-                key={patient.id}
-                patient={patient}
-                doctorName={students.find(s => s.id === patient.student_id)?.name || 'Unassigned'}
-                classYear={classYears.find(cy => cy.id === patient.class_year_id)?.year_range}
-                treatmentName={treatments.find(t => t.id === patient.treatment_id)?.name}
-                toothClassName={toothClasses.find(tc => tc.id === patient.tooth_class_id)?.name}
-                onEdit={openEditModal}
-                onDelete={handleDeletePatient}
-                onInfo={openInfoModal}
-                onNotes={openNotesModal}
-                hasNotes={patientsWithNotes.has(patient.id)}
-                onStatusChange={handleStatusChange}
-              />
-            ))
-          )}
-          {/* Pagination Controls for Mobile */}
-          {mobileTotalPages > 1 && (
-            <div className="flex flex-col gap-4 items-center justify-between px-4 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-4 rounded-lg shadow-sm">
-              <div className="flex items-center gap-4 w-full justify-center">
-                <button
-                  onClick={() => setMobileCurrentPage(p => {
-                    const next = Math.max(1, p - 1);
-                    return next;
-                  })}
-                  disabled={mobileCurrentPage === 1}
-                  className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
-                >
-                  Previous
-                </button>
-                <span className="text-base text-gray-700 dark:text-gray-300 font-semibold">
-                  Page {mobileCurrentPage} of {mobileTotalPages}
-                </span>
-                <button
-                  onClick={() => setMobileCurrentPage(p => {
-                    const next = Math.min(mobileTotalPages, p + 1);
-                    return next;
-                  })}
-                  disabled={mobileCurrentPage === mobileTotalPages}
-                  className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
-                >
-                  Next
-                </button>
+        <>
+          <div className="flex justify-end mb-2">
+            <button
+              className="flex items-center gap-1 px-3 py-1 rounded bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200"
+              onClick={() => setSortConfig(config => ({
+                column: 'start_date',
+                direction: config.direction === 'asc' ? 'desc' : 'asc'
+              }))}
+            >
+              Sort by Start Date
+              {sortConfig.column === 'start_date' && (
+                sortConfig.direction === 'asc' ? <ArrowUp className="inline h-4 w-4" /> : <ArrowDown className="inline h-4 w-4" />
+              )}
+            </button>
+          </div>
+          <div className="sm:hidden" ref={mobileCardListRef}>
+            {paginatedMobilePatients.length === 0 && !loading ? (
+              <div className="text-center py-8 text-gray-500">No patients found</div>
+            ) : (
+              paginatedMobilePatients.map((patient) => (
+                <PatientCard
+                  key={patient.id}
+                  patient={patient}
+                  doctorName={students.find(s => s.id === patient.student_id)?.name || 'Unassigned'}
+                  classYear={classYears.find(cy => cy.id === patient.class_year_id)?.year_range}
+                  treatmentName={treatments.find(t => t.id === patient.treatment_id)?.name}
+                  toothClassName={toothClasses.find(tc => tc.id === patient.tooth_class_id)?.name}
+                  onEdit={openEditModal}
+                  onDelete={handleDeletePatient}
+                  onInfo={openInfoModal}
+                  onNotes={openNotesModal}
+                  hasNotes={patientsWithNotes.has(patient.id)}
+                  onStatusChange={handleStatusChange}
+                />
+              ))
+            )}
+            {/* Pagination Controls for Mobile */}
+            {mobileTotalPages > 1 && (
+              <div className="flex flex-col gap-4 items-center justify-between px-4 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-4 rounded-lg shadow-sm">
+                <div className="flex items-center gap-4 w-full justify-center">
+                  <button
+                    onClick={() => setMobileCurrentPage(p => {
+                      const next = Math.max(1, p - 1);
+                      return next;
+                    })}
+                    disabled={mobileCurrentPage === 1}
+                    className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
+                  >
+                    Previous
+                  </button>
+                  <span className="text-base text-gray-700 dark:text-gray-300 font-semibold">
+                    Page {mobileCurrentPage} of {mobileTotalPages}
+                  </span>
+                  <button
+                    onClick={() => setMobileCurrentPage(p => {
+                      const next = Math.min(mobileTotalPages, p + 1);
+                      return next;
+                    })}
+                    disabled={mobileCurrentPage === mobileTotalPages}
+                    className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
+                  >
+                    Next
+                  </button>
+                </div>
+                <div className="flex items-center gap-3 w-full justify-center">
+                  <span className="text-base text-gray-700 dark:text-gray-300 font-medium">Cards per page:</span>
+                  <select
+                    value={mobileRowsPerPage}
+                    onChange={e => setMobileRowsPerPage(Number(e.target.value))}
+                    className="rounded-lg border-gray-300 text-base dark:bg-gray-700 dark:text-white px-3 py-2"
+                  >
+                    {[3, 5, 10, 20].map(size => (
+                      <option key={size} value={size}>{size}</option>
+                    ))}
+                  </select>
+                </div>
               </div>
-              <div className="flex items-center gap-3 w-full justify-center">
-                <span className="text-base text-gray-700 dark:text-gray-300 font-medium">Cards per page:</span>
-                <select
-                  value={mobileRowsPerPage}
-                  onChange={e => setMobileRowsPerPage(Number(e.target.value))}
-                  className="rounded-lg border-gray-300 text-base dark:bg-gray-700 dark:text-white px-3 py-2"
-                >
-                  {[3, 5, 10, 20].map(size => (
-                    <option key={size} value={size}>{size}</option>
-                  ))}
-                </select>
-              </div>
-            </div>
-          )}
-        </div>
+            )}
+          </div>
+        </>
       )}
 
       {/* Add Patient Modal */}

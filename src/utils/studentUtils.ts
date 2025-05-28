@@ -43,31 +43,34 @@ export async function handlePatientStatusChange(
   onSuccess?: () => void
 ) {
   try {
-    // Update the patient's status
-    const updates = {
+    // Update the patient's status and dates
+    const updates: any = {
       status: newStatus,
       end_date: newStatus === 'completed' ? new Date().toISOString() : currentPatient.end_date
     };
-
+    // Set start_date if moving from pending to in_progress
+    if (currentPatient.status === 'pending' && newStatus === 'in_progress') {
+      updates.start_date = new Date().toISOString();
+    }
     const { error } = await supabase
       .from('patients')
       .update(updates)
       .eq('id', patientId);
-
     if (error) throw error;
-
-    // If the patient is assigned to a student, update their counts
+    // Update student availability if needed
     if (currentPatient.student_id) {
+      if (newStatus === 'completed') {
+        await supabase
+          .from('students')
+          .update({ is_available: true })
+          .eq('id', currentPatient.student_id);
+      }
       await updateStudentPatientCounts(currentPatient.student_id);
     }
-
-    // If the status changed to/from completed and the patient is reassigned, update the previous student's counts
     if (currentPatient.previousStudentId && currentPatient.previousStudentId !== currentPatient.student_id) {
       await updateStudentPatientCounts(currentPatient.previousStudentId);
     }
-
     if (onSuccess) onSuccess();
-
     return true;
   } catch (error) {
     console.error('Error updating patient status:', error);
