@@ -100,6 +100,12 @@ export function StudentsPage() {
   const [citySearchTerm, setCitySearchTerm] = useState<string>('');
   const [workingDaysFilter, setWorkingDaysFilter] = useState<string>('all');
   const [registrationEndDateFilter, setRegistrationEndDateFilter] = useState<string>('all');
+  const [patientsInProgressFilter, setPatientsInProgressFilter] = useState<{
+    operator: 'gt' | 'lt' | 'eq' | '';
+    value?: number;
+  }>({ operator: '', value: undefined });
+  // University Type Filter state
+  const [universityTypeFilter, setUniversityTypeFilter] = useState<string>('all');
   const uniqueRegistrationEndDates = React.useMemo(() => {
     const dates = students
       .map(s => s.registration_end_date)
@@ -127,6 +133,7 @@ export function StudentsPage() {
     { id: 'mobile', label: 'Mobile' },
     { id: 'city', label: 'City' },
     { id: 'university', label: 'University' },
+    { id: 'university_type', label: 'University Type' }, // <-- Added
     { id: 'working_days', label: 'Working Days' },
     { id: 'status', label: 'Status' },
     { id: 'registration', label: 'Registration' },
@@ -777,18 +784,18 @@ export function StudentsPage() {
   };
 
   // Get unique universities, cities and working days for filters
-  const uniqueUniversities = React.useMemo(() => {
+  const uniqueUniversities = useMemo(() => {
     const universities = students.map(student => student.university);
     return [...new Set(universities)].filter(Boolean).sort();
   }, [students]);
 
-  const uniqueCities = React.useMemo(() => {
+  const uniqueCities = useMemo(() => {
     const cities = students.map(student => student.city);
     return [...new Set(cities)].filter(Boolean).sort();
   }, [students]);
 
   // Filtered universities based on search term
-  const filteredUniversities = React.useMemo(() => {
+  const filteredUniversities = useMemo(() => {
     if (!universitySearchTerm) return uniqueUniversities;
     return uniqueUniversities.filter(university =>
       university.toLowerCase().includes(universitySearchTerm.toLowerCase())
@@ -796,7 +803,7 @@ export function StudentsPage() {
   }, [uniqueUniversities, universitySearchTerm]);
 
   // Filtered cities based on search term
-  const filteredCities = React.useMemo(() => {
+  const filteredCities = useMemo(() => {
     if (!citySearchTerm) return uniqueCities;
     return uniqueCities.filter(city =>
       city.toLowerCase().includes(citySearchTerm.toLowerCase())
@@ -808,7 +815,7 @@ export function StudentsPage() {
   const [showUniversityDropdown, setShowUniversityDropdown] = useState(false);
 
   // Filtered cities based on input
-  const filteredCitiesForInput = React.useMemo(() => {
+  const filteredCitiesForInput = useMemo(() => {
     if (!newStudent.city) return uniqueCities;
     return uniqueCities.filter(city =>
       city.toLowerCase().includes(newStudent.city.toLowerCase())
@@ -816,107 +823,116 @@ export function StudentsPage() {
   }, [uniqueCities, newStudent.city]);
 
   // Filtered universities based on input
-  const filteredUniversitiesForInput = React.useMemo(() => {
+  const filteredUniversitiesForInput = useMemo(() => {
     if (!newStudent.university) return uniqueUniversities;
     return uniqueUniversities.filter(university =>
       university.toLowerCase().includes(newStudent.university.toLowerCase())
     );
   }, [uniqueUniversities, newStudent.university]);
 
-  // Modify the filteredStudents logic to include class year filtering, sorting, and column-specific filtering
+  // Filter students based on search term and filters
   const filteredStudents = useMemo(() => {
-    return students
-      .filter(student => {
-        // First apply class year filter
-        if (selectedClassYearFilter !== 'all' && student.class_year_id !== selectedClassYearFilter) {
-          return false;
-        }
-        // Apply status filter
-        if (statusFilter !== 'all') {
-          if (statusFilter === 'available' && !student.is_available) return false;
-          if (statusFilter === 'busy' && student.is_available) return false;
-        }
-        // Apply registration filter
-        if (registrationFilter !== 'all' && student.registration_status !== registrationFilter) {
-          return false;
-        }
-        // Apply university filter
-        if (universityFilter !== 'all' && student.university !== universityFilter) {
-          return false;
-        }
-        // Apply city filter
-        if (cityFilter !== 'all' && student.city !== cityFilter) {
-          return false;
-        }
-        // Apply working days filter
-        if (workingDaysFilter !== 'all' && student.working_days_id !== workingDaysFilter) {
-          return false;
-        }
-        if (
-          registrationEndDateFilter !== 'all' &&
-          (!student.registration_end_date ||
-            new Date(student.registration_end_date).toISOString().split('T')[0] !== registrationEndDateFilter)
-        ) {
-          return false;
-        }
-        // Then apply search term filter
-        if (!searchTerm) return true;
-        const searchTermLower = searchTerm.toLowerCase();
-        return selectedColumns.some(column => {
-          switch (column) {
-            case 'name':
-              return student.name.toLowerCase().includes(searchTermLower);
-            case 'mobile':
-              return student.mobile.includes(searchTerm);
-            case 'university':
-              return student.university.toLowerCase().includes(searchTermLower);
-            case 'city':
-              return student.city.toLowerCase().includes(searchTermLower);
-            case 'status':
-              return (student.is_available ? 'available' : 'busy').includes(searchTermLower);
-            case 'registration':
-              return student.registration_status.toLowerCase().includes(searchTermLower);
-            default:
-              return false;
-          }
-        });
-      })
-      .sort((a, b) => {
-        if (!sortConfig.column || !sortConfig.direction) return 0;
-        let valueA, valueB;
-        switch (sortConfig.column) {
-          case 'name':
-            valueA = a.name.toLowerCase();
-            valueB = b.name.toLowerCase();
-            break;
-          case 'mobile':
-            valueA = a.mobile;
-            valueB = b.mobile;
-            break;
-          case 'university':
-            valueA = a.university.toLowerCase();
-            valueB = b.university.toLowerCase();
-            break;
-          case 'city':
-            valueA = a.city.toLowerCase();
-            valueB = b.city.toLowerCase();
-            break;
-          case 'status':
-            valueA = a.is_available ? 'available' : 'busy';
-            valueB = b.is_available ? 'available' : 'busy';
-            break;
-          case 'registration':
-            valueA = a.registration_status;
-            valueB = b.registration_status;
-            break;
+    return students.filter(student => {
+      // Search term filter
+      const matchesSearch = searchTerm === '' || 
+        student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.mobile.includes(searchTerm) ||
+        student.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        student.university?.toLowerCase().includes(searchTerm.toLowerCase());
+
+      // Status filter
+      const matchesStatus = statusFilter === 'all' || 
+        (statusFilter === 'available' && student.is_available) ||
+        (statusFilter === 'busy' && !student.is_available);
+
+      // Registration status filter
+      const matchesRegistration = registrationFilter === 'all' || 
+        student.registration_status === registrationFilter;
+
+      // Working days filter
+      const matchesWorkingDays = workingDaysFilter === 'all' || 
+        student.working_days_id === workingDaysFilter;
+
+      // Class year filter
+      const matchesClassYear = selectedClassYearFilter === 'all' || 
+        student.class_year_id === selectedClassYearFilter;
+
+      // University type filter
+      const matchesUniversityType = universityTypeFilter === 'all' || 
+        student.university_type === universityTypeFilter;
+
+      // City filter
+      const matchesCity = cityFilter === 'all' || 
+        (student.city && student.city.toLowerCase().includes(cityFilter.toLowerCase()));
+
+      // Patients in progress filter
+      const matchesPatientsInProgress = !patientsInProgressFilter.operator || 
+        !patientsInProgressFilter.value || 
+        (
+          (patientsInProgressFilter.operator === 'gt' && (student.patients_in_progress || 0) > patientsInProgressFilter.value) ||
+          (patientsInProgressFilter.operator === 'lt' && (student.patients_in_progress || 0) < patientsInProgressFilter.value) ||
+          (patientsInProgressFilter.operator === 'eq' && (student.patients_in_progress || 0) === patientsInProgressFilter.value)
+        );
+
+      // Registration end date filter
+      const matchesRegistrationEndDate = () => {
+        if (registrationEndDateFilter === 'all') return true;
+        
+        if (!student.registration_end_date) return false;
+        
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const endDate = new Date(student.registration_end_date);
+        endDate.setHours(0, 0, 0, 0);
+        
+        const timeDiff = endDate.getTime() - today.getTime();
+        const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+        
+        switch (registrationEndDateFilter) {
+          case 'expired':
+            return daysDiff < 0;
+          case 'this_week':
+            return daysDiff >= 0 && daysDiff <= 7;
+          case 'this_month':
+            const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
+            const daysThisMonth = thisMonthEnd.getDate() - today.getDate();
+            return daysDiff >= 0 && daysDiff <= daysThisMonth;
+          case 'next_month':
+            const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
+            const daysNextMonth = nextMonthEnd.getDate();
+            return daysDiff > (thisMonthEnd.getDate() - today.getDate()) && 
+                   daysDiff <= (thisMonthEnd.getDate() - today.getDate() + daysNextMonth);
+          case 'future':
+            return daysDiff > 0;
           default:
-            return 0;
+            return true;
         }
-        if (valueA < valueB) return sortConfig.direction === 'asc' ? -1 : 1;
-        if (valueA > valueB) return sortConfig.direction === 'asc' ? 1 : -1;
-        return 0;
-      });
-  }, [students, selectedClassYearFilter, statusFilter, registrationFilter, universityFilter, cityFilter, workingDaysFilter, registrationEndDateFilter, searchTerm, selectedColumns, sortConfig]);
+      };
+
+      return (
+        matchesSearch &&
+        matchesStatus &&
+        matchesRegistration &&
+        matchesWorkingDays &&
+        matchesClassYear &&
+        matchesUniversityType &&
+        matchesCity &&
+        matchesPatientsInProgress &&
+        matchesRegistrationEndDate()
+      );
+    });
+  }, [
+    students, 
+    searchTerm, 
+    statusFilter, 
+    registrationFilter, 
+    workingDaysFilter, 
+    selectedClassYearFilter, 
+    newStudent.university_type, 
+    cityFilter, 
+    patientsInProgressFilter,
+    registrationEndDateFilter
+  ]);
 
   function openInfoModal(student: Student) {
     setSelectedStudent(student);
@@ -1085,7 +1101,7 @@ export function StudentsPage() {
         icon: 'error',
         title: 'Error',
         text: 'Failed to check ticket number',
-        confirmButtonColor: '#4f46e5',
+        confirmButtonColor: '#4f46e5'
       });
       return;
     }
@@ -1664,6 +1680,11 @@ export function StudentsPage() {
                     </div>
                   </th>
                 )}
+                {selectedColumns.includes('university_type') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    University Type
+                  </th>
+                )}
                 {selectedColumns.includes('working_days') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
                     <div className="flex items-center relative">
@@ -1960,6 +1981,11 @@ export function StudentsPage() {
                     )}
                     {selectedColumns.includes('university') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.university}</td>
+                    )}
+                    {selectedColumns.includes('university_type') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {student.university_type || 'N/A'}
+                      </td>
                     )}
                     {selectedColumns.includes('working_days') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
@@ -2689,9 +2715,6 @@ export function StudentsPage() {
                 </div>
                 {/* Tooth Treatments Section */}
                 <div className="space-y-4">
-                  <label className="block text-sm font-bold text-gray-700 dark:text-gray-300 mb-1">
-                    Tooth Treatments
-                  </label>
                   {addPatientTreatments.map((tt, idx) => (
                     <div key={idx} className="grid grid-cols-1 md:grid-cols-4 gap-4 items-end">
                       <div>
@@ -2799,10 +2822,7 @@ export function StudentsPage() {
             <div className="flex flex-col gap-4 items-center justify-between px-4 py-5 bg-gray-50 dark:bg-gray-900 border-t border-gray-200 dark:border-gray-700 mt-4 rounded-lg shadow-sm">
               <div className="flex items-center gap-4 w-full justify-center">
                 <button
-                  onClick={() => setMobileCurrentPage(p => {
-                    const next = Math.max(1, p - 1);
-                    return next;
-                  })}
+                  onClick={() => setMobileCurrentPage(p => Math.max(1, p - 1))}
                   disabled={mobileCurrentPage === 1}
                   className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
                 >
@@ -2812,10 +2832,7 @@ export function StudentsPage() {
                   Page {mobileCurrentPage} of {mobileTotalPages}
                 </span>
                 <button
-                  onClick={() => setMobileCurrentPage(p => {
-                    const next = Math.min(mobileTotalPages, p + 1);
-                    return next;
-                  })}
+                  onClick={() => setMobileCurrentPage(p => Math.min(mobileTotalPages, p + 1))}
                   disabled={mobileCurrentPage === mobileTotalPages}
                   className="px-5 py-2 rounded-lg bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-200 hover:bg-gray-300 dark:hover:bg-gray-600 disabled:opacity-50 text-base font-medium"
                 >
@@ -2836,6 +2853,261 @@ export function StudentsPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Mobile Filter FAB */}
+      {isMobile && (
+        <div className="fixed bottom-6 right-6 z-40">
+          <button
+            onClick={() => setIsMobileFilterModalOpen(true)}
+            className="p-4 bg-indigo-600 text-white rounded-full shadow-lg hover:bg-indigo-700 transition-colors duration-200"
+            aria-label="Open filters"
+          >
+            <Filter className="h-6 w-6" />
+          </button>
+        </div>
+      )}
+
+      {/* Mobile Filter Modal */}
+      {isMobileFilterModalOpen && (
+        <div className="fixed inset-0 z-50 overflow-y-auto">
+          <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
+            <div 
+              className="fixed inset-0 transition-opacity" 
+              aria-hidden="true"
+              onClick={() => setIsMobileFilterModalOpen(false)}
+            >
+              <div className="absolute inset-0 bg-gray-500 opacity-75"></div>
+            </div>
+
+            <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
+            
+            <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
+              <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
+                <div className="sm:flex sm:items-start">
+                  <div className="w-full">
+                    <div className="flex justify-between items-center mb-4">
+                      <h3 className="text-lg leading-6 font-medium text-gray-900 dark:text-white">
+                        Filters
+                      </h3>
+                      <button
+                        type="button"
+                        className="bg-white dark:bg-gray-800 rounded-md text-gray-400 hover:text-gray-500"
+                        onClick={() => setIsMobileFilterModalOpen(false)}
+                      >
+                        <span className="sr-only">Close</span>
+                        <X className="h-6 w-6" />
+                      </button>
+                    </div>
+
+                    <div className="space-y-4">
+                      {/* Status Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Status
+                        </label>
+                        <select
+                          value={statusFilter}
+                          onChange={(e) => setStatusFilter(e.target.value as any)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="available">Available</option>
+                          <option value="busy">Busy</option>
+                        </select>
+                      </div>
+
+                      {/* Registration Status Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Registration Status
+                        </label>
+                        <select
+                          value={registrationFilter}
+                          onChange={(e) => setRegistrationFilter(e.target.value as any)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Statuses</option>
+                          <option value="registered">Registered</option>
+                          <option value="unregistered">Unregistered</option>
+                          <option value="pending">Pending</option>
+                        </select>
+                      </div>
+
+                      {/* Registration End Date Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Registration End Date
+                        </label>
+                        <select
+                          value={registrationEndDateFilter}
+                          onChange={(e) => setRegistrationEndDateFilter(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Dates</option>
+                          <option value="expired">Expired</option>
+                          <option value="this_week">Expiring This Week</option>
+                          <option value="this_month">Expiring This Month</option>
+                          <option value="next_month">Expiring Next Month</option>
+                          <option value="future">Future Dates</option>
+                        </select>
+                      </div>
+
+                      {/* Working Days Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Working Days
+                        </label>
+                        <select
+                          value={workingDaysFilter}
+                          onChange={(e) => setWorkingDaysFilter(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Working Days</option>
+                          {workingDays.map((wd) => (
+                            <option key={wd.id} value={wd.id}>
+                              {wd.name}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Class Year Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Class Year
+                        </label>
+                        <select
+                          value={selectedClassYearFilter}
+                          onChange={(e) => {
+                            setSelectedClassYearFilter(e.target.value);
+                            localStorage.setItem('studentClassYearFilter', e.target.value);
+                          }}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Class Years</option>
+                          {classYears.map((year) => (
+                            <option key={year.id} value={year.id}>
+                              {year.year_range}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* University Type Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          University Type
+                        </label>
+                        <select
+                          value={universityTypeFilter}
+                          onChange={(e) => setUniversityTypeFilter(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Types</option>
+                          <option value="حكومي">حكومي</option>
+                          <option value="خاص">خاص</option>
+                          <option value="اخري">أخرى</option>
+                        </select>
+                      </div>
+
+                      {/* University Filter Dropdown */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">University</label>
+                        <select
+                          value={universityFilter}
+                          onChange={e => setUniversityFilter(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Universities</option>
+                          {Array.from(new Set(students.map(s => s.university).filter(Boolean))).map((uni, idx) => (
+                            <option key={idx} value={uni}>{uni}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* City Filter Dropdown */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">City</label>
+                        <select
+                          value={cityFilter}
+                          onChange={e => setCityFilter(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                        >
+                          <option value="all">All Cities</option>
+                          {Array.from(new Set(students.map(s => s.city).filter(Boolean))).map((city, idx) => (
+                            <option key={idx} value={city}>{city}</option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {/* Patients Count Filter */}
+                      <div>
+                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                          Patients in Progress
+                        </label>
+                        <div className="flex gap-2">
+                          <select
+                            value={patientsInProgressFilter.operator || ''}
+                            onChange={(e) => setPatientsInProgressFilter({
+                              ...patientsInProgressFilter,
+                              operator: e.target.value as 'gt' | 'lt' | 'eq' | ''
+                            })}
+                            className="w-1/3 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                          >
+                            <option value="">-</option>
+                            <option value="gt">&gt;</option>
+                            <option value="lt">&lt;</option>
+                            <option value="eq">=</option>
+                          </select>
+                          <input
+                            type="number"
+                            value={patientsInProgressFilter.value || ''}
+                            onChange={(e) => setPatientsInProgressFilter({
+                              ...patientsInProgressFilter,
+                              value: e.target.value ? parseInt(e.target.value) : undefined
+                            })}
+                            placeholder="Count"
+                            className="flex-1 p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                            min="0"
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="bg-gray-50 dark:bg-gray-800 px-4 py-3 sm:px-6 sm:flex sm:flex-row-reverse">
+                <button
+                  type="button"
+                  className="w-full inline-flex justify-center rounded-md border border-transparent shadow-sm px-4 py-2 bg-indigo-600 text-base font-medium text-white hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    setIsMobileFilterModalOpen(false);
+                    setMobileCurrentPage(1);
+                  }}
+                >
+                  Apply Filters
+                </button>
+                <button
+                  type="button"
+                  className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
+                  onClick={() => {
+                    setStatusFilter('all');
+                    setRegistrationFilter('registered');
+                    setWorkingDaysFilter('all');
+                    setUniversityFilter('all');
+                    setCityFilter('all');
+                    setUniversityTypeFilter('all');
+                    setMobileCurrentPage(1);
+                  }}
+                >
+                  Reset
+                </button>
+              </div>
+            </div>
+          </div>
         </div>
       )}
     </div>

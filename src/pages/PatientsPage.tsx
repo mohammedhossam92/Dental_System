@@ -726,7 +726,7 @@ export function PatientsPage() {
   }
 
   // Add filter states
-  const [statusFilter, setStatusFilter] = useState('in_progress');
+  const [statusFilter, setStatusFilter] = useState(['pending', 'in_progress']);
   const [classYearFilter, setClassYearFilter] = useState('all');
   const [workingDaysFilter, setWorkingDaysFilter] = useState('all');
   const [treatmentFilter, setTreatmentFilter] = useState('all');
@@ -744,7 +744,7 @@ export function PatientsPage() {
       }
       if (!inDateRange) return false;
       // Status filter
-      if (statusFilter !== 'all' && patient.status !== statusFilter) return false;
+      if (statusFilter !== 'all' && !statusFilter.includes(patient.status)) return false;
       // Class year filter
       if (classYearFilter !== 'all' && patient.class_year_id !== classYearFilter) return false;
       // Working days filter
@@ -1237,17 +1237,30 @@ export function PatientsPage() {
             <div className="space-y-3">
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
-                <select
-                  value={statusFilter}
-                  onChange={e => setStatusFilter(e.target.value)}
-                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white text-sm"
-                >
-                  <option value="all">All Status</option>
-                  <option value="pending">Pending</option>
-                  <option value="in_progress">In Progress</option>
-                  <option value="completed">Completed</option>
-                  <option value="cancelled">Cancelled</option>
-                </select>
+                <div className="flex flex-wrap gap-2">
+                  {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
+  <label
+    key={status}
+    className="flex items-center gap-2 px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 cursor-pointer transition-colors duration-150 hover:bg-indigo-50 dark:hover:bg-indigo-900 focus-within:ring-2 focus-within:ring-indigo-500"
+  >
+    <input
+      type="checkbox"
+      checked={statusFilter.includes(status)}
+      onChange={e => {
+        if (e.target.checked) {
+          setStatusFilter([...statusFilter, status]);
+        } else {
+          setStatusFilter(statusFilter.filter(s => s !== status));
+        }
+      }}
+      className="accent-indigo-600 w-4 h-4 rounded focus:ring-2 focus:ring-indigo-500"
+    />
+    <span className="text-sm text-gray-700 dark:text-gray-200 select-none">
+      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+    </span>
+  </label>
+))}
+                </div>
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Class Year</label>
@@ -2188,17 +2201,25 @@ export function PatientsPage() {
               <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
                 Status
               </label>
-              <select
-                value={statusFilter}
-                onChange={e => setStatusFilter(e.target.value)}
-                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="all">All Status</option>
-                <option value="pending">Pending</option>
-                <option value="in_progress">In Progress</option>
-                <option value="completed">Completed</option>
-                <option value="cancelled">Cancelled</option>
-              </select>
+              <div className="flex flex-wrap gap-2">
+                {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
+                  <label key={status} className="flex items-center gap-1 text-sm">
+                    <input
+                      type="checkbox"
+                      checked={statusFilter.includes(status)}
+                      onChange={e => {
+                        if (e.target.checked) {
+                          setStatusFilter([...statusFilter, status]);
+                        } else {
+                          setStatusFilter(statusFilter.filter(s => s !== status));
+                        }
+                      }}
+                      className="accent-indigo-600"
+                    />
+                    {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                  </label>
+                ))}
+              </div>
             </div>
 
             {/* Class Year Filter */}
