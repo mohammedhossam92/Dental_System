@@ -39,14 +39,25 @@ export async function updateStudentPatientCounts(studentId: string) {
 export async function handlePatientStatusChange(
   patientId: string,
   newStatus: string,
-  currentPatient: any,
+  currentPatient: {
+    id: string;
+    student_id: string;
+    previousStudentId?: string;
+    status: string;
+    start_date?: string | null;
+    end_date?: string | null;
+  },
   onSuccess?: () => void
 ) {
   try {
     // Update the patient's status and dates
-    const updates: any = {
+    const updates: {
+      status: string;
+      start_date?: string;
+      end_date?: string | null;
+    } = {
       status: newStatus,
-      end_date: newStatus === 'completed' ? new Date().toISOString() : currentPatient.end_date
+      end_date: newStatus === 'completed' ? new Date().toISOString() : null
     };
     // Set start_date if moving from pending to in_progress
     if (currentPatient.status === 'pending' && newStatus === 'in_progress') {
@@ -63,6 +74,12 @@ export async function handlePatientStatusChange(
         await supabase
           .from('students')
           .update({ is_available: true })
+          .eq('id', currentPatient.student_id);
+      } else if (newStatus === 'in_progress' && currentPatient.status === 'completed') {
+        // When changing from completed to in_progress, make student busy
+        await supabase
+          .from('students')
+          .update({ is_available: false })
           .eq('id', currentPatient.student_id);
       }
       await updateStudentPatientCounts(currentPatient.student_id);
