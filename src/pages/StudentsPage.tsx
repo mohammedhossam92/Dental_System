@@ -148,7 +148,7 @@ export function StudentsPage() {
         return;
       }
 
-    
+
 
       const [studentsResult, workingDaysResult, classYearsResult] = await Promise.all([
         supabase
@@ -286,7 +286,7 @@ export function StudentsPage() {
     ];
 
     for (const { field, label } of requiredFields) {
-      // @ts-ignore
+      // @ts-expect-error: Accessing object with string index
       if (!newStudent[field]) {
         await Swal.fire({
           icon: 'error',
@@ -834,40 +834,40 @@ export function StudentsPage() {
   const filteredStudents = useMemo(() => {
     return students.filter(student => {
       // Search term filter
-      const matchesSearch = searchTerm === '' || 
+      const matchesSearch = searchTerm === '' ||
         student.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.mobile.includes(searchTerm) ||
         student.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.university?.toLowerCase().includes(searchTerm.toLowerCase());
 
       // Status filter
-      const matchesStatus = statusFilter === 'all' || 
+      const matchesStatus = statusFilter === 'all' ||
         (statusFilter === 'available' && student.is_available) ||
         (statusFilter === 'busy' && !student.is_available);
 
       // Registration status filter
-      const matchesRegistration = registrationFilter === 'all' || 
+      const matchesRegistration = registrationFilter === 'all' ||
         student.registration_status === registrationFilter;
 
       // Working days filter
-      const matchesWorkingDays = workingDaysFilter === 'all' || 
+      const matchesWorkingDays = workingDaysFilter === 'all' ||
         student.working_days_id === workingDaysFilter;
 
       // Class year filter
-      const matchesClassYear = selectedClassYearFilter === 'all' || 
+      const matchesClassYear = selectedClassYearFilter === 'all' ||
         student.class_year_id === selectedClassYearFilter;
 
       // University type filter
-      const matchesUniversityType = universityTypeFilter === 'all' || 
+      const matchesUniversityType = universityTypeFilter === 'all' ||
         student.university_type === universityTypeFilter;
 
       // City filter
-      const matchesCity = cityFilter === 'all' || 
+      const matchesCity = cityFilter === 'all' ||
         (student.city && student.city.toLowerCase().includes(cityFilter.toLowerCase()));
 
       // Patients in progress filter
-      const matchesPatientsInProgress = !patientsInProgressFilter.operator || 
-        !patientsInProgressFilter.value || 
+      const matchesPatientsInProgress = !patientsInProgressFilter.operator ||
+        !patientsInProgressFilter.value ||
         (
           (patientsInProgressFilter.operator === 'gt' && (student.patients_in_progress || 0) > patientsInProgressFilter.value) ||
           (patientsInProgressFilter.operator === 'lt' && (student.patients_in_progress || 0) < patientsInProgressFilter.value) ||
@@ -877,35 +877,36 @@ export function StudentsPage() {
       // Registration end date filter
       const matchesRegistrationEndDate = () => {
         if (registrationEndDateFilter === 'all') return true;
-        
+
         if (!student.registration_end_date) return false;
-        
+
         const today = new Date();
         today.setHours(0, 0, 0, 0);
         const endDate = new Date(student.registration_end_date);
         endDate.setHours(0, 0, 0, 0);
-        
+
         const timeDiff = endDate.getTime() - today.getTime();
         const daysDiff = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-        
+
         switch (registrationEndDateFilter) {
           case 'expired':
             return daysDiff < 0;
           case 'this_week':
             return daysDiff >= 0 && daysDiff <= 7;
-          case 'this_month':
-            const thisMonthEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0);
-            const daysThisMonth = thisMonthEnd.getDate() - today.getDate();
-            return daysDiff >= 0 && daysDiff <= daysThisMonth;
-          case 'next_month':
-            const nextMonthEnd = new Date(today.getFullYear(), today.getMonth() + 2, 0);
-            const daysNextMonth = nextMonthEnd.getDate();
-            return daysDiff > (thisMonthEnd.getDate() - today.getDate()) && 
-                   daysDiff <= (thisMonthEnd.getDate() - today.getDate() + daysNextMonth);
+          case 'this_month': {
+            // Simplified logic: check if the end date is in the current calendar month
+            return endDate.getMonth() === today.getMonth() && endDate.getFullYear() === today.getFullYear();
+          }
+          case 'next_month': {
+            // Simplified logic: check if the end date is in the next calendar month
+            const nextMonth = new Date(today.getFullYear(), today.getMonth() + 1, 1);
+            return endDate.getMonth() === nextMonth.getMonth() && endDate.getFullYear() === nextMonth.getFullYear();
+          }
           case 'future':
             return daysDiff > 0;
           default:
-            return true;
+            // If the filter value is a specific date string
+            return student.registration_end_date.startsWith(registrationEndDateFilter);
         }
       };
 
@@ -922,14 +923,14 @@ export function StudentsPage() {
       );
     });
   }, [
-    students, 
-    searchTerm, 
-    statusFilter, 
-    registrationFilter, 
-    workingDaysFilter, 
-    selectedClassYearFilter, 
-    newStudent.university_type, 
-    cityFilter, 
+    students,
+    searchTerm,
+    statusFilter,
+    registrationFilter,
+    workingDaysFilter,
+    selectedClassYearFilter,
+    newStudent.university_type,
+    cityFilter,
     patientsInProgressFilter,
     registrationEndDateFilter
   ]);
@@ -1014,7 +1015,7 @@ export function StudentsPage() {
       });
       return;
     }
-    
+
     if (!addPatientForm.name) {
       await Swal.fire({
         icon: 'error',
@@ -1094,7 +1095,7 @@ export function StudentsPage() {
       .select('id')
       .eq('ticket_number', addPatientForm.ticket_number)
       .maybeSingle();
-      
+
     if (ticketError) {
       console.error('Error checking ticket number:', ticketError);
       await Swal.fire({
@@ -1105,7 +1106,7 @@ export function StudentsPage() {
       });
       return;
     }
-    
+
     if (existingTicket) {
       await Swal.fire({
         icon: 'error',
@@ -1269,7 +1270,7 @@ export function StudentsPage() {
 
         // Remove the student from the local state
         setStudents(prevStudents => prevStudents.filter(student => student.id !== id));
-        
+
         await Swal.fire({
           title: 'Deleted!',
           text: 'Student has been deleted.',
@@ -2873,8 +2874,8 @@ export function StudentsPage() {
       {isMobileFilterModalOpen && (
         <div className="fixed inset-0 z-50 overflow-y-auto">
           <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-            <div 
-              className="fixed inset-0 transition-opacity" 
+            <div
+              className="fixed inset-0 transition-opacity"
               aria-hidden="true"
               onClick={() => setIsMobileFilterModalOpen(false)}
             >
@@ -2882,7 +2883,7 @@ export function StudentsPage() {
             </div>
 
             <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-            
+
             <div className="inline-block align-bottom bg-white dark:bg-gray-800 rounded-lg text-left overflow-hidden shadow-xl transform transition-all sm:my-8 sm:align-middle sm:max-w-lg sm:w-full">
               <div className="bg-white dark:bg-gray-800 px-4 pt-5 pb-4 sm:p-6 sm:pb-4">
                 <div className="sm:flex sm:items-start">
@@ -2909,7 +2910,7 @@ export function StudentsPage() {
                         </label>
                         <select
                           value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value as any)}
+                          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'available' | 'busy')}
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         >
                           <option value="all">All Statuses</option>
@@ -2925,7 +2926,7 @@ export function StudentsPage() {
                         </label>
                         <select
                           value={registrationFilter}
-                          onChange={(e) => setRegistrationFilter(e.target.value as any)}
+                          onChange={(e) => setRegistrationFilter(e.target.value as 'all' | 'registered' | 'unregistered' | 'pending')}
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         >
                           <option value="all">All Statuses</option>
@@ -2946,6 +2947,11 @@ export function StudentsPage() {
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         >
                           <option value="all">All Dates</option>
+                          {/* Populate with unique registration end dates */}
+                          {uniqueRegistrationEndDates.map(date => (
+                            <option key={date} value={date}>{date}</option>
+                          ))}
+                          {/* Keep other date range options */}
                           <option value="expired">Expired</option>
                           <option value="this_week">Expiring This Week</option>
                           <option value="this_month">Expiring This Month</option>
