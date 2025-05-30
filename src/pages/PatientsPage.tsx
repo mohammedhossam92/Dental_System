@@ -190,7 +190,7 @@ export function PatientsPage() {
     return match ? match.id : '';
   };
 
-  const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'> & { age?: number, working_days_id?: string }>({
+  const [newPatient, setNewPatient] = useState<Omit<Patient, 'id' | 'created_at' | 'start_date' | 'end_date' | 'student'> & { age?: number, working_days_id?: string, payment?: 'free' | 'economical' | 'unknown' }>({
     ticket_number: '',
     name: '',
     mobile: null,
@@ -201,7 +201,8 @@ export function PatientsPage() {
     age: undefined,
     treatment_id: '',
     tooth_number: '',
-    tooth_class_id: ''
+    tooth_class_id: '',
+    payment: undefined
   });
 
   const [toothTreatments, setToothTreatments] = useState<{
@@ -463,7 +464,8 @@ export function PatientsPage() {
         age: undefined,
         treatment_id: '',
         tooth_number: '',
-        tooth_class_id: ''
+        tooth_class_id: '',
+        payment: undefined
       });
       setToothTreatments([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
       setStudentSearchTerm('');
@@ -575,7 +577,8 @@ export function PatientsPage() {
                     start_date: editPatient.start_date,
                     end_date: editPatient.end_date,
                     status: editPatient.status,
-                    age: editPatient.age
+                    age: editPatient.age,
+                    payment: editPatient.payment
                   })
                   .eq('id', editPatient.id);
 
@@ -1297,27 +1300,27 @@ export function PatientsPage() {
                 <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                 <div className="flex flex-wrap gap-2">
                   {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
-  <label
-    key={status}
-    className="flex items-center gap-2 px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 cursor-pointer transition-colors duration-150 hover:bg-indigo-50 dark:hover:bg-indigo-900 focus-within:ring-2 focus-within:ring-indigo-500"
-  >
-    <input
-      type="checkbox"
-      checked={statusFilter.includes(status)}
-      onChange={e => {
-        if (e.target.checked) {
-          setStatusFilter([...statusFilter, status]);
-        } else {
-          setStatusFilter(statusFilter.filter(s => s !== status));
-        }
-      }}
-      className="accent-indigo-600 w-4 h-4 rounded focus:ring-2 focus:ring-indigo-500"
-    />
-    <span className="text-sm text-gray-700 dark:text-gray-200 select-none">
-      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-    </span>
-  </label>
-))}
+                    <label
+                      key={status}
+                      className="flex items-center gap-2 px-3 py-1 rounded-lg border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 cursor-pointer transition-colors duration-150 hover:bg-indigo-50 dark:hover:bg-indigo-900 focus-within:ring-2 focus-within:ring-indigo-500 dark:text-white"
+                    >
+                      <input
+                        type="checkbox"
+                        checked={statusFilter.includes(status)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setStatusFilter([...statusFilter, status]);
+                          } else {
+                            setStatusFilter(statusFilter.filter(s => s !== status));
+                          }
+                        }}
+                        className="accent-indigo-600 w-4 h-4 rounded focus:ring-2 focus:ring-indigo-500"
+                      />
+                      <span className="text-sm text-gray-700 dark:text-gray-200 select-none">
+                        {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                      </span>
+                    </label>
+                  ))}
                 </div>
               </div>
               <div>
@@ -1539,6 +1542,24 @@ export function PatientsPage() {
                   </div>
                   <div>
                     <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      Payment <span className="text-red-500">*</span>
+                    </label>
+                    <select
+                      value={newPatient.payment || ''}
+                      onChange={(e) => {
+                        setNewPatient({ ...newPatient, payment: e.target.value as 'free' | 'economical' | 'unknown' | null });
+                      }}
+                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                      required
+                    >
+                      <option value="">Select payment type</option>
+                      <option value="free">Free</option>
+                      <option value="economical">Economical</option>
+                      <option value="unknown">Unknown</option>
+                    </select>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
                       Working Days
                     </label>
                     <select
@@ -1552,26 +1573,6 @@ export function PatientsPage() {
                       {workingDays.map((wd) => (
                         <option key={wd.id} value={wd.id}>
                           {wd.name} ({wd.days && Array.isArray(wd.days) ? wd.days.join(', ') : ''})
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Class Year
-                    </label>
-                    <select
-                      value={newPatient.class_year_id || ''}
-                      onChange={(e) => {
-                        const selectedValue = e.target.value;
-                        setNewPatient({ ...newPatient, class_year_id: selectedValue || null, student_id: '' });
-                      }}
-                      className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
-                    >
-                      <option value="">Select class year</option>
-                      {classYears.map((classYear) => (
-                        <option key={classYear.id} value={classYear.id}>
-                          {classYear.year_range}
                         </option>
                       ))}
                     </select>
@@ -2011,7 +2012,7 @@ export function PatientsPage() {
                         setSelectedColumns(selectedColumns.filter(c => c !== column.id));
                       }
                     }}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="text-gray-700 dark:text-gray-300">{column.label}</span>
                 </label>
@@ -2170,206 +2171,206 @@ export function PatientsPage() {
           </div>
         </div>
       )}
-    {/* Notes Modal */}
-    {isNotesModalOpen && (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
-        <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative text-white">
-          <button
-            className="absolute top-2 right-2 text-gray-300 hover:text-gray-100"
-            onClick={closeNotesModal}
-          >
-            <span aria-hidden="true">&times;</span>
-          </button>
-          <h2 className="text-lg font-bold mb-4">
-            Notes for <span className="text-blue-400">{notesPatient?.name}</span>
-          </h2>
-          {notesLoading ? (
-            <div>Loading...</div>
-          ) : notesError ? (
-            <div className="text-red-400">{notesError}</div>
-          ) : (
-            <ul className="mb-4 max-h-40 overflow-y-auto">
-              {notes.length === 0 && <li className="text-gray-300">No notes yet.</li>}
-              {notes.map(note => (
-            <div key={note.id} className="flex items-center justify-between py-2 border-b border-gray-700">
-              <div className="flex-1 min-w-0">
-                {editingNoteId === note.id ? (
-                  <>
-                    <textarea
-                      className="text-sm text-black rounded p-1 w-full"
-                      value={editingContent}
-                      onChange={e => setEditingContent(e.target.value)}
-                    />
-                    <div className="flex gap-2 mt-1">
-                      <button className="text-green-400 hover:text-green-600 text-xs" onClick={() => handleSaveEditNote(note.id)}>Save</button>
-                      <button className="text-gray-400 hover:text-gray-600 text-xs" onClick={handleCancelEdit}>Cancel</button>
-                    </div>
-                  </>
-                ) : (
-                  <>
-                    <div className="text-sm text-white">{note.content}</div>
-                    <div className="text-xs text-gray-400 mt-1">
-                      Added by: {note.created_by || 'Unknown'} |
-                      {note.edited_at
-                        ? ` Edited at: ${new Date(note.edited_at).toLocaleString('en-GB')}`
-                        : ` Created at: ${new Date(note.created_at).toLocaleString('en-GB')}`}
-                    </div>
-                  </>
-                )}
-              </div>
-              <div className="flex gap-2 ml-2">
-                {editingNoteId !== note.id && (
-                  <button
-                    className="text-indigo-400 hover:text-indigo-600 transition-colors text-xs"
-                    onClick={() => handleEditNote(note)}
-                    title="Edit Note"
-                  >Edit</button>
-                )}
-                <button
-                  className="text-red-400 hover:text-red-600 transition-colors text-xs"
-                  onClick={() => handleDeleteNote(note.id)}
-                  title="Delete Note"
-                >Delete</button>
-              </div>
-            </div>
-          ))}
-            </ul>
-          )}
-          <div className="flex gap-2">
-            <input
-              type="text"
-              className="flex-1 border rounded-md px-2 py-1 text-sm dark:bg-gray-700 dark:text-white bg-gray-900 text-white"
-              placeholder="Add a note..."
-              value={newNote}
-              onChange={e => setNewNote(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') handleAddNote(); }}
-            />
+      {/* Notes Modal */}
+      {isNotesModalOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-40">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 w-full max-w-md relative text-white">
             <button
-              className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
-              onClick={handleAddNote}
+              className="absolute top-2 right-2 text-gray-300 hover:text-gray-100"
+              onClick={closeNotesModal}
             >
-              Add
+              <span aria-hidden="true">&times;</span>
             </button>
+            <h2 className="text-lg font-bold mb-4">
+              Notes for <span className="text-blue-400">{notesPatient?.name}</span>
+            </h2>
+            {notesLoading ? (
+              <div>Loading...</div>
+            ) : notesError ? (
+              <div className="text-red-400">{notesError}</div>
+            ) : (
+              <ul className="mb-4 max-h-40 overflow-y-auto">
+                {notes.length === 0 && <li className="text-gray-300">No notes yet.</li>}
+                {notes.map(note => (
+                  <div key={note.id} className="flex items-center justify-between py-2 border-b border-gray-700">
+                    <div className="flex-1 min-w-0">
+                      {editingNoteId === note.id ? (
+                        <>
+                          <textarea
+                            className="text-sm text-black rounded p-1 w-full"
+                            value={editingContent}
+                            onChange={e => setEditingContent(e.target.value)}
+                          />
+                          <div className="flex gap-2 mt-1">
+                            <button className="text-green-400 hover:text-green-600 text-xs" onClick={() => handleSaveEditNote(note.id)}>Save</button>
+                            <button className="text-gray-400 hover:text-gray-600 text-xs" onClick={handleCancelEdit}>Cancel</button>
+                          </div>
+                        </>
+                      ) : (
+                        <>
+                          <div className="text-sm text-white">{note.content}</div>
+                          <div className="text-xs text-gray-400 mt-1">
+                            Added by: {note.created_by || 'Unknown'} |
+                            {note.edited_at
+                              ? ` Edited at: ${new Date(note.edited_at).toLocaleString('en-GB')}`
+                              : ` Created at: ${new Date(note.created_at).toLocaleString('en-GB')}`}
+                          </div>
+                        </>
+                      )}
+                    </div>
+                    <div className="flex gap-2 ml-2">
+                      {editingNoteId !== note.id && (
+                        <button
+                          className="text-indigo-400 hover:text-indigo-600 transition-colors text-xs"
+                          onClick={() => handleEditNote(note)}
+                          title="Edit Note"
+                        >Edit</button>
+                      )}
+                      <button
+                        className="text-red-400 hover:text-red-600 transition-colors text-xs"
+                        onClick={() => handleDeleteNote(note.id)}
+                        title="Delete Note"
+                      >Delete</button>
+                    </div>
+                  </div>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                type="text"
+                className="flex-1 border rounded-md px-2 py-1 text-sm dark:bg-gray-700 dark:text-white bg-gray-900 text-white"
+                placeholder="Add a note..."
+                value={newNote}
+                onChange={e => setNewNote(e.target.value)}
+                onKeyDown={e => { if (e.key === 'Enter') handleAddNote(); }}
+              />
+              <button
+                className="bg-blue-500 text-white px-3 py-1 rounded-md hover:bg-blue-600"
+                onClick={handleAddNote}
+              >
+                Add
+              </button>
+            </div>
           </div>
         </div>
-      </div>
-    )}
+      )}
 
-    {/* Filters Modal */}
-    {isFiltersModalOpen && (
-      <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-        <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Patients</h3>
-            <button
-              onClick={() => setIsFiltersModalOpen(false)}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
-            >
-              <X className="h-6 w-6" />
-            </button>
-          </div>
+      {/* Filters Modal */}
+      {isFiltersModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white dark:bg-gray-800 p-6 rounded-lg shadow-xl w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-4">
+              <h3 className="text-lg font-semibold text-gray-900 dark:text-white">Filter Patients</h3>
+              <button
+                onClick={() => setIsFiltersModalOpen(false)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
 
-          <div className="space-y-4">
-            {/* Status Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Status
-              </label>
-              <div className="flex flex-wrap gap-2">
-                {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
-                  <label key={status} className="flex items-center gap-1 text-sm">
-                    <input
-                      type="checkbox"
-                      checked={statusFilter.includes(status)}
-                      onChange={e => {
-                        if (e.target.checked) {
-                          setStatusFilter([...statusFilter, status]);
-                        } else {
-                          setStatusFilter(statusFilter.filter(s => s !== status));
-                        }
-                      }}
-                      className="accent-indigo-600"
-                    />
-                    {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
-                  </label>
-                ))}
+            <div className="space-y-4">
+              {/* Status Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Status
+                </label>
+                <div className="flex flex-wrap gap-2">
+                  {['pending', 'in_progress', 'completed', 'cancelled'].map(status => (
+                    <label key={status} className="flex items-center gap-1 text-sm dark:text-white">
+                      <input
+                        type="checkbox"
+                        checked={statusFilter.includes(status)}
+                        onChange={e => {
+                          if (e.target.checked) {
+                            setStatusFilter([...statusFilter, status]);
+                          } else {
+                            setStatusFilter(statusFilter.filter(s => s !== status));
+                          }
+                        }}
+                        className="accent-indigo-600"
+                      />
+                      {status.charAt(0).toUpperCase() + status.slice(1).replace('_', ' ')}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Class Year Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Class Year
+                </label>
+                <select
+                  value={classYearFilter}
+                  onChange={e => setClassYearFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="all">All Class Years</option>
+                  {classYears.map(cy => (
+                    <option key={cy.id} value={cy.id}>{cy.year_range}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Working Days Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Working Days
+                </label>
+                <select
+                  value={workingDaysFilter}
+                  onChange={e => setWorkingDaysFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="all">All Working Days</option>
+                  {workingDays.map(wd => (
+                    <option key={wd.id} value={wd.id}>{wd.name}</option>
+                  ))}
+                </select>
+              </div>
+
+              {/* Treatment Filter */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                  Treatment
+                </label>
+                <select
+                  value={treatmentFilter}
+                  onChange={e => setTreatmentFilter(e.target.value)}
+                  className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                >
+                  <option value="all">All Treatments</option>
+                  {treatments.map(t => (
+                    <option key={t.id} value={t.id}>{t.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
-            {/* Class Year Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Class Year
-              </label>
-              <select
-                value={classYearFilter}
-                onChange={e => setClassYearFilter(e.target.value)}
-                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+            <div className="flex justify-between mt-6">
+              <button
+                onClick={() => {
+                  setStatusFilter('in_progress');
+                  setClassYearFilter('all');
+                  setWorkingDaysFilter('all');
+                  setTreatmentFilter('all');
+                }}
+                className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
               >
-                <option value="all">All Class Years</option>
-                {classYears.map(cy => (
-                  <option key={cy.id} value={cy.id}>{cy.year_range}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Working Days Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Working Days
-              </label>
-              <select
-                value={workingDaysFilter}
-                onChange={e => setWorkingDaysFilter(e.target.value)}
-                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                Reset Filters
+              </button>
+              <button
+                onClick={() => setIsFiltersModalOpen(false)}
+                className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
               >
-                <option value="all">All Working Days</option>
-                {workingDays.map(wd => (
-                  <option key={wd.id} value={wd.id}>{wd.name}</option>
-                ))}
-              </select>
+                Apply Filters
+              </button>
             </div>
-
-            {/* Treatment Filter */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                Treatment
-              </label>
-              <select
-                value={treatmentFilter}
-                onChange={e => setTreatmentFilter(e.target.value)}
-                className="w-full rounded-md px-3 py-2 border border-gray-300 bg-white dark:bg-gray-700 dark:text-white dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
-              >
-                <option value="all">All Treatments</option>
-                {treatments.map(t => (
-                  <option key={t.id} value={t.id}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-          </div>
-
-          <div className="flex justify-between mt-6">
-            <button
-              onClick={() => {
-                setStatusFilter('in_progress');
-                setClassYearFilter('all');
-                setWorkingDaysFilter('all');
-                setTreatmentFilter('all');
-              }}
-              className="px-4 py-2 text-sm font-medium text-gray-700 bg-gray-100 hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-300 dark:hover:bg-gray-600"
-            >
-              Reset Filters
-            </button>
-            <button
-              onClick={() => setIsFiltersModalOpen(false)}
-              className="px-4 py-2 text-sm font-medium text-white bg-indigo-600 hover:bg-indigo-700"
-            >
-              Apply Filters
-            </button>
           </div>
         </div>
-      </div>
-    )}
-  </div>
+      )}
+    </div>
   );
 }

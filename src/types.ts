@@ -52,7 +52,12 @@ export interface Patient {
   tooth_number: string;
   tooth_class_id: string;
   working_days_id?: string | null;
+  payment: 'free' | 'economical' | 'unknown' | null;
 }
+
+export type PatientForm = Omit<Patient, 'id' | 'created_at' | 'payment'> & {
+  payment: 'free' | 'economical' | 'unknown';
+};
 
 export interface PatientToothTreatment {
   id: string;

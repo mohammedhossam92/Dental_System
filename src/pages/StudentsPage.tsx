@@ -954,7 +954,8 @@ export function StudentsPage() {
     age: undefined,
     treatment_id: '',
     tooth_number: '',
-    tooth_class_id: ''
+    tooth_class_id: '',
+    payment: 'unknown' as const,
   });
   const [addPatientTreatments, setAddPatientTreatments] = useState<{
     treatment_id: string;
@@ -994,7 +995,8 @@ export function StudentsPage() {
       age: undefined,
       treatment_id: '',
       tooth_number: '',
-      tooth_class_id: ''
+      tooth_class_id: '',
+      payment: 'unknown' as const,
     });
     setAddPatientTreatments([{ treatment_id: '', tooth_number: '', tooth_class_id: '' }]);
     setAddPatientError('');
@@ -1041,6 +1043,16 @@ export function StudentsPage() {
         icon: 'error',
         title: 'Missing Field',
         text: 'Student assignment is required',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    if (!addPatientForm.payment) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Field',
+        text: 'Payment type is required',
         confirmButtonColor: '#4f46e5',
       });
       return;
@@ -2133,7 +2145,7 @@ export function StudentsPage() {
                         setSelectedColumns(selectedColumns.filter(c => c !== column.id));
                       }
                     }}
-                    className="rounded border-gray-300 text-indigo-600 focus:ring-indigo-500"
+                    className="rounded border-gray-300 text-indigo-600 focus:ring-2 focus:ring-indigo-500"
                   />
                   <span className="text-gray-700 dark:text-gray-300">{column.label}</span>
                 </label>
@@ -2783,6 +2795,21 @@ export function StudentsPage() {
                     <Plus className="h-5 w-5 mr-2" />
                     Add Treatment
                   </button>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Payment <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={addPatientForm.payment}
+                    onChange={(e) => setAddPatientForm({ ...addPatientForm, payment: e.target.value as 'free' | 'economical' | 'unknown' })}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-colors duration-200"
+                    required
+                  >
+                    <option value="free">Free</option>
+                    <option value="economical">Economical</option>
+                    <option value="unknown">Unknown</option>
+                  </select>
                 </div>
                 <div className="flex justify-end">
                   <button
