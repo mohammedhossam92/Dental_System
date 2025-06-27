@@ -18,6 +18,23 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
   openAddPatientModal: (student: Student) => void,
 }) {
   const [showMore, setShowMore] = React.useState(false);
+  
+  // Function to determine color based on patient count ratio
+  const getPatientCountColor = () => {
+    if (student.registration_status !== 'registered') return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+    
+    const patientsInProgress = student.patients_in_progress || 0;
+    const limit = (student as StudentWithDetails).effective_limit || 2;
+    
+    // Calculate ratio (0 to 1)
+    const ratio = patientsInProgress / limit;
+    
+    if (ratio === 0) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'; // Available (0/limit)
+    if (ratio < 0.5) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; // Less than half (1/3, etc)
+    if (ratio < 1) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'; // More than half but not full (2/3, etc)
+    return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'; // Full (limit/limit)
+  };
+  
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-3 mx-1 border border-gray-200 dark:border-gray-700">
       <div className="flex justify-between items-center">
@@ -30,14 +47,18 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
           <button onClick={() => handleEdit(student)} title="Edit" className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"><Edit className="h-5 w-5" /></button>
           <button onClick={() => handleDelete(student.id)} title="Delete" className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"><Trash2 className="h-5 w-5" /></button>
           <button onClick={() => openInfoModal(student)} title="Info" className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"><Info className="h-5 w-5" /></button>
-          {student.registration_status === 'registered' && student.is_available && (
+          {student.registration_status === 'registered' && (student.patients_in_progress || 0) < (student as StudentWithDetails).effective_limit && (
             <button onClick={() => openAddPatientModal(student)} title="Add Patient" className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"><Plus className="h-5 w-5" /></button>
           )}
         </div>
       </div>
       <div className="flex items-center gap-2 mt-2">
         <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${student.registration_status === 'registered' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : student.registration_status === 'unregistered' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>{student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}</span>
-        <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${student.is_available ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>{student.is_available ? 'Available' : 'Busy'}</span>
+        {student.registration_status === 'registered' && (
+           <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${getPatientCountColor()}`}>
+              Patients: {student.patients_in_progress || 0} / {(student as StudentWithDetails).effective_limit}
+            </span>
+        )}
       </div>
       <button className="mt-2 text-xs text-indigo-600 dark:text-indigo-300 underline" onClick={() => setShowMore(m => !m)}>{showMore ? 'Show Less' : 'Show More'}</button>
       {showMore && (
@@ -125,7 +146,7 @@ export function StudentsPage() {
     organization_id: '',
     registration_status: 'pending',
     registration_end_date: null,
-    is_available: true // Add status field to state
+    // Remove is_available
   });
 
   const availableColumns = [
@@ -148,9 +169,8 @@ export function StudentsPage() {
         return;
       }
 
-
-
-      const [studentsResult, workingDaysResult, classYearsResult] = await Promise.all([
+      // Fetch global limit and student-specific limits
+      const [studentsResult, workingDaysResult, classYearsResult, globalLimitResult, studentLimitsResult] = await Promise.all([
         supabase
           .from('students')
           .select('*, working_days:working_days_id (name, days)')
@@ -165,14 +185,38 @@ export function StudentsPage() {
           .from('class_years')
           .select('*')
           .eq('organization_id', organizationId)
-          .order('year_range', { ascending: true })
+          .order('year_range', { ascending: true }),
+        supabase
+          .from('organization_settings')
+          .select('global_patient_limit')
+          .maybeSingle(),
+        supabase
+          .from('student_limits')
+          .select('student_id, max_patients')
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
       if (workingDaysResult.error) throw workingDaysResult.error;
       if (classYearsResult.error) throw classYearsResult.error;
 
-      setStudents(studentsResult.data || []);
+      // Get global limit (default to 2 if not found)
+      const globalLimit = globalLimitResult.data?.global_patient_limit || 2;
+      
+      // Create a map of student-specific limits
+      const studentLimitsMap: {[key: string]: number} = {};
+      if (!studentLimitsResult.error && studentLimitsResult.data) {
+        studentLimitsResult.data.forEach(limit => {
+          studentLimitsMap[limit.student_id] = limit.max_patients;
+        });
+      }
+
+      // Apply limits to students (individual limit or global limit)
+      const studentsWithLimits = (studentsResult.data || []).map(student => ({
+        ...student,
+        effective_limit: studentLimitsMap[student.id] || globalLimit
+      }));
+
+      setStudents(studentsWithLimits);
       setWorkingDays(workingDaysResult.data || []);
       setClassYears(classYearsResult.data || []);
     } catch (error) {
@@ -324,7 +368,7 @@ export function StudentsPage() {
       ...newStudent,
       organization_id: organizationId,
       registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null,
-      is_available: newStudent.is_available
+      // Remove is_available
     };
 
     try {
@@ -386,7 +430,7 @@ export function StudentsPage() {
       organization_id: organizationId || '',
       registration_status: 'pending',
       registration_end_date: null,
-      is_available: true
+      // Remove is_available
     });
     setIsEditMode(false);
     setSelectedStudent(null);
@@ -840,10 +884,11 @@ export function StudentsPage() {
         student.city?.toLowerCase().includes(searchTerm.toLowerCase()) ||
         student.university?.toLowerCase().includes(searchTerm.toLowerCase());
 
-      // Status filter
-      const matchesStatus = statusFilter === 'all' ||
-        (statusFilter === 'available' && student.is_available) ||
-        (statusFilter === 'busy' && !student.is_available);
+      // Remove Status filter
+      // const matchesStatus = statusFilter === 'all' ||
+      //   (statusFilter === 'available' && student.is_available) ||
+      //   (statusFilter === 'busy' && !student.is_available);
+      const matchesStatus = true; // Status filter removed
 
       // Registration status filter
       const matchesRegistration = registrationFilter === 'all' ||
@@ -867,7 +912,7 @@ export function StudentsPage() {
 
       // Patients in progress filter
       const matchesPatientsInProgress = !patientsInProgressFilter.operator ||
-        !patientsInProgressFilter.value ||
+        patientsInProgressFilter.value === undefined || // Check for undefined instead of !value for 0
         (
           (patientsInProgressFilter.operator === 'gt' && (student.patients_in_progress || 0) > patientsInProgressFilter.value) ||
           (patientsInProgressFilter.operator === 'lt' && (student.patients_in_progress || 0) < patientsInProgressFilter.value) ||
@@ -925,7 +970,7 @@ export function StudentsPage() {
   }, [
     students,
     searchTerm,
-    statusFilter,
+    // Remove statusFilter
     registrationFilter,
     workingDaysFilter,
     selectedClassYearFilter,
@@ -991,7 +1036,7 @@ export function StudentsPage() {
       class_year_id: student.class_year_id || '',
       working_days_id: student.working_days_id || '',
       student_id: student.id,
-      status: 'pending',
+      status: 'in_progress', // Changed from 'pending' to 'in_progress'
       age: undefined,
       treatment_id: '',
       tooth_number: '',
@@ -1157,7 +1202,8 @@ export function StudentsPage() {
       }
       await supabase
         .from('students')
-        .update({ is_available: false })
+        // Remove is_available update, increment patients_in_progress
+        .update({ patients_in_progress: (addPatientStudent?.patients_in_progress || 0) + 1 })
         .eq('id', addPatientForm.student_id);
       setIsAddPatientModalOpen(false);
       Swal.fire({
@@ -1251,7 +1297,7 @@ export function StudentsPage() {
       organization_id: organizationId || '',
       registration_status: student.registration_status || 'pending',
       registration_end_date: student.registration_end_date,
-      is_available: student.is_available ?? true
+      // Remove is_available
     });
     setSelectedStudent(student);
     setIsEditMode(true);
@@ -1751,78 +1797,10 @@ export function StudentsPage() {
                 )}
                 {selectedColumns.includes('status') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    {/* Updated table header text */}
                     <div className="flex items-center relative">
-                      <span>Status</span>
-                      <div className="flex items-center ml-1">
-                        <button
-                          onClick={() => handleSort('status')}
-                          className="focus:outline-none mr-1"
-                        >
-                          {sortConfig.column === 'status' ? (
-                            sortConfig.direction === 'asc' ? (
-                              <ArrowUp className="h-3 w-3 text-indigo-500" />
-                            ) : sortConfig.direction === 'desc' ? (
-                              <ArrowDown className="h-3 w-3 text-indigo-500" />
-                            ) : (
-                              <div className="h-3 w-3"></div>
-                            )
-                          ) : (
-                            <div className="h-3 w-3"></div>
-                          )}
-                        </button>
-                        <button
-                          onClick={() => toggleColumnDropdown('status')}
-                          className="focus:outline-none"
-                        >
-                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
-                        </button>
-                      </div>
-
-                      {columnDropdownOpen === 'status' && (
-                        <div className="absolute z-10 mt-1 top-full left-0 w-32 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
-                          <ul className="py-1">
-                            <li
-                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'all'
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
-                                  : 'text-gray-900 dark:text-white'
-                              }`}
-                              onClick={() => {
-                                setStatusFilter('all');
-                                toggleColumnDropdown(null);
-                              }}
-                            >
-                              All
-                            </li>
-                            <li
-                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'available'
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
-                                  : 'text-gray-900 dark:text-white'
-                              }`}
-                              onClick={() => {
-                                setStatusFilter('available');
-                                toggleColumnDropdown(null);
-                              }}
-                            >
-                              Available
-                            </li>
-                            <li
-                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
-                                statusFilter === 'busy'
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
-                                  : 'text-gray-900 dark:text-white'
-                              }`}
-                              onClick={() => {
-                                setStatusFilter('busy');
-                                toggleColumnDropdown(null);
-                              }}
-                            >
-                              Busy
-                            </li>
-                          </ul>
-                        </div>
-                      )}
+                      <span>Patients In Progress</span>
+                      {/* Remove status sorting/filtering buttons */}
                     </div>
                   </th>
                 )}
@@ -1887,7 +1865,7 @@ export function StudentsPage() {
                             <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
                                 registrationFilter === 'unregistered'
-                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                                   : 'text-gray-900 dark:text-white'
                               }`}
                               onClick={() => {
@@ -2007,18 +1985,28 @@ export function StudentsPage() {
                     )}
                     {selectedColumns.includes('status') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
-                        {student.registration_status === 'unregistered' ? (
-                          <span className="inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
-                            -
+                         {/* Updated status display */}
+                        {student.registration_status === 'registered' ? (
+                           <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${(() => {
+                             if (student.registration_status !== 'registered') return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
+                             
+                             const patientsInProgress = student.patients_in_progress || 0;
+                             const limit = (student as StudentWithDetails).effective_limit || 2;
+                             
+                             // Calculate ratio (0 to 1)
+                             const ratio = patientsInProgress / limit;
+                             
+                             if (ratio === 0) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'; // Available (0/limit)
+                             if (ratio < 0.5) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; // Less than half (1/3, etc)
+                             if (ratio < 1) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'; // More than half but not full (2/3, etc)
+                             return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'; // Full (limit/limit)
+                           })()}`}>
+                            {student.patients_in_progress || 0} / {(student as StudentWithDetails).effective_limit}
                           </span>
                         ) : (
-                          <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${
-                            student.is_available
-                              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                              : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                          }`}>
-                            {student.is_available ? 'Available' : 'Busy'}
-                          </span>
+                           <span className="inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300">
+                             -
+                           </span>
                         )}
                       </td>
                     )}
@@ -2063,7 +2051,8 @@ export function StudentsPage() {
                         >
                           <Info className="h-5 w-5" />
                         </button>
-                        {student.registration_status === 'registered' && student.is_available && (
+                         {/* Updated condition for Add Patient button */}
+                        {student.registration_status === 'registered' && (student.patients_in_progress || 0) < (student as StudentWithDetails).effective_limit && (
                           <button
                             onClick={() => openAddPatientModal(student)}
                             className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300 transition-colors duration-200"
@@ -2375,7 +2364,7 @@ export function StudentsPage() {
                         ...newStudent,
                         registration_status: newStatus,
                         registration_end_date: newStatus !== 'registered' ? null : newStudent.registration_end_date,
-                        // No need to set is_available here as the Status dropdown will handle it
+                        // Remove is_available update
                       });
                     }}
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
@@ -2402,38 +2391,7 @@ export function StudentsPage() {
                   </div>
                 )}
 
-                {/* Student Status Toggle */}
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    Status
-                  </label>
-                  <select
-                    value={newStudent.registration_status === 'unregistered' ? '-' : (newStudent.is_available ? 'available' : 'busy')}
-                    onChange={e => {
-                      // Only update is_available if the student is not unregistered
-                      if (newStudent.registration_status !== 'unregistered') {
-                        setNewStudent({ ...newStudent, is_available: e.target.value === 'available' });
-                      }
-                    }}
-                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
-                    style={{ backgroundImage: 'url("data:image/svg+xml,%3csvg xmlns=\'http://www.w3.org/2000/svg\' fill=\'none\' viewBox=\'0 0 20 20\'%3e%3cpath stroke=\'%236b7280\' stroke-linecap=\'round\' stroke-linejoin=\'round\' stroke-width=\'1.5\' d=\'M6 8l4 4 4-4\'/%3e%3c/svg%3e")', backgroundSize: '1.5em 1.5em' }}
-                    disabled={newStudent.registration_status === 'unregistered'}
-                  >
-                    {newStudent.registration_status === 'unregistered' ? (
-                      <option value="-">-</option>
-                    ) : (
-                      <>
-                        <option value="available">Available</option>
-                        <option value="busy">Busy</option>
-                      </>
-                    )}
-                  </select>
-                  {newStudent.registration_status === 'unregistered' && (
-                    <p className="mt-1 text-xs text-amber-600 dark:text-amber-400">
-                      Unregistered students have status "-"
-                    </p>
-                  )}
-                </div>
+                {/* Remove Student Status Toggle */}
 
               </div>
 
@@ -2488,13 +2446,12 @@ export function StudentsPage() {
                 }`}>
                   {selectedStudent.registration_status.charAt(0).toUpperCase() + selectedStudent.registration_status.slice(1)}
                 </span>
-                <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
-                  selectedStudent.is_available
-                    ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                    : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                }`}>
-                  {selectedStudent.is_available ? 'Available' : 'Busy'}
-                </span>
+                 {/* Updated status display */}
+                 {selectedStudent.registration_status === 'registered' && (
+                   <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${ (selectedStudent.patients_in_progress || 0) < (selectedStudent as StudentWithDetails).effective_limit ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                      Patients: {selectedStudent.patients_in_progress || 0} / {(selectedStudent as StudentWithDetails).effective_limit}
+                    </span>
+                )}
               </div>
             </div>
 
@@ -2556,15 +2513,12 @@ export function StudentsPage() {
                   </p>
                 </div>
 
+                 {/* Updated status display */}
                 <div className="hidden md:block">
-                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Availability Status</label>
-                  <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
-                    selectedStudent.is_available
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                  }`}>
-                    {selectedStudent.is_available ? 'Available' : 'Busy'}
-                  </span>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Patients Assigned</label>
+                   <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${ (selectedStudent.patients_in_progress || 0) < (selectedStudent as StudentWithDetails).effective_limit ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'}`}>
+                      {selectedStudent.patients_in_progress || 0} / {(selectedStudent as StudentWithDetails).effective_limit}
+                    </span>
                 </div>
 
                 <div>
@@ -2930,21 +2884,7 @@ export function StudentsPage() {
                     </div>
 
                     <div className="space-y-4">
-                      {/* Status Filter */}
-                      <div>
-                        <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                          Status
-                        </label>
-                        <select
-                          value={statusFilter}
-                          onChange={(e) => setStatusFilter(e.target.value as 'all' | 'available' | 'busy')}
-                          className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
-                        >
-                          <option value="all">All Statuses</option>
-                          <option value="available">Available</option>
-                          <option value="busy">Busy</option>
-                        </select>
-                      </div>
+                      {/* Remove Status Filter */}
 
                       {/* Registration Status Filter */}
                       <div>
@@ -3127,7 +3067,7 @@ export function StudentsPage() {
                   type="button"
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   onClick={() => {
-                    setStatusFilter('all');
+                    // Remove status filter reset
                     setRegistrationFilter('registered');
                     setWorkingDaysFilter('all');
                     setUniversityFilter('all');
@@ -3145,4 +3085,28 @@ export function StudentsPage() {
       )}
     </div>
   );
+}
+// Add effective_limit to Student type for temporary demonstration
+declare module "../types" {
+  export type Student = {
+    id: string;
+    created_at: string;
+    name: string;
+    mobile: string;
+    city: string | null;
+    university: string | null;
+    university_type: "حكومي" | "خاص" | "اخري";
+    working_days_id: string | null;
+    class_year_id: string | null;
+    organization_id: string;
+    registration_status: "pending" | "registered" | "unregistered";
+    registration_end_date: string | null;
+    // patients_in_progress: number; // Assuming this already exists based on usage
+    // patients_completed: number; // Assuming this already exists based on usage
+    effective_limit: number; // Temporary field for demonstration
+  };
+
+  export type StudentWithDetails = Student & {
+    working_days?: { name: string; days: string[] } | null;
+  };
 }

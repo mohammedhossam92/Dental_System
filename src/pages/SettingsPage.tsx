@@ -175,7 +175,7 @@ export function SettingsPage() {
         setGlobalLimit(updatedSettings.global_patient_limit);
         setNewGlobalLimit(updatedSettings.global_patient_limit);
       }
-      
+
       setIsGlobalLimitModalOpen(false);
     } catch (error) {
       console.error('Error updating global limit:', error);
