@@ -18,23 +18,23 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
   openAddPatientModal: (student: Student) => void,
 }) {
   const [showMore, setShowMore] = React.useState(false);
-  
+
   // Function to determine color based on patient count ratio
   const getPatientCountColor = () => {
     if (student.registration_status !== 'registered') return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-    
+
     const patientsInProgress = student.patients_in_progress || 0;
     const limit = (student as StudentWithDetails).effective_limit || 2;
-    
+
     // Calculate ratio (0 to 1)
     const ratio = patientsInProgress / limit;
-    
+
     if (ratio === 0) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'; // Available (0/limit)
     if (ratio < 0.5) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; // Less than half (1/3, etc)
     if (ratio < 1) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'; // More than half but not full (2/3, etc)
     return 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'; // Full (limit/limit)
   };
-  
+
   return (
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow p-4 mb-3 mx-1 border border-gray-200 dark:border-gray-700">
       <div className="flex justify-between items-center">
@@ -201,7 +201,7 @@ export function StudentsPage() {
 
       // Get global limit (default to 2 if not found)
       const globalLimit = globalLimitResult.data?.global_patient_limit || 2;
-      
+
       // Create a map of student-specific limits
       const studentLimitsMap: {[key: string]: number} = {};
       if (!studentLimitsResult.error && studentLimitsResult.data) {
@@ -343,7 +343,7 @@ export function StudentsPage() {
     }
 
     // Validate university type
-    if (newStudent.university_type !== 'حكومي' && newStudent.university_type !== 'خاص') {
+    if (newStudent.university_type !== 'حكومي' && newStudent.university_type !== 'خاص' && newStudent.university_type !== 'اخري') {
       await Swal.fire({
         icon: 'error',
         title: 'Invalid University Type',
@@ -906,6 +906,10 @@ export function StudentsPage() {
       const matchesUniversityType = universityTypeFilter === 'all' ||
         student.university_type === universityTypeFilter;
 
+      // University filter
+      const matchesUniversity = universityFilter === 'all' ||
+        (student.university && student.university === universityFilter);
+
       // City filter
       const matchesCity = cityFilter === 'all' ||
         (student.city && student.city.toLowerCase().includes(cityFilter.toLowerCase()));
@@ -962,6 +966,7 @@ export function StudentsPage() {
         matchesWorkingDays &&
         matchesClassYear &&
         matchesUniversityType &&
+        matchesUniversity &&
         matchesCity &&
         matchesPatientsInProgress &&
         matchesRegistrationEndDate()
@@ -974,7 +979,8 @@ export function StudentsPage() {
     registrationFilter,
     workingDaysFilter,
     selectedClassYearFilter,
-    newStudent.university_type,
+    universityTypeFilter,
+    universityFilter,
     cityFilter,
     patientsInProgressFilter,
     registrationEndDateFilter
@@ -1741,7 +1747,76 @@ export function StudentsPage() {
                 )}
                 {selectedColumns.includes('university_type') && (
                   <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
-                    University Type
+                    <div className="flex items-center relative">
+                      <span>University Type</span>
+                      <div className="flex items-center ml-1">
+                        <button
+                          onClick={() => toggleColumnDropdown('university_type')}
+                          className="focus:outline-none"
+                        >
+                          <Filter className="h-3 w-3 text-gray-400 hover:text-indigo-500" />
+                        </button>
+                      </div>
+
+                      {columnDropdownOpen === 'university_type' && (
+                        <div className="absolute z-10 mt-1 top-full left-0 w-40 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700">
+                          <ul className="py-1">
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                universityTypeFilter === 'all'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setUniversityTypeFilter('all');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              All Types
+                            </li>
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                universityTypeFilter === 'حكومي'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setUniversityTypeFilter('حكومي');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              حكومي
+                            </li>
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                universityTypeFilter === 'خاص'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setUniversityTypeFilter('خاص');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              خاص
+                            </li>
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                universityTypeFilter === 'اخري'
+                                  ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setUniversityTypeFilter('اخري');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              أخرى
+                            </li>
+                          </ul>
+                        </div>
+                      )}
+                    </div>
                   </th>
                 )}
                 {selectedColumns.includes('working_days') && (
@@ -1989,13 +2064,13 @@ export function StudentsPage() {
                         {student.registration_status === 'registered' ? (
                            <span className={`inline-flex text-xs leading-5 font-semibold rounded-full px-2 py-1 ${(() => {
                              if (student.registration_status !== 'registered') return 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200';
-                             
+
                              const patientsInProgress = student.patients_in_progress || 0;
                              const limit = (student as StudentWithDetails).effective_limit || 2;
-                             
+
                              // Calculate ratio (0 to 1)
                              const ratio = patientsInProgress / limit;
-                             
+
                              if (ratio === 0) return 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'; // Available (0/limit)
                              if (ratio < 0.5) return 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'; // Less than half (1/3, etc)
                              if (ratio < 1) return 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'; // More than half but not full (2/3, etc)
