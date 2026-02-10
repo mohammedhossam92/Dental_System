@@ -548,6 +548,71 @@ export function StudentsPage() {
   // Add state for import dropdown
   const [showImportDropdown, setShowImportDropdown] = useState(false);
 
+  const exportStudentsToExcel = (data: Student[], filenameSuffix: string) => {
+    if (!data.length) {
+      Swal.fire({
+        title: 'No Data',
+        text: 'There are no students to export.',
+        icon: 'info',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    const workingDaysMap = new Map(workingDays.map(wd => [wd.id, wd.name]));
+    const classYearsMap = new Map(classYears.map(cy => [cy.id, cy.year_range]));
+
+    const headers = [
+      'Name',
+      'Mobile',
+      'City',
+      'University',
+      'University Type',
+      'Working Days',
+      'Class Year',
+      'Registration Status',
+      'Registration End Date',
+      'Patients In Progress',
+      'Patients Completed',
+      'Created At'
+    ];
+
+    const rows = data.map(student => [
+      student.name,
+      student.mobile,
+      student.city || '',
+      student.university || '',
+      student.university_type || '',
+      (student.working_days_id && workingDaysMap.get(student.working_days_id)) || '',
+      (student.class_year_id && classYearsMap.get(student.class_year_id)) || '',
+      student.registration_status,
+      student.registration_end_date ? new Date(student.registration_end_date).toISOString().split('T')[0] : '',
+      student.patients_in_progress ?? '',
+      student.patients_completed ?? '',
+      student.created_at ? new Date(student.created_at).toISOString() : ''
+    ]);
+
+    const ws = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, 'Students');
+
+    const excelBuffer = XLSX.write(wb, { bookType: 'xlsx', type: 'array' });
+    const blob = new Blob([excelBuffer], { type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `students_export${filenameSuffix}.xlsx`;
+    link.click();
+    URL.revokeObjectURL(url);
+  };
+
+  const [showExportDropdown, setShowExportDropdown] = useState(false);
+
+  const selectedClassYearStudents = useMemo(() => {
+    if (selectedClassYearFilter === 'all') return students;
+    return students.filter(student => student.class_year_id === selectedClassYearFilter);
+  }, [students, selectedClassYearFilter]);
+
   // Modify the file upload handler to have an option for adding without replacing
   async function handleFileUpload(event: React.ChangeEvent<HTMLInputElement>, shouldReplace: boolean = true) {
     if (!event.target.files?.[0]) return;
@@ -1465,6 +1530,60 @@ export function StudentsPage() {
                         }}
                       />
                     </label>
+                  </li>
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <div className="relative">
+            <button
+              onClick={() => setShowExportDropdown(!showExportDropdown)}
+              className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
+            >
+              <Download className="h-5 w-5 mr-2" />
+              Export Excel
+              <ChevronDown className="h-4 w-4 ml-2" />
+            </button>
+
+            {showExportDropdown && (
+              <div className="absolute z-10 mt-1 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0">
+                <ul className="py-1">
+                  <li className="relative">
+                    <button
+                      onClick={() => {
+                        exportStudentsToExcel(students, '_all');
+                        setShowExportDropdown(false);
+                      }}
+                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export All Students
+                    </button>
+                  </li>
+                  <li className="relative">
+                    <button
+                      onClick={() => {
+                        exportStudentsToExcel(selectedClassYearStudents, '_selected_year');
+                        setShowExportDropdown(false);
+                      }}
+                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Selected Class Year
+                    </button>
+                  </li>
+                  <li className="relative">
+                    <button
+                      onClick={() => {
+                        exportStudentsToExcel(filteredStudents, '_selected_year_filtered');
+                        setShowExportDropdown(false);
+                      }}
+                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                    >
+                      <Download className="h-4 w-4 mr-2" />
+                      Export Selected Year + Filters
+                    </button>
                   </li>
                 </ul>
               </div>
