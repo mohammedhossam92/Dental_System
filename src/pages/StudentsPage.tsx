@@ -1,11 +1,15 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
+
+type StudentForm = Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at' | 'is_available'>;
+
+const toDateInputValue = (date: string | null | undefined) => date ? date.split('T')[0] : '';
 
 // StudentCard component OUTSIDE StudentsPage
 function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal }: {
@@ -68,6 +72,9 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
           </div>
           <div>
             <span className="font-semibold">Class Year:</span> <span className="font-bold text-purple-600 dark:text-purple-400">{classYears.find(cy => cy.id === student.class_year_id)?.year_range || 'N/A'}</span>
+          </div>
+          <div>
+            <span className="font-semibold">Registration Start:</span> <span className="font-bold text-teal-600 dark:text-teal-400">{student.registration_start_date ? new Date(student.registration_start_date).toLocaleDateString('en-GB') : 'N/A'}</span>
           </div>
           <div>
             <span className="font-semibold">Registration End:</span> <span className="font-bold text-orange-600 dark:text-orange-400">{student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}</span>
@@ -135,7 +142,7 @@ export function StudentsPage() {
     return Array.from(new Set(dates)).sort();
   }, [students]);
 
-  const [newStudent, setNewStudent] = useState<Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at'>>({
+  const [newStudent, setNewStudent] = useState<StudentForm>({
     name: '',
     mobile: '',
     city: '',
@@ -145,9 +152,12 @@ export function StudentsPage() {
     class_year_id: '',
     organization_id: '',
     registration_status: 'pending',
+    registration_start_date: null,
     registration_end_date: null,
-    // Remove is_available
   });
+  const [selectedStudentPeriods, setSelectedStudentPeriods] = useState<StudentRegistrationPeriod[]>([]);
+  const [periodForm, setPeriodForm] = useState<{ start_date: string; end_date: string }>({ start_date: '', end_date: '' });
+  const [editingPeriodId, setEditingPeriodId] = useState<string | null>(null);
 
   const availableColumns = [
     { id: 'name', label: 'Name' },
@@ -227,6 +237,52 @@ export function StudentsPage() {
     }
   }, [organizationId]);
 
+  const fetchStudentPeriods = useCallback(async (studentId: string) => {
+    const { data, error } = await supabase
+      .from('student_registration_periods')
+      .select('*')
+      .eq('student_id', studentId)
+      .order('end_date', { ascending: false, nullsFirst: false })
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data || [];
+  }, []);
+
+  const refreshSelectedStudentPeriods = useCallback(async (studentId: string) => {
+    try {
+      const periods = await fetchStudentPeriods(studentId);
+      setSelectedStudentPeriods(periods);
+      return periods;
+    } catch (error) {
+      console.error('Error fetching registration periods:', error);
+      setSelectedStudentPeriods([]);
+      return [];
+    }
+  }, [fetchStudentPeriods]);
+
+  const archiveRegistrationPeriod = useCallback(async (
+    student: Pick<Student, 'id' | 'organization_id' | 'registration_start_date' | 'registration_end_date'>,
+    startDate?: string | null,
+    endDate?: string | null
+  ) => {
+    const archivedStartDate = startDate ?? student.registration_start_date;
+    const archivedEndDate = endDate ?? student.registration_end_date;
+
+    if (!student.organization_id || (!archivedStartDate && !archivedEndDate)) return;
+
+    const { error } = await supabase
+      .from('student_registration_periods')
+      .insert({
+        student_id: student.id,
+        organization_id: student.organization_id,
+        start_date: archivedStartDate || null,
+        end_date: archivedEndDate || null,
+      });
+
+    if (error) throw error;
+  }, []);
+
   const memoizedCheckRegistrationStatus = useCallback(async () => {
     try {
       if (!organizationId) return;
@@ -234,7 +290,7 @@ export function StudentsPage() {
       const today = new Date();
       const { data: expiredStudents, error } = await supabase
         .from('students')
-        .select('id')
+        .select('id, organization_id, registration_start_date, registration_end_date')
         .eq('organization_id', organizationId)
         .eq('registration_status', 'registered')
         .lte('registration_end_date', today.toISOString());
@@ -242,9 +298,11 @@ export function StudentsPage() {
       if (error) throw error;
 
       if (expiredStudents.length > 0) {
+        await Promise.all(expiredStudents.map(student => archiveRegistrationPeriod(student)));
+
         const { error: updateError } = await supabase
           .from('students')
-          .update({ registration_status: 'unregistered', registration_end_date: null })
+          .update({ registration_status: 'unregistered', registration_start_date: null, registration_end_date: null })
           .in('id', expiredStudents.map(s => s.id));
 
         if (updateError) throw updateError;
@@ -254,7 +312,7 @@ export function StudentsPage() {
     } catch (error) {
       console.error('Error checking registration status:', error);
     }
-  }, [organizationId, memoizedFetchData]);
+  }, [organizationId, memoizedFetchData, archiveRegistrationPeriod]);
 
   useEffect(() => {
     const checkAndScheduleRegistration = () => {
@@ -367,12 +425,21 @@ export function StudentsPage() {
     const studentData = {
       ...newStudent,
       organization_id: organizationId,
+      registration_start_date: newStudent.registration_status === 'registered' ? newStudent.registration_start_date || null : null,
       registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null,
       // Remove is_available
     };
 
     try {
       if (isEditMode && selectedStudent) {
+        if (selectedStudent.registration_status !== 'unregistered' && newStudent.registration_status === 'unregistered') {
+          await archiveRegistrationPeriod(
+            selectedStudent,
+            newStudent.registration_start_date || selectedStudent.registration_start_date,
+            newStudent.registration_end_date || selectedStudent.registration_end_date
+          );
+        }
+
         const { error } = await supabase
           .from('students')
           .update(studentData)
@@ -429,6 +496,7 @@ export function StudentsPage() {
       class_year_id: '',
       organization_id: organizationId || '',
       registration_status: 'pending',
+      registration_start_date: null,
       registration_end_date: null,
       // Remove is_available
     });
@@ -479,7 +547,9 @@ export function StudentsPage() {
         "University Type",
         "Working Days",
         "Class Year",
-        "Registration Status"
+        "Registration Status",
+        "Registration Start Date",
+        "Registration End Date"
       ];
 
       // Create example row to guide users
@@ -491,7 +561,9 @@ export function StudentsPage() {
         "حكومي",
         workingDaysList[0]?.name || "",
         classYearsList[0]?.year_range || "",
-        "registered"
+        "registered",
+        new Date().toISOString().split('T')[0],
+        new Date().toISOString().split('T')[0]
       ];
 
       const wsData = [headers, exampleRow];
@@ -571,6 +643,7 @@ export function StudentsPage() {
       'Working Days',
       'Class Year',
       'Registration Status',
+      'Registration Start Date',
       'Registration End Date',
       'Patients In Progress',
       'Patients Completed',
@@ -586,6 +659,7 @@ export function StudentsPage() {
       (student.working_days_id && workingDaysMap.get(student.working_days_id)) || '',
       (student.class_year_id && classYearsMap.get(student.class_year_id)) || '',
       student.registration_status,
+      student.registration_start_date ? new Date(student.registration_start_date).toISOString().split('T')[0] : '',
       student.registration_end_date ? new Date(student.registration_end_date).toISOString().split('T')[0] : '',
       student.patients_in_progress ?? '',
       student.patients_completed ?? '',
@@ -708,7 +782,8 @@ export function StudentsPage() {
             class_year_id: classYearId,
             organization_id: organizationId,
             registration_status: row['Registration Status'] || 'registered',
-            registration_end_date: null
+            registration_start_date: row['Registration Start Date'] || null,
+            registration_end_date: row['Registration End Date'] || null
           };
         });
 
@@ -1051,8 +1126,11 @@ export function StudentsPage() {
     registrationEndDateFilter
   ]);
 
-  function openInfoModal(student: Student) {
+  async function openInfoModal(student: Student) {
     setSelectedStudent(student);
+    await refreshSelectedStudentPeriods(student.id);
+    setPeriodForm({ start_date: '', end_date: '' });
+    setEditingPeriodId(null);
     setIsInfoModalOpen(true);
   }
 
@@ -1356,7 +1434,15 @@ export function StudentsPage() {
   }, [mobileCurrentPage, mobileRowsPerPage]);
 
   // Function to handle editing a student
-  const handleEdit = (student: Student) => {
+  const handleEdit = async (student: Student) => {
+    let latestPeriod: StudentRegistrationPeriod | undefined;
+    try {
+      const periods = await fetchStudentPeriods(student.id);
+      latestPeriod = periods[0];
+    } catch (error) {
+      console.error('Error fetching latest registration period:', error);
+    }
+
     setNewStudent({
       name: student.name,
       mobile: student.mobile,
@@ -1367,7 +1453,8 @@ export function StudentsPage() {
       class_year_id: student.class_year_id || '',
       organization_id: organizationId || '',
       registration_status: student.registration_status || 'pending',
-      registration_end_date: student.registration_end_date,
+      registration_start_date: student.registration_start_date || latestPeriod?.start_date || null,
+      registration_end_date: student.registration_end_date || latestPeriod?.end_date || null,
       // Remove is_available
     });
     setSelectedStudent(student);
@@ -1416,6 +1503,108 @@ export function StudentsPage() {
           confirmButtonColor: '#4f46e5'
         });
       }
+    }
+  };
+
+  const resetPeriodForm = () => {
+    setPeriodForm({ start_date: '', end_date: '' });
+    setEditingPeriodId(null);
+  };
+
+  const handleSavePeriod = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudent || !organizationId) return;
+
+    if (!periodForm.start_date && !periodForm.end_date) {
+      await Swal.fire({
+        icon: 'error',
+        title: 'Missing Period',
+        text: 'Add a start date, an end date, or both.',
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    try {
+      if (editingPeriodId) {
+        const { error } = await supabase
+          .from('student_registration_periods')
+          .update({
+            start_date: periodForm.start_date || null,
+            end_date: periodForm.end_date || null,
+          })
+          .eq('id', editingPeriodId)
+          .eq('organization_id', organizationId);
+
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('student_registration_periods')
+          .insert({
+            student_id: selectedStudent.id,
+            organization_id: organizationId,
+            start_date: periodForm.start_date || null,
+            end_date: periodForm.end_date || null,
+          });
+
+        if (error) throw error;
+      }
+
+      await refreshSelectedStudentPeriods(selectedStudent.id);
+      resetPeriodForm();
+    } catch (error) {
+      console.error('Error saving registration period:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to save registration period',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5',
+      });
+    }
+  };
+
+  const handleEditPeriod = (period: StudentRegistrationPeriod) => {
+    setEditingPeriodId(period.id);
+    setPeriodForm({
+      start_date: toDateInputValue(period.start_date),
+      end_date: toDateInputValue(period.end_date),
+    });
+  };
+
+  const handleDeletePeriod = async (periodId: string) => {
+    if (!selectedStudent || !organizationId) return;
+
+    const result = await Swal.fire({
+      title: 'Delete this period?',
+      text: 'This registration period will be removed.',
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#6b7280',
+      confirmButtonText: 'Delete',
+      cancelButtonText: 'Cancel',
+    });
+
+    if (!result.isConfirmed) return;
+
+    try {
+      const { error } = await supabase
+        .from('student_registration_periods')
+        .delete()
+        .eq('id', periodId)
+        .eq('organization_id', organizationId);
+
+      if (error) throw error;
+      await refreshSelectedStudentPeriods(selectedStudent.id);
+      if (editingPeriodId === periodId) resetPeriodForm();
+    } catch (error) {
+      console.error('Error deleting registration period:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to delete registration period',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5',
+      });
     }
   };
 
@@ -2557,7 +2746,6 @@ export function StudentsPage() {
                       setNewStudent({
                         ...newStudent,
                         registration_status: newStatus,
-                        registration_end_date: newStatus !== 'registered' ? null : newStudent.registration_end_date,
                         // Remove is_available update
                       });
                     }}
@@ -2570,20 +2758,29 @@ export function StudentsPage() {
                   </select>
                 </div>
 
-                {newStudent.registration_status === 'registered' && (
-                  <div>
-                    <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      Registration End Date
-                    </label>
-                    <input
-                      type="date"
-                      value={newStudent.registration_end_date || ''}
-                      onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value || null })}
-                      className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
-                      min={new Date().toISOString().split('T')[0]}
-                    />
-                  </div>
-                )}
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Registration Start Date
+                  </label>
+                  <input
+                    type="date"
+                    value={toDateInputValue(newStudent.registration_start_date)}
+                    onChange={(e) => setNewStudent({ ...newStudent, registration_start_date: e.target.value || null })}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    Registration End Date
+                  </label>
+                  <input
+                    type="date"
+                    value={toDateInputValue(newStudent.registration_end_date)}
+                    onChange={(e) => setNewStudent({ ...newStudent, registration_end_date: e.target.value || null })}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                  />
+                </div>
 
                 {/* Remove Student Status Toggle */}
 
@@ -2701,6 +2898,13 @@ export function StudentsPage() {
                 </div>
 
                 <div>
+                  <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration Start Date</label>
+                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">
+                    {selectedStudent.registration_start_date ? new Date(selectedStudent.registration_start_date).toLocaleDateString('en-GB') : 'N/A'}
+                  </p>
+                </div>
+
+                <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration End Date</label>
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
@@ -2730,6 +2934,85 @@ export function StudentsPage() {
                     <span className="ml-2 text-xs sm:text-sm text-gray-600 dark:text-gray-400">patients</span>
                   </div>
                 </div>
+              </div>
+            </div>
+
+            <div className="mt-5 border-t dark:border-gray-700 pt-4">
+              <div className="flex items-center justify-between mb-3">
+                <h3 className="text-base sm:text-lg font-semibold text-gray-900 dark:text-white">Periods</h3>
+                {selectedStudent.registration_start_date || selectedStudent.registration_end_date ? (
+                  <span className="text-xs font-medium text-green-700 dark:text-green-300 bg-green-100 dark:bg-green-900 px-2 py-1 rounded-full">
+                    Current active dates shown above
+                  </span>
+                ) : null}
+              </div>
+
+              <form onSubmit={handleSavePeriod} className="grid grid-cols-1 sm:grid-cols-[1fr_1fr_auto] gap-2 mb-4">
+                <input
+                  type="date"
+                  value={periodForm.start_date}
+                  onChange={(e) => setPeriodForm({ ...periodForm, start_date: e.target.value })}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                  aria-label="Period start date"
+                />
+                <input
+                  type="date"
+                  value={periodForm.end_date}
+                  onChange={(e) => setPeriodForm({ ...periodForm, end_date: e.target.value })}
+                  className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                  aria-label="Period end date"
+                />
+                <div className="flex gap-2">
+                  <button
+                    type="submit"
+                    className="px-3 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 text-sm"
+                  >
+                    {editingPeriodId ? 'Update' : 'Add'}
+                  </button>
+                  {editingPeriodId && (
+                    <button
+                      type="button"
+                      onClick={resetPeriodForm}
+                      className="px-3 py-2 bg-gray-100 text-gray-700 rounded-md hover:bg-gray-200 dark:bg-gray-700 dark:text-gray-200 dark:hover:bg-gray-600 text-sm"
+                    >
+                      Cancel
+                    </button>
+                  )}
+                </div>
+              </form>
+
+              <div className="space-y-2 max-h-44 overflow-y-auto pr-1">
+                {selectedStudentPeriods.length === 0 ? (
+                  <p className="text-sm text-gray-500 dark:text-gray-400">No saved periods yet.</p>
+                ) : (
+                  selectedStudentPeriods.map((period) => (
+                    <div key={period.id} className="flex items-center justify-between gap-3 rounded-md border border-gray-200 dark:border-gray-700 p-3">
+                      <div className="text-sm text-gray-900 dark:text-white">
+                        <span className="font-medium">{period.start_date ? new Date(period.start_date).toLocaleDateString('en-GB') : 'No start'}</span>
+                        <span className="text-gray-500 dark:text-gray-400"> to </span>
+                        <span className="font-medium">{period.end_date ? new Date(period.end_date).toLocaleDateString('en-GB') : 'No end'}</span>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => handleEditPeriod(period)}
+                          className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"
+                          title="Edit period"
+                        >
+                          <Edit className="h-4 w-4" />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeletePeriod(period.id)}
+                          className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"
+                          title="Delete period"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
@@ -3294,6 +3577,7 @@ declare module "../types" {
     class_year_id: string | null;
     organization_id: string;
     registration_status: "pending" | "registered" | "unregistered";
+    registration_start_date: string | null;
     registration_end_date: string | null;
     // patients_in_progress: number; // Assuming this already exists based on usage
     // patients_completed: number; // Assuming this already exists based on usage

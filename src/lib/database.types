@@ -116,6 +116,7 @@ export interface Database {
           patients_completed: number
           patients_in_progress: number
           registration_end_date: string | null
+          registration_start_date: string | null
           registration_status: "registered" | "unregistered" | "pending"
           university: string
           working_days_id: string
@@ -132,6 +133,7 @@ export interface Database {
           patients_completed?: number
           patients_in_progress?: number
           registration_end_date?: string | null
+          registration_start_date?: string | null
           registration_status: "registered" | "unregistered" | "pending"
           university: string
           working_days_id: string
@@ -148,6 +150,7 @@ export interface Database {
           patients_completed?: number
           patients_in_progress?: number
           registration_end_date?: string | null
+          registration_start_date?: string | null
           registration_status?: "registered" | "unregistered" | "pending"
           university?: string
           working_days_id?: string
@@ -163,6 +166,49 @@ export interface Database {
             foreignKeyName: "students_working_days_id_fkey"
             columns: ["working_days_id"]
             referencedRelation: "working_days"
+            referencedColumns: ["id"]
+          }
+        ]
+      }
+      student_registration_periods: {
+        Row: {
+          created_at: string
+          end_date: string | null
+          id: string
+          organization_id: string
+          start_date: string | null
+          student_id: string
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          organization_id: string
+          start_date?: string | null
+          student_id: string
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          end_date?: string | null
+          id?: string
+          organization_id?: string
+          start_date?: string | null
+          student_id?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "student_registration_periods_organization_id_fkey"
+            columns: ["organization_id"]
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "student_registration_periods_student_id_fkey"
+            columns: ["student_id"]
+            referencedRelation: "students"
             referencedColumns: ["id"]
           }
         ]
