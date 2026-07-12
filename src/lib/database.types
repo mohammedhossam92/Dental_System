@@ -118,6 +118,7 @@ export interface Database {
           registration_end_date: string | null
           registration_start_date: string | null
           registration_status: "registered" | "unregistered" | "pending"
+          unregistered_at: string | null
           university: string
           working_days_id: string
         }
@@ -135,6 +136,7 @@ export interface Database {
           registration_end_date?: string | null
           registration_start_date?: string | null
           registration_status: "registered" | "unregistered" | "pending"
+          unregistered_at?: string | null
           university: string
           working_days_id: string
         }
@@ -152,6 +154,7 @@ export interface Database {
           registration_end_date?: string | null
           registration_start_date?: string | null
           registration_status?: "registered" | "unregistered" | "pending"
+          unregistered_at?: string | null
           university?: string
           working_days_id?: string
         }

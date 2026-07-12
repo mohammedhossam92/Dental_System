@@ -1,20 +1,34 @@
 import React, { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Patient, Treatment, Student } from '../types';
-import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2 } from 'lucide-react';
+import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
 export function ReportsPage() {
+  const navigate = useNavigate();
   const [dateRange, setDateRange] = useState({ start: '', end: '' });
   const [datePreset, setDatePreset] = useState<DatePreset>('month');
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
+  const [unregisteredStudents, setUnregisteredStudents] = useState<Student[]>([]);
   const [treatmentStats, setTreatmentStats] = useState<{ [key: string]: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'treatments' | 'students'>('treatments');
+  const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered'>('treatments');
+
+  const formatDate = (dateString: string | null) => {
+    if (!dateString) return 'N/A';
+    return new Date(dateString).toLocaleDateString(undefined, {
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric',
+      hour: '2-digit',
+      minute: '2-digit',
+    });
+  };
 
   // Set date range based on preset
   useEffect(() => {
@@ -74,22 +88,37 @@ export function ReportsPage() {
       setError(null);
       
       try {
-        const [treatmentsRes, patientsRes, studentsRes] = await Promise.all([
+        let unregisteredQuery = supabase
+          .from('students')
+          .select('*')
+          .eq('registration_status', 'unregistered');
+        
+        if (dateRange.start) {
+          unregisteredQuery = unregisteredQuery.gte('unregistered_at', `${dateRange.start}T00:00:00.000Z`);
+        }
+        if (dateRange.end) {
+          unregisteredQuery = unregisteredQuery.lte('unregistered_at', `${dateRange.end}T23:59:59.999Z`);
+        }
+
+        const [treatmentsRes, patientsRes, studentsRes, unregisteredRes] = await Promise.all([
           supabase.from('treatments').select('*'),
           supabase
             .from('patients')
             .select('*, treatment_id')
             .gte('created_at', dateRange.start || '1970-01-01')
             .lte('created_at', dateRange.end || new Date().toISOString()),
-          supabase.from('students').select('*')
+          supabase.from('students').select('*'),
+          unregisteredQuery
         ]);
 
         if (treatmentsRes.error) throw treatmentsRes.error;
         if (patientsRes.error) throw patientsRes.error;
         if (studentsRes.error) throw studentsRes.error;
+        if (unregisteredRes.error) throw unregisteredRes.error;
 
         setTreatments(treatmentsRes.data || []);
         setStudents(studentsRes.data || []);
+        setUnregisteredStudents(unregisteredRes.data || []);
 
         // Calculate treatment statistics
         const stats: { [key: string]: number } = {};
@@ -128,7 +157,28 @@ export function ReportsPage() {
 
     const ws = XLSX.utils.aoa_to_sheet(data);
     const wb = XLSX.utils.book_new();
-    XLSX.utils.book_append_sheet(wb, ws, 'Report');
+    XLSX.utils.book_append_sheet(wb, ws, 'Summary Report');
+
+    // Add Recently Unregistered Students sheet
+    const unregisteredData = [
+      ['Recently Unregistered Students Report'],
+      ['Date Range', `${dateRange.start || 'All'} to ${dateRange.end || 'All'}`],
+      [],
+      ['Student Name', 'Mobile', 'City', 'University', 'University Type', 'Unregistration Date', 'Completed Cases', 'In Progress Cases'],
+      ...unregisteredStudents.map(s => [
+        s.name,
+        s.mobile,
+        s.city,
+        s.university,
+        s.university_type,
+        s.unregistered_at ? new Date(s.unregistered_at).toLocaleString() : 'N/A',
+        s.patients_completed,
+        s.patients_in_progress
+      ])
+    ];
+    const wsUnregistered = XLSX.utils.aoa_to_sheet(unregisteredData);
+    XLSX.utils.book_append_sheet(wb, wsUnregistered, 'Unregistered Students');
+
     XLSX.writeFile(wb, `dental_report_${new Date().toISOString().split('T')[0]}.xlsx`);
   };
 
@@ -308,6 +358,16 @@ export function ReportsPage() {
           >
             Student Performance
           </button>
+          <button
+            onClick={() => setActiveTab('unregistered')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm ${
+              activeTab === 'unregistered'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            Recently Unregistered
+          </button>
         </nav>
       </div>
 
@@ -370,7 +430,7 @@ export function ReportsPage() {
                 </div>
               )}
             </div>
-          ) : (
+          ) : activeTab === 'students' ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
@@ -436,6 +496,72 @@ export function ReportsPage() {
                           <span className="text-xs text-gray-500 dark:text-gray-400 w-12 text-right">
                             {completionRate.toFixed(1)}%
                           </span>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
+          ) : (
+            <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center">
+                  <Users className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+                  <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Recently Unregistered Students</h2>
+                </div>
+                <span className="text-sm text-gray-500 dark:text-gray-400">
+                  {unregisteredStudents.length} unregistered
+                </span>
+              </div>
+              
+              {unregisteredStudents.length === 0 ? (
+                renderNoDataState()
+              ) : (
+                <div className="space-y-4">
+                  {unregisteredStudents.map((student) => {
+                    const totalCases = student.patients_completed + student.patients_in_progress;
+                    return (
+                      <div
+                        key={student.id}
+                        className="p-4 bg-gray-50 dark:bg-gray-700 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-600 transition-all duration-200 transform hover:scale-[1.02]"
+                      >
+                        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
+                          <div>
+                            <span className="text-gray-800 dark:text-white font-medium block">{student.name}</span>
+                            <div className="flex flex-wrap items-center gap-y-1 gap-x-4 text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-1">
+                              <span>
+                                <strong>Mobile:</strong> {student.mobile}
+                              </span>
+                              <span>
+                                <strong>University:</strong> {student.university} ({student.university_type})
+                              </span>
+                              <span className="text-red-600 dark:text-red-400 font-medium">
+                                <strong>Unregistered:</strong> {formatDate(student.unregistered_at)}
+                              </span>
+                            </div>
+                          </div>
+                          <div className="flex items-center space-x-6">
+                            <div className="text-center">
+                              <span className="block text-xl font-bold text-gray-700 dark:text-gray-300">
+                                {student.patients_completed}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">Completed</span>
+                            </div>
+                            <div className="text-center">
+                              <span className="block text-xl font-bold text-yellow-600 dark:text-yellow-400">
+                                {student.patients_in_progress}
+                              </span>
+                              <span className="text-xs text-gray-500 dark:text-gray-400">In Progress</span>
+                            </div>
+                            <button
+                              onClick={() => navigate(`/students?edit=${student.id}`)}
+                              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 text-indigo-600 dark:text-indigo-400 rounded-lg transition-colors"
+                              title="Edit Student"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     );

@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import { useSearchParams } from 'react-router-dom';
 import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod } from '../types';
@@ -92,6 +93,8 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
 }
 
 export function StudentsPage() {
+  const [searchParams, setSearchParams] = useSearchParams();
+  const editStudentId = searchParams.get('edit');
   const { organizationId } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
@@ -120,7 +123,7 @@ export function StudentsPage() {
     direction: null
   });
   const [statusFilter, setStatusFilter] = useState<'all' | 'available' | 'busy'>('all');
-  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered' | 'pending'>('registered');
+  const [registrationFilter, setRegistrationFilter] = useState<'all' | 'registered' | 'unregistered' | 'pending' | 'recently_unregistered'>('registered');
   const [columnDropdownOpen, setColumnDropdownOpen] = useState<string | null>(null);
   const [universityFilter, setUniversityFilter] = useState<string>('all');
   const [universitySearchTerm, setUniversitySearchTerm] = useState<string>('');
@@ -302,7 +305,12 @@ export function StudentsPage() {
 
         const { error: updateError } = await supabase
           .from('students')
-          .update({ registration_status: 'unregistered', registration_start_date: null, registration_end_date: null })
+          .update({ 
+            registration_status: 'unregistered', 
+            registration_start_date: null, 
+            registration_end_date: null,
+            unregistered_at: new Date().toISOString()
+          })
           .in('id', expiredStudents.map(s => s.id));
 
         if (updateError) throw updateError;
@@ -422,11 +430,18 @@ export function StudentsPage() {
       return;
     }
 
+    const unregisteredAt = newStudent.registration_status === 'unregistered'
+      ? (isEditMode && selectedStudent?.registration_status === 'unregistered'
+          ? selectedStudent.unregistered_at
+          : new Date().toISOString())
+      : null;
+
     const studentData = {
       ...newStudent,
       organization_id: organizationId,
       registration_start_date: newStudent.registration_status === 'registered' ? newStudent.registration_start_date || null : null,
       registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null,
+      unregistered_at: unregisteredAt,
       // Remove is_available
     };
 
@@ -783,7 +798,8 @@ export function StudentsPage() {
             organization_id: organizationId,
             registration_status: row['Registration Status'] || 'registered',
             registration_start_date: row['Registration Start Date'] || null,
-            registration_end_date: row['Registration End Date'] || null
+            registration_end_date: row['Registration End Date'] || null,
+            unregistered_at: (row['Registration Status'] || 'registered') === 'unregistered' ? new Date().toISOString() : null
           };
         });
 
@@ -1032,7 +1048,11 @@ export function StudentsPage() {
 
       // Registration status filter
       const matchesRegistration = registrationFilter === 'all' ||
-        student.registration_status === registrationFilter;
+        (registrationFilter === 'recently_unregistered'
+          ? (student.registration_status === 'unregistered' &&
+             student.unregistered_at &&
+             (new Date().getTime() - new Date(student.unregistered_at).getTime()) <= 30 * 24 * 60 * 60 * 1000)
+          : student.registration_status === registrationFilter);
 
       // Working days filter
       const matchesWorkingDays = workingDaysFilter === 'all' ||
@@ -1461,6 +1481,16 @@ export function StudentsPage() {
     setIsEditMode(true);
     setIsModalOpen(true);
   };
+
+  useEffect(() => {
+    if (editStudentId && students.length > 0) {
+      const matched = students.find(s => s.id === editStudentId);
+      if (matched) {
+        handleEdit(matched);
+        setSearchParams({}, { replace: true });
+      }
+    }
+  }, [editStudentId, students, handleEdit, setSearchParams]);
 
   // Function to handle deleting a student
   const handleDelete = async (id: string) => {
@@ -2260,6 +2290,19 @@ export function StudentsPage() {
                             </li>
                             <li
                               className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
+                                registrationFilter === 'recently_unregistered'
+                                  ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200 font-semibold'
+                                  : 'text-gray-900 dark:text-white'
+                              }`}
+                              onClick={() => {
+                                setRegistrationFilter('recently_unregistered');
+                                toggleColumnDropdown(null);
+                              }}
+                            >
+                              Recently Unregistered
+                            </li>
+                            <li
+                              className={`px-3 py-1 text-xs cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 ${
                                 registrationFilter === 'pending'
                                   ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-600 dark:text-indigo-300'
                                   : 'text-gray-900 dark:text-white'
@@ -2400,9 +2443,11 @@ export function StudentsPage() {
                             ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                             : student.registration_status === 'unregistered'
                             ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                            : student.registration_status === 'recently_unregistered'
+                            ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                             : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                         }`}>
-                          {student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}
+                          {student.registration_status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                         </span>
                       </td>
                     )}
@@ -2746,7 +2791,6 @@ export function StudentsPage() {
                       setNewStudent({
                         ...newStudent,
                         registration_status: newStatus,
-                        // Remove is_available update
                       });
                     }}
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base appearance-none bg-no-repeat bg-right pr-8"
@@ -2781,8 +2825,6 @@ export function StudentsPage() {
                     className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
                   />
                 </div>
-
-                {/* Remove Student Status Toggle */}
 
               </div>
 
@@ -2835,7 +2877,7 @@ export function StudentsPage() {
                     ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                     : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                 }`}>
-                  {selectedStudent.registration_status.charAt(0).toUpperCase() + selectedStudent.registration_status.slice(1)}
+                  {selectedStudent.registration_status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                 </span>
                  {/* Updated status display */}
                  {selectedStudent.registration_status === 'registered' && (
@@ -2893,7 +2935,7 @@ export function StudentsPage() {
                       ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
                       : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
                   }`}>
-                    {selectedStudent.registration_status.charAt(0).toUpperCase() + selectedStudent.registration_status.slice(1)}
+                    {selectedStudent.registration_status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
                   </span>
                 </div>
 
@@ -3361,8 +3403,6 @@ export function StudentsPage() {
                     </div>
 
                     <div className="space-y-4">
-                      {/* Remove Status Filter */}
-
                       {/* Registration Status Filter */}
                       <div>
                         <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -3370,12 +3410,13 @@ export function StudentsPage() {
                         </label>
                         <select
                           value={registrationFilter}
-                          onChange={(e) => setRegistrationFilter(e.target.value as 'all' | 'registered' | 'unregistered' | 'pending')}
+                          onChange={(e) => setRegistrationFilter(e.target.value as 'all' | 'registered' | 'unregistered' | 'pending' | 'recently_unregistered')}
                           className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white"
                         >
                           <option value="all">All Statuses</option>
                           <option value="registered">Registered</option>
                           <option value="unregistered">Unregistered</option>
+                          <option value="recently_unregistered">Recently Unregistered</option>
                           <option value="pending">Pending</option>
                         </select>
                       </div>

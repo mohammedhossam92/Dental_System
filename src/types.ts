@@ -11,6 +11,7 @@ export interface Student {
   registration_status: 'registered' | 'unregistered' | 'pending';
   registration_start_date: string | null;
   registration_end_date: string | null;
+  unregistered_at: string | null;
   is_available: boolean;
   patients_in_progress: number;
   patients_completed: number;
