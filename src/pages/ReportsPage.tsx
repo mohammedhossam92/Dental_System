@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { Patient, Treatment, Student } from '../types';
 import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { useLanguage } from '../context/LanguageContext';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
@@ -18,6 +19,7 @@ export function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered'>('treatments');
+  const { t, language } = useLanguage();
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -100,19 +102,13 @@ export function ReportsPage() {
           unregisteredQuery = unregisteredQuery.lte('unregistered_at', `${dateRange.end}T23:59:59.999Z`);
         }
 
-        const [treatmentsRes, patientsRes, studentsRes, unregisteredRes] = await Promise.all([
-          supabase.from('treatments').select('*'),
-          supabase
-            .from('patients')
-            .select('*, treatment_id')
-            .gte('created_at', dateRange.start || '1970-01-01')
-            .lte('created_at', dateRange.end || new Date().toISOString()),
-          supabase.from('students').select('*'),
+        const [treatmentsRes, studentsRes, unregisteredRes] = await Promise.all([
+          supabase.from('treatments').select('*').order('name'),
+          supabase.from('students').select('*').eq('registration_status', 'registered').order('name'),
           unregisteredQuery
         ]);
 
         if (treatmentsRes.error) throw treatmentsRes.error;
-        if (patientsRes.error) throw patientsRes.error;
         if (studentsRes.error) throw studentsRes.error;
         if (unregisteredRes.error) throw unregisteredRes.error;
 
@@ -120,34 +116,52 @@ export function ReportsPage() {
         setStudents(studentsRes.data || []);
         setUnregisteredStudents(unregisteredRes.data || []);
 
-        // Calculate treatment statistics
+        let patientsQuery = supabase
+          .from('patients')
+          .select('treatment_id');
+
+        if (dateRange.start) {
+          patientsQuery = patientsQuery.gte('created_at', `${dateRange.start}T00:00:00.000Z`);
+        }
+        if (dateRange.end) {
+          patientsQuery = patientsQuery.lte('created_at', `${dateRange.end}T23:59:59.999Z`);
+        }
+
+        const { data: patientsData, error: patientsError } = await patientsQuery;
+        if (patientsError) throw patientsError;
+
         const stats: { [key: string]: number } = {};
-        patientsRes.data?.forEach(patient => {
-          if (patient.treatment_id) {
-            stats[patient.treatment_id] = (stats[patient.treatment_id] || 0) + 1;
+        patientsData?.forEach(p => {
+          if (p.treatment_id) {
+            stats[p.treatment_id] = (stats[p.treatment_id] || 0) + 1;
           }
         });
         setTreatmentStats(stats);
-      } catch (err) {
-        console.error('Error fetching data:', err);
-        setError('Failed to load data. Please try again later.');
+      } catch (err: any) {
+        console.error('Error fetching report data:', err);
+        setError(err.message || 'Failed to load report data');
       } finally {
         setIsLoading(false);
       }
     }
 
-    fetchData();
-  }, [dateRange]);
+    if (dateRange.start || datePreset !== 'custom') {
+      fetchData();
+    }
+  }, [dateRange, datePreset]);
 
   const exportToExcel = () => {
     const data = [
-      ['Report', 'Value'],
-      ['Date Range', `${dateRange.start} to ${dateRange.end}`],
-      ['Total Patients', totalPatients],
+      ['Dental Clinic Management Summary Report'],
+      ['Date Range', `${dateRange.start || 'All'} to ${dateRange.end || 'All'}`],
+      [],
+      ['Summary Metrics'],
+      ['Total Patients Treated', totalPatients],
       ['Active Students', activeStudents],
-      ['Treatment Types', totalTreatments],
+      ['Total Treatment Types', totalTreatments],
       ['Completion Rate', `${completionRate}%`],
       [],
+      ['Treatment Statistics'],
       ['Treatment', 'Patient Count'],
       ...treatments.map(t => [t.name, treatmentStats[t.id] || 0]),
       [],
@@ -187,7 +201,7 @@ export function ReportsPage() {
       <div className="bg-gradient-to-r from-blue-500 to-blue-600 text-white rounded-2xl p-6 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-sm font-medium text-blue-100">Total Patients</p>
+            <p className="text-sm font-medium text-blue-100">{t('totalPatientsReport')}</p>
             <p className="text-3xl font-bold">{totalPatients}</p>
           </div>
           <Users className="h-10 w-10 opacity-20" />
@@ -196,7 +210,7 @@ export function ReportsPage() {
       <div className="bg-gradient-to-r from-green-500 to-green-600 text-white rounded-2xl p-6 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-sm font-medium text-green-100">Active Students</p>
+            <p className="text-sm font-medium text-green-100">{t('activeStudentsReport')}</p>
             <p className="text-3xl font-bold">{activeStudents}</p>
           </div>
           <UserPlus className="h-10 w-10 opacity-20" />
@@ -205,7 +219,7 @@ export function ReportsPage() {
       <div className="bg-gradient-to-r from-purple-500 to-purple-600 text-white rounded-2xl p-6 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-sm font-medium text-purple-100">Treatment Types</p>
+            <p className="text-sm font-medium text-purple-100">{t('totalTreatmentsReport')}</p>
             <p className="text-3xl font-bold">{totalTreatments}</p>
           </div>
           <Activity className="h-10 w-10 opacity-20" />
@@ -214,7 +228,7 @@ export function ReportsPage() {
       <div className="bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl p-6 shadow-lg">
         <div className="flex justify-between items-center">
           <div>
-            <p className="text-sm font-medium text-amber-100">Completion Rate</p>
+            <p className="text-sm font-medium text-amber-100">{t('completionRateReport')}</p>
             <p className="text-3xl font-bold">{completionRate}%</p>
           </div>
           <BarChart2 className="h-10 w-10 opacity-20" />
@@ -226,11 +240,11 @@ export function ReportsPage() {
   const renderDatePresets = () => (
     <div className="flex flex-wrap gap-2 mb-6">
       {[
-        { id: 'today', label: 'Today' },
-        { id: 'week', label: 'This Week' },
-        { id: 'month', label: 'This Month' },
-        { id: 'lastMonth', label: 'Last Month' },
-        { id: 'custom', label: 'Custom' }
+        { id: 'today', label: t('todayPreset') },
+        { id: 'week', label: t('weekPreset') },
+        { id: 'month', label: t('monthPreset') },
+        { id: 'lastMonth', label: t('lastMonthPreset') },
+        { id: 'custom', label: t('customPreset') }
       ].map(preset => (
         <button
           key={preset.id}
@@ -250,7 +264,7 @@ export function ReportsPage() {
   const renderLoadingState = () => (
     <div className="flex flex-col items-center justify-center py-12">
       <Loader2 className="h-12 w-12 text-indigo-600 dark:text-indigo-400 animate-spin mb-4" />
-      <p className="text-gray-600 dark:text-gray-400">Loading report data...</p>
+      <p className="text-gray-600 dark:text-gray-400">{t('loading')}</p>
     </div>
   );
 
@@ -284,7 +298,7 @@ export function ReportsPage() {
     <div className="container mx-auto px-4 sm:px-6 py-8">
       <div className="mb-8 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white mb-2">Analytics Dashboard</h1>
+          <h1 className="text-3xl sm:text-4xl font-bold text-gray-800 dark:text-white mb-2">{t('reportsTitle')}</h1>
           <p className="text-gray-600 dark:text-gray-400">Track treatment progress and student performance</p>
         </div>
         <button
@@ -292,7 +306,7 @@ export function ReportsPage() {
           className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors"
         >
           <Download className="h-4 w-4" />
-          Export to Excel
+          {t('exportData')}
         </button>
       </div>
 
@@ -300,16 +314,16 @@ export function ReportsPage() {
 
       <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6 mb-8">
         <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center mb-6 gap-4">
-          <div className="flex items-center">
-            <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mr-2" />
-            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Date Range</h2>
+          <div className="flex items-center rtl:space-x-reverse">
+            <Calendar className="h-5 w-5 text-indigo-600 dark:text-indigo-400 mr-2 ml-2" />
+            <h2 className="text-lg font-semibold text-gray-800 dark:text-white">{t('datePreset')}</h2>
           </div>
           {renderDatePresets()}
         </div>
         
         <div className="grid grid-cols-1 sm:grid-cols-2 gap-6">
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">Start Date</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">{t('startDate')}</label>
             <input
               type="date"
               className="w-full px-4 py-2 rounded-xl border bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
@@ -321,7 +335,7 @@ export function ReportsPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">End Date</label>
+            <label className="block text-sm font-medium text-gray-600 dark:text-gray-400">{t('endDate')}</label>
             <input
               type="date"
               className="w-full px-4 py-2 rounded-xl border bg-gray-50 dark:bg-gray-700 text-gray-800 dark:text-gray-200 border-gray-200 dark:border-gray-600 focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 transition-all duration-200"
@@ -337,7 +351,7 @@ export function ReportsPage() {
       </div>
 
       <div className="mb-6 border-b border-gray-200 dark:border-gray-700">
-        <nav className="-mb-px flex space-x-8">
+        <nav className="-mb-px flex space-x-8 rtl:space-x-reverse">
           <button
             onClick={() => setActiveTab('treatments')}
             className={`py-4 px-1 border-b-2 font-medium text-sm ${

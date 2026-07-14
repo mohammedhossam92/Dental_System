@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { Users, Stethoscope, UserCheck, Clock, CheckCircle, UserPlus } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, Patient, TreatmentVisit } from '../types';
+import { useLanguage } from '../context/LanguageContext';
 
 export function Dashboard() {
+  const { t, language } = useLanguage();
   const [stats, setStats] = useState({
     totalStudents: 0,
     casesToday: 0,
@@ -86,75 +88,67 @@ export function Dashboard() {
   if (loading) {
     return (
       <div className="flex items-center justify-center min-h-[calc(100vh-4rem)]">
-        <div className="text-gray-600 dark:text-gray-400">Loading dashboard data...</div>
+        <div className="text-gray-600 dark:text-gray-400">{t('loadingDashboard')}</div>
       </div>
     );
   }
 
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6">
-      <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 dark:text-white">Dashboard</h1>
+      <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 dark:text-white">{t('dashboard')}</h1>
       <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
         <DashboardCard
           icon={<Users className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />}
-          title="Total Students"
+          title={t('totalStudents')}
           value={stats.totalStudents.toString()}
-          subtitle="Total students in system"
+          subtitle={t('totalStudentsSub')}
         />
         <DashboardCard
           icon={<Users className="h-6 sm:h-8 w-6 sm:w-8 text-orange-500" />}
-          title="Currently Registered Students"
+          title={t('registeredStudents')}
           value={registeredStudents.toString()}
-          subtitle="Students with registered status"
+          subtitle={t('registeredStudentsSub')}
         />
         <DashboardCard
           icon={<UserPlus className="h-6 sm:h-8 w-6 sm:w-8 text-cyan-500" />}
-          title="Available Students"
+          title={t('availableStudents')}
           value={stats.availableStudents.toString()}
-          subtitle="Ready for new cases"
+          subtitle={t('availableStudentsSub')}
         />
         <DashboardCard
           icon={<Stethoscope className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />}
-          title="Cases Today"
+          title={t('casesToday')}
           value={stats.casesToday.toString()}
-          subtitle="New cases today"
+          subtitle={t('casesTodaySub')}
         />
         <DashboardCard
           icon={<CheckCircle className="h-6 sm:h-8 w-6 sm:w-8 text-emerald-500" />}
-          title="Total Cases Done"
+          title={t('totalCasesDone')}
           value={stats.totalCasesDone.toString()}
-          subtitle="Successfully completed"
+          subtitle={t('totalCasesDoneSub')}
         />
-        {/* <DashboardCard
-          icon={<UserCheck className="h-6 sm:h-8 w-6 sm:w-8 text-indigo-500" />}
-          title="Attendance Rate"
-          value={`${stats.attendanceRate}%`}
-          subtitle="Present today"
-        /> */}
         <DashboardCard
           icon={<Clock className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />}
-          title="Pending Cases"
+          title={t('pendingCases')}
           value={stats.pendingCases.toString()}
-          subtitle="Awaiting assignment"
+          subtitle={t('pendingCasesSub')}
         />
-
-
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Cases */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Recent Cases</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-900 dark:text-white">{t('recentCases')}</h2>
           <div className="space-y-4 max-h-[calc(100vh-24rem)] overflow-y-auto">
             {recentCases.map((case_) => (
               <div key={case_.id} className="border-b dark:border-gray-700 pb-4">
                 <div className="flex flex-col sm:flex-row sm:justify-between sm:items-start gap-2">
                   <div>
                     <h3 className="font-medium text-gray-900 dark:text-white">
-                      {case_.treatment?.name || 'Unknown Treatment'}
+                      {case_.treatment?.name || t('unknownTreatment')}
                     </h3>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      Assigned to: {case_.student?.name || 'Unassigned'}
+                      {t('assignedTo')}: {case_.student?.name || t('unassigned')}
                     </p>
                   </div>
                   <span className={`text-sm px-2 py-1 rounded self-start ${
@@ -164,11 +158,11 @@ export function Dashboard() {
                       ? 'text-blue-600 bg-blue-100 dark:text-blue-400 dark:bg-blue-900'
                       : 'text-red-600 bg-red-100 dark:text-red-400 dark:bg-red-900'
                   }`}>
-                    {case_.status.charAt(0).toUpperCase() + case_.status.slice(1).replace('_', ' ')}
+                    {t(case_.status)}
                   </span>
                 </div>
                 <p className="text-sm text-gray-600 dark:text-gray-400 mt-1">
-                  Patient #{case_.ticket_number} • {new Date(case_.created_at).toLocaleDateString()}
+                  {t('patientTicket')}{case_.ticket_number} • {new Date(case_.created_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US')}
                 </p>
               </div>
             ))}
@@ -177,11 +171,11 @@ export function Dashboard() {
 
         {/* Available Students */}
         <div className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-4 sm:p-6">
-          <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-900 dark:text-white">Available Students</h2>
+          <h2 className="text-lg sm:text-xl font-semibold mb-4 text-gray-900 dark:text-white">{t('availableStudents')}</h2>
           <div className="space-y-4 max-h-[calc(100vh-24rem)] overflow-y-auto">
             {todayAttendance.map((student) => (
               <div key={student.id} className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 border-b dark:border-gray-700 pb-4">
-                <div className="flex items-center space-x-3">
+                <div className="flex items-center space-x-3 rtl:space-x-reverse">
                   <div className="w-10 h-10 bg-gray-200 dark:bg-gray-700 rounded-full flex items-center justify-center flex-shrink-0">
                     <span className="text-gray-600 dark:text-gray-300 font-medium">
                       {student.name.charAt(0)}
@@ -190,7 +184,7 @@ export function Dashboard() {
                   <div>
                     <p className="font-medium text-gray-900 dark:text-white">{student.name}</p>
                     <p className="text-sm text-gray-500 dark:text-gray-400">
-                      {student.patients_completed} completed • {student.patients_in_progress} in progress
+                      {student.patients_completed} {t('completed')} • {student.patients_in_progress} {t('in_progress')}
                     </p>
                   </div>
                 </div>
@@ -199,7 +193,7 @@ export function Dashboard() {
                     ? 'text-green-600 bg-green-100 dark:text-green-400 dark:bg-green-900'
                     : 'text-yellow-600 bg-yellow-100 dark:text-yellow-400 dark:bg-yellow-900'
                 }`}>
-                  {student.is_available ? 'Available' : 'Busy'}
+                  {student.is_available ? t('available') : t('busy')}
                 </span>
               </div>
             ))}

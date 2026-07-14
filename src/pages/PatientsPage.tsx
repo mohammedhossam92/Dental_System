@@ -9,12 +9,14 @@ import type { Patient, Student, Treatment, ToothClass, ClassYear, WorkingDays } 
 import Swal from 'sweetalert2';
 import { PatientCard } from '../components/PatientCard';
 import { updateStudentPatientCounts, handlePatientStatusChange } from '../utils/studentUtils';
+import { useLanguage } from '../context/LanguageContext';
 
 // If you have a type for patient notes, use it here. Otherwise, fallback to any.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type PatientNote = any;
 
 export function PatientsPage() {
+  const { t, language } = useLanguage();
   const [patients, setPatients] = useState<Patient[]>([]);
   // @ts-expect-error: user property is present in AuthContext
   const { user } = useContext(AuthContext); // assumes user object has a 'username' property
@@ -917,14 +919,16 @@ export function PatientsPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Patients Management</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+          {language === 'ar' ? 'إدارة المرضى' : 'Patients Management'}
+        </h1>
         <div className="flex flex-col sm:flex-row gap-2 items-center">
           <button
             onClick={() => setIsModalOpen(true)}
             className="flex items-center justify-center w-full sm:w-auto px-6 py-3 bg-indigo-600 text-white rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow"
           >
-            <Plus className="h-6 w-6 mr-3" />
-            Add Patient
+            <Plus className="h-6 w-6 mr-3 ml-3" />
+            {t('addPatient')}
           </button>
         </div>
       </div>
@@ -995,7 +999,7 @@ export function PatientsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <input
             type="text"
-            placeholder="Search by name, ticket number, mobile or doctor..."
+            placeholder={language === 'ar' ? 'البحث عن المرضى بالاسم أو رقم التذكرة أو الهاتف أو الطبيب...' : 'Search by name, ticket number, mobile or doctor...'}
             className="w-full pl-9 pr-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white transition-colors duration-200 text-sm"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}

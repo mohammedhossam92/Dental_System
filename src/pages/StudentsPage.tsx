@@ -7,6 +7,7 @@ import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
+import { useLanguage } from '../context/LanguageContext';
 
 type StudentForm = Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at' | 'is_available'>;
 
@@ -93,6 +94,7 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
 }
 
 export function StudentsPage() {
+  const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const editStudentId = searchParams.get('edit');
   const { organizationId } = useAuth();
@@ -1641,7 +1643,9 @@ export function StudentsPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-6">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">Students Management</h1>
+        <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white">
+          {language === 'ar' ? 'إدارة الطلاب' : 'Students Management'}
+        </h1>
         <div className="flex flex-col sm:flex-row gap-4">
           {/* Replace select with styled button */}
           <div className="relative">
@@ -1649,11 +1653,11 @@ export function StudentsPage() {
               onClick={() => setIsClassYearDropdownOpen(!isClassYearDropdownOpen)}
               className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
             >
-              <Filter className="h-5 w-5 mr-2" />
+              <Filter className="h-5 w-5 mr-2 ml-2" />
               {selectedClassYearFilter === 'all'
-                ? 'All Class Years'
-                : classYears.find(year => year.id === selectedClassYearFilter)?.year_range || 'Class Year'}
-              <ChevronDown className="h-4 w-4 ml-2" />
+                ? (language === 'ar' ? 'جميع السنوات الدراسية' : 'All Class Years')
+                : classYears.find(year => year.id === selectedClassYearFilter)?.year_range || (language === 'ar' ? 'السنة الدراسية' : 'Class Year')}
+              <ChevronDown className="h-4 w-4 ml-2 mr-2" />
             </button>
 
             {isClassYearDropdownOpen && (
@@ -1670,7 +1674,7 @@ export function StudentsPage() {
                       setIsClassYearDropdownOpen(false);
                     }}
                   >
-                    All Class Years
+                    {language === 'ar' ? 'جميع السنوات الدراسية' : 'All Class Years'}
                   </li>
                   {classYears.map((year) => (
                     <li
@@ -1699,13 +1703,13 @@ export function StudentsPage() {
               onClick={() => setShowImportDropdown(!showImportDropdown)}
               className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
             >
-              <Upload className="h-5 w-5 mr-2" />
-              Import Excel
-              <ChevronDown className="h-4 w-4 ml-2" />
+              <Upload className="h-5 w-5 mr-2 ml-2" />
+              {t('importExcel')}
+              <ChevronDown className="h-4 w-4 ml-2 mr-2" />
             </button>
 
             {showImportDropdown && (
-              <div className="absolute z-10 mt-1 w-56 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0">
+              <div className="absolute z-10 mt-1 w-56 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0 left-auto rtl:left-0 rtl:right-auto">
                 <ul className="py-1">
                   <li className="relative">
                     <button
@@ -1713,17 +1717,17 @@ export function StudentsPage() {
                         downloadExcelTemplate();
                         setShowImportDropdown(false);
                       }}
-                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex items-center px-4 py-2 w-full text-left rtl:text-right cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Download Template
+                      <Download className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'تحميل النموذج' : 'Download Template'}
                     </button>
                   </li>
                   <li className="border-t border-gray-200 dark:border-gray-700"></li>
                   <li className="relative">
-                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Replace All Students
+                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white justify-start">
+                      <Upload className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'استبدال جميع الطلاب' : 'Replace All Students'}
                       <input
                         type="file"
                         className="hidden"
@@ -1736,9 +1740,9 @@ export function StudentsPage() {
                     </label>
                   </li>
                   <li className="relative">
-                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white">
-                      <Upload className="h-4 w-4 mr-2" />
-                      Add to Existing Students
+                    <label className="flex items-center px-4 py-2 w-full cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white justify-start">
+                      <Upload className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'إضافة إلى الطلاب الحاليين' : 'Add to Existing Students'}
                       <input
                         type="file"
                         className="hidden"
@@ -1760,13 +1764,13 @@ export function StudentsPage() {
               onClick={() => setShowExportDropdown(!showExportDropdown)}
               className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
             >
-              <Download className="h-5 w-5 mr-2" />
-              Export Excel
-              <ChevronDown className="h-4 w-4 ml-2" />
+              <Download className="h-5 w-5 mr-2 ml-2" />
+              {t('exportExcel')}
+              <ChevronDown className="h-4 w-4 ml-2 mr-2" />
             </button>
 
             {showExportDropdown && (
-              <div className="absolute z-10 mt-1 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0">
+              <div className="absolute z-10 mt-1 w-64 bg-white dark:bg-gray-800 shadow-lg rounded-md border border-gray-200 dark:border-gray-700 right-0 left-auto rtl:left-0 rtl:right-auto">
                 <ul className="py-1">
                   <li className="relative">
                     <button
@@ -1774,10 +1778,10 @@ export function StudentsPage() {
                         exportStudentsToExcel(students, '_all');
                         setShowExportDropdown(false);
                       }}
-                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex items-center px-4 py-2 w-full text-left rtl:text-right cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export All Students
+                      <Download className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'تصدير جميع الطلاب' : 'Export All Students'}
                     </button>
                   </li>
                   <li className="relative">
@@ -1786,10 +1790,10 @@ export function StudentsPage() {
                         exportStudentsToExcel(selectedClassYearStudents, '_selected_year');
                         setShowExportDropdown(false);
                       }}
-                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex items-center px-4 py-2 w-full text-left rtl:text-right cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Selected Class Year
+                      <Download className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'تصدير السنة الدراسية المختارة' : 'Export Selected Class Year'}
                     </button>
                   </li>
                   <li className="relative">
@@ -1798,10 +1802,10 @@ export function StudentsPage() {
                         exportStudentsToExcel(filteredStudents, '_selected_year_filtered');
                         setShowExportDropdown(false);
                       }}
-                      className="flex items-center px-4 py-2 w-full text-left cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
+                      className="flex items-center px-4 py-2 w-full text-left rtl:text-right cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700 text-gray-900 dark:text-white"
                     >
-                      <Download className="h-4 w-4 mr-2" />
-                      Export Selected Year + Filters
+                      <Download className="h-4 w-4 mr-2 ml-2" />
+                      {language === 'ar' ? 'تصدير السنة المختارة + الفلاتر' : 'Export Selected Year + Filters'}
                     </button>
                   </li>
                 </ul>
@@ -1816,8 +1820,8 @@ export function StudentsPage() {
             }}
             className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-indigo-600 text-white rounded-md hover:bg-indigo-700 transition-colors duration-200"
           >
-            <Plus className="h-5 w-5 mr-2" />
-            Add Student
+            <Plus className="h-5 w-5 mr-2 ml-2" />
+            {t('addStudent')}
           </button>
         </div>
       </div>
@@ -1827,7 +1831,7 @@ export function StudentsPage() {
           <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-5 w-5 text-gray-400" />
           <input
             type="text"
-            placeholder={`Search by ${selectedColumns.join(', ')}...`}
+            placeholder={language === 'ar' ? 'البحث عن الطلاب...' : `Search by ${selectedColumns.join(', ')}...`}
             className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 dark:bg-gray-700 dark:border-gray-600 dark:text-white"
             value={searchTerm}
             onChange={handleSearch}

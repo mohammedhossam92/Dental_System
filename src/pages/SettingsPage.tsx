@@ -2,8 +2,10 @@ import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
 import type { WorkingDays, ToothClass, Treatment, ClassYear, Student } from '../types';
 import { Trash2, Plus, X, Users, Settings, Edit3, RotateCcw } from 'lucide-react';
+import { useLanguage } from '../context/LanguageContext';
 
 export function SettingsPage() {
+  const { t } = useLanguage();
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
@@ -498,7 +500,7 @@ export function SettingsPage() {
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6 space-y-8">
       <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between">
-        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">Settings</h1>
+        <h1 className="text-2xl font-bold text-gray-900 dark:text-white mb-4 sm:mb-0">{t('settings')}</h1>
       </div>
 
       {error && (
