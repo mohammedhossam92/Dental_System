@@ -183,6 +183,25 @@ export const translations = {
     studentName: "Student Name",
     unregisteredDate: "Unregistration Date",
 
+    // Waiting List Page
+    waitingListTitle: "Waiting List",
+    waitinglisttitle: "Waiting List",
+    addPatientToWaitingList: "Add Patient to Waiting List",
+    patientPhone: "Patient Phone",
+    diagnosis: "Diagnosis",
+    addedDate: "Added Date",
+    noWaitingPatients: "No patients in the waiting list.",
+    searchWaitingList: "Search waiting list by name or phone...",
+    patientAddedWaitingSuccess: "Patient added to waiting list successfully",
+    patientAddedWaitingError: "Failed to add patient to waiting list",
+    deleteWaitingConfirm: "Are you sure you want to remove this patient from the waiting list?",
+    diagRct: "RCT (Root Canal)",
+    diagOperative: "Operative",
+    diagScaling: "Scaling",
+    diagPulpotomy: "Pulpotomy",
+    diagPulpectomy: "Pulpectomy",
+    diagImpaction: "Impaction",
+
     // Alerts and Popups
     areYouSure: "Are you sure?",
     cannotUndo: "You won't be able to revert this!",
@@ -374,6 +393,25 @@ export const translations = {
     patientCount: "عدد المرضى",
     studentName: "اسم الطالب",
     unregisteredDate: "تاريخ إلغاء التسجيل",
+
+    // Waiting List Page
+    waitingListTitle: "قائمة الانتظار",
+    waitinglisttitle: "قائمة الانتظار",
+    addPatientToWaitingList: "إضافة مريض لقائمة الانتظار",
+    patientPhone: "هاتف المريض",
+    diagnosis: "التشخيص",
+    addedDate: "تاريخ الإضافة",
+    noWaitingPatients: "لا يوجد مرضى في قائمة الانتظار.",
+    searchWaitingList: "البحث في قائمة الانتظار بالاسم أو الهاتف...",
+    patientAddedWaitingSuccess: "تم إضافة المريض لقائمة الانتظار بنجاح",
+    patientAddedWaitingError: "فشل إضافة المريض لقائمة الانتظار",
+    deleteWaitingConfirm: "هل أنت متأكد من إزالة هذا المريض من قائمة الانتظار؟",
+    diagRct: "علاج عصب (RCT)",
+    diagOperative: "حشوات (Operative)",
+    diagScaling: "تنظيف أسنان (Scaling)",
+    diagPulpotomy: "بتر عصب (Pulpotomy)",
+    diagPulpectomy: "استئصال عصب (Pulpectomy)",
+    diagImpaction: "جراحة ضرس عقل (Impaction)",
 
     // Alerts and Popups
     areYouSure: "هل أنت متأكد؟",

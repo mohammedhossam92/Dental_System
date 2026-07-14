@@ -98,3 +98,13 @@ export interface ClassYear {
   name: string;
   created_at: string;
 }
+
+export interface WaitingListEntry {
+  id: string;
+  patient_name: string;
+  patient_phone: string;
+  city: string;
+  diagnosis: 'rct' | 'operative' | 'scaling' | 'pulpotomy' | 'pulpectomy' | 'impaction';
+  organization_id: string;
+  created_at: string;
+}

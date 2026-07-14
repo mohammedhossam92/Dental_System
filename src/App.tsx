@@ -8,6 +8,7 @@ import { StudentsPage } from './pages/StudentsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportsPage } from './pages/ReportsPage';
+import { WaitingListPage } from './pages/WaitingListPage';
 import { Dashboard } from './components/Dashboard';
 import { CasesPage } from './pages/CasesPage';
 import { AttendancePage } from './pages/AttendancePage';
@@ -50,6 +51,7 @@ export default function App() {
                           <Route path="/" element={<Dashboard />} />
                           <Route path="/students" element={<StudentsPage />} />
                           <Route path="/patients" element={<PatientsPage />} />
+                          <Route path="/waiting-list" element={<WaitingListPage />} />
                           <Route path="/settings" element={<SettingsPage />} />
                           <Route path="/reports" element={<ReportsPage />} />
                           <Route path="/cases" element={<CasesPage />} />

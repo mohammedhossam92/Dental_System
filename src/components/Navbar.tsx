@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Users, UserCircle, Settings, FileText, Home, Sun, Moon, LogOut } from 'lucide-react';
+import { Users, UserCircle, Settings, FileText, Home, Sun, Moon, LogOut, Clock } from 'lucide-react';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useDarkMode } from '../context/DarkModeContext';
 import { useAuth } from '../context/AuthContext';
@@ -17,6 +17,7 @@ export function Navbar() {
     { path: '/', icon: Home, label: 'Dashboard' },
     { path: '/students', icon: Users, label: 'Students' },
     { path: '/patients', icon: UserCircle, label: 'Patients' },
+    { path: '/waiting-list', icon: Clock, label: 'waitinglisttitle' },
     { path: '/reports', icon: FileText, label: 'Reports' },
     { path: '/settings', icon: Settings, label: 'Settings' },
   ];
