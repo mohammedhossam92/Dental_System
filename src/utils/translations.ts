@@ -201,6 +201,15 @@ export const translations = {
     diagPulpotomy: "Pulpotomy",
     diagPulpectomy: "Pulpectomy",
     diagImpaction: "Impaction",
+    waitingStatusPending: "Pending",
+    waitingStatusAnswered: "Answered",
+    waitingStatusNoAnswer: "No Answer",
+    callStatus: "Call Status",
+    appointmentInfo: "Appointment Details",
+    assignToStudent: "Assign to Student",
+    updateCallDetails: "Update Call & Notes",
+    assignedStudent: "Assigned Student",
+    waitingPatientConverted: "Patient assigned and removed from waiting list successfully",
 
     // Alerts and Popups
     areYouSure: "Are you sure?",
@@ -412,6 +421,15 @@ export const translations = {
     diagPulpotomy: "بتر عصب (Pulpotomy)",
     diagPulpectomy: "استئصال عصب (Pulpectomy)",
     diagImpaction: "جراحة ضرس عقل (Impaction)",
+    waitingStatusPending: "قيد الانتظار",
+    waitingStatusAnswered: "تم الرد (حجز موعد)",
+    waitingStatusNoAnswer: "لم يرد",
+    callStatus: "حالة الاتصال",
+    appointmentInfo: "تفاصيل الموعد",
+    assignToStudent: "تعيين لطالب",
+    updateCallDetails: "تعديل تفاصيل الاتصال والملاحظات",
+    assignedStudent: "الطالب المعين",
+    waitingPatientConverted: "تم تعيين المريض وحذفه من قائمة الانتظار بنجاح",
 
     // Alerts and Popups
     areYouSure: "هل أنت متأكد؟",

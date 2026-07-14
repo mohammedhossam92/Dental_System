@@ -105,6 +105,9 @@ export interface WaitingListEntry {
   patient_phone: string;
   city: string;
   diagnosis: 'rct' | 'operative' | 'scaling' | 'pulpotomy' | 'pulpectomy' | 'impaction';
+  status: 'pending' | 'answered' | 'no_answer';
+  appointment_info: string | null;
+  notes: string | null;
   organization_id: string;
   created_at: string;
 }
