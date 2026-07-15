@@ -28,6 +28,7 @@ export function WaitingListPage() {
 
   // Add Patient form states
   const [isAddModalOpen, setIsAddModalOpen] = useState(false);
+  const [editingEntry, setEditingEntry] = useState<WaitingListEntry | null>(null);
   const [patientName, setPatientName] = useState('');
   const [patientPhone, setPatientPhone] = useState('');
   const [city, setCity] = useState('');
@@ -101,6 +102,15 @@ export function WaitingListPage() {
     }
   }
 
+  function openEditModal(entry: WaitingListEntry) {
+    setEditingEntry(entry);
+    setPatientName(entry.patient_name);
+    setPatientPhone(entry.patient_phone);
+    setCity(entry.city);
+    setDiagnosis(entry.diagnosis);
+    setIsAddModalOpen(true);
+  }
+
   async function handleAddEntry(e: React.FormEvent) {
     e.preventDefault();
     if (!organizationId) return;
@@ -117,39 +127,70 @@ export function WaitingListPage() {
 
     try {
       setSubmitting(true);
-      const { error } = await supabase
-        .from('waiting_list')
-        .insert({
-          patient_name: patientName,
-          patient_phone: patientPhone,
-          city,
-          diagnosis,
-          organization_id: organizationId
+      if (editingEntry) {
+        const { error } = await supabase
+          .from('waiting_list')
+          .update({
+            patient_name: patientName,
+            patient_phone: patientPhone,
+            city,
+            diagnosis
+          })
+          .eq('id', editingEntry.id);
+
+        if (error) throw error;
+
+        Swal.fire({
+          icon: 'success',
+          title: t('success'),
+          text: language === 'ar' ? 'تم تحديث بيانات المريض بنجاح' : 'Patient updated successfully',
+          confirmButtonColor: '#4f46e5',
+          timer: 1500
         });
 
-      if (error) throw error;
+        setEntries(prev => prev.map(entry =>
+          entry.id === editingEntry.id
+            ? { ...entry, patient_name: patientName, patient_phone: patientPhone, city, diagnosis }
+            : entry
+        ));
+      } else {
+        const { error } = await supabase
+          .from('waiting_list')
+          .insert({
+            patient_name: patientName,
+            patient_phone: patientPhone,
+            city,
+            diagnosis,
+            organization_id: organizationId
+          });
 
-      Swal.fire({
-        icon: 'success',
-        title: t('success'),
-        text: t('patientAddedWaitingSuccess'),
-        confirmButtonColor: '#4f46e5',
-        timer: 2000
-      });
+        if (error) throw error;
+
+        Swal.fire({
+          icon: 'success',
+          title: t('success'),
+          text: t('patientAddedWaitingSuccess'),
+          confirmButtonColor: '#4f46e5',
+          timer: 2000
+        });
+
+        fetchWaitingList();
+      }
 
       setPatientName('');
       setPatientPhone('');
       setCity('');
       setDiagnosis('rct');
       setIsAddModalOpen(false);
-
-      fetchWaitingList();
+      setEditingEntry(null);
     } catch (error) {
-      console.error('Error adding patient to waiting list:', error);
+      console.error('Error saving entry:', error);
       Swal.fire({
         icon: 'error',
         title: t('error'),
-        text: t('patientAddedWaitingError'),
+        text: editingEntry
+          ? (language === 'ar' ? 'فشل تحديث بيانات المريض' : 'Failed to update patient')
+          : t('patientAddedWaitingError'),
         confirmButtonColor: '#4f46e5'
       });
     } finally {
@@ -490,7 +531,14 @@ export function WaitingListPage() {
           {t('waitingListTitle')}
         </h1>
         <button
-          onClick={() => setIsAddModalOpen(true)}
+          onClick={() => {
+            setEditingEntry(null);
+            setPatientName('');
+            setPatientPhone('');
+            setCity('');
+            setDiagnosis('rct');
+            setIsAddModalOpen(true);
+          }}
           className="flex items-center justify-center px-6 py-3 bg-indigo-600 text-white rounded-lg text-lg font-semibold hover:bg-indigo-700 transition-colors duration-200 shadow"
         >
           <Plus className="h-6 w-6 mr-2 ml-2" />
@@ -605,6 +653,13 @@ export function WaitingListPage() {
                             <UserCheck className="h-5 w-5" />
                           </button>
                           <button
+                            onClick={() => openEditModal(entry)}
+                            className="flex items-center justify-center p-1.5 bg-blue-50 hover:bg-blue-100 dark:bg-blue-950/30 dark:hover:bg-blue-900/50 rounded text-blue-600 dark:text-blue-400"
+                            title={language === 'ar' ? 'تعديل' : 'Edit'}
+                          >
+                            <Edit3 className="h-5 w-5" />
+                          </button>
+                          <button
                             onClick={() => handleDeleteEntry(entry.id)}
                             className="p-1.5 hover:bg-red-50 dark:hover:bg-red-950/30 rounded text-red-600 dark:text-red-400"
                             title={t('delete')}
@@ -683,6 +738,13 @@ export function WaitingListPage() {
                     {t('assignToStudent')}
                   </button>
                   <button
+                    onClick={() => openEditModal(entry)}
+                    className="flex items-center justify-center p-2 bg-blue-50 dark:bg-blue-950/20 text-blue-600 dark:text-blue-400 rounded-lg hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+                    title={language === 'ar' ? 'تعديل' : 'Edit'}
+                  >
+                    <Edit3 className="h-4 w-4" />
+                  </button>
+                  <button
                     onClick={() => handleDeleteEntry(entry.id)}
                     className="flex items-center justify-center p-2 bg-red-50 dark:bg-red-950/20 text-red-600 dark:text-red-400 rounded-lg hover:bg-red-100 dark:hover:bg-red-900/30 transition-colors"
                     title={t('delete')}
@@ -701,8 +763,8 @@ export function WaitingListPage() {
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4">
           <div className="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-md overflow-hidden animate-in fade-in zoom-in duration-200">
             <div className="flex justify-between items-center px-6 py-4 bg-indigo-600 text-white">
-              <h3 className="text-xl font-bold">{t('addPatientToWaitingList')}</h3>
-              <button onClick={() => setIsAddModalOpen(false)} className="text-white hover:text-gray-200">
+              <h3 className="text-xl font-bold">{editingEntry ? (language === 'ar' ? 'تعديل بيانات المريض' : 'Edit Patient Information') : t('addPatientToWaitingList')}</h3>
+              <button onClick={() => { setIsAddModalOpen(false); setEditingEntry(null); }} className="text-white hover:text-gray-200">
                 <X className="h-6 w-6" />
               </button>
             </div>
