@@ -142,6 +142,9 @@ export const translations = {
     studentDeletedSuccess: "Student deleted successfully",
     deleteStudentConfirm: "Are you sure you want to delete this student?",
     uploading: "Uploading...",
+    contactWhatsApp: "Contact via WhatsApp",
+    noNotesForStudent: "No notes for this student.",
+    studentNotesFor: "Notes for student",
 
     // Settings Page
     workingDaysTitle: "Working Days Configuration",
@@ -362,6 +365,10 @@ export const translations = {
     studentDeletedSuccess: "تم حذف الطالب بنجاح",
     deleteStudentConfirm: "هل أنت متأكد من حذف هذا الطالب؟",
     uploading: "جاري الرفع...",
+    contactWhatsApp: "التواصل عبر واتساب",
+    noNotesForStudent: "لا توجد ملاحظات لهذا الطالب.",
+    studentNotesFor: "ملاحظات للطالب",
+
 
     // Settings Page
     workingDaysTitle: "تهيئة أيام العمل",

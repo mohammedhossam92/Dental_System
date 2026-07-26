@@ -1,20 +1,29 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
 import { useLanguage } from '../context/LanguageContext';
+import { formatWhatsAppUrl } from '../utils/phoneUtils';
 
 type StudentForm = Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at' | 'is_available'>;
 
 const toDateInputValue = (date: string | null | undefined) => date ? date.split('T')[0] : '';
 
+function WhatsAppIcon({ className = "h-5 w-5" }: { className?: string }) {
+  return (
+    <svg className={className} fill="currentColor" viewBox="0 0 24 24">
+      <path d="M.057 24l1.687-6.163c-1.041-1.804-1.588-3.849-1.587-5.946.003-6.556 5.338-11.891 11.893-11.891 3.181.001 6.167 1.24 8.413 3.488 2.245 2.248 3.481 5.236 3.48 8.414-.003 6.557-5.338 11.892-11.893 11.892-1.99-.001-3.951-.5-5.688-1.448l-6.305 1.654zm6.597-3.807c1.676.995 3.276 1.591 5.392 1.592 5.448 0 9.886-4.434 9.889-9.885.002-5.462-4.415-9.89-9.881-9.892-5.452 0-9.887 4.434-9.889 9.884-.001 2.225.651 3.891 1.746 5.634l-.999 3.648 3.742-.981zm11.387-5.464c-.074-.124-.272-.198-.57-.347-.297-.149-1.758-.868-2.031-.967-.272-.099-.47-.149-.669.149-.198.297-.768.967-.941 1.165-.173.198-.347.223-.644.074-.297-.149-1.255-.462-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.297-.347.446-.521.151-.172.2-.296.3-.495.099-.198.05-.372-.025-.521-.075-.148-.669-1.611-.916-2.206-.242-.579-.487-.501-.669-.51l-.57-.01c-.198 0-.52.074-.792.372s-1.04 1.016-1.04 2.479 1.065 2.876 1.213 3.074c.149.198 2.095 3.2 5.076 4.487.709.306 1.263.489 1.694.626.712.226 1.36.194 1.872.118.571-.085 1.758-.719 2.006-1.413.248-.695.248-1.29.173-1.414z"/>
+    </svg>
+  );
+}
+
 // StudentCard component OUTSIDE StudentsPage
-function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal }: {
+function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal, openNotesModal, hasNotes }: {
   student: Student,
   workingDays: WorkingDays[],
   classYears: ClassYear[],
@@ -22,6 +31,8 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
   handleDelete: (id: string) => void,
   openInfoModal: (student: Student) => void,
   openAddPatientModal: (student: Student) => void,
+  openNotesModal: (student: Student) => void,
+  hasNotes?: boolean,
 }) {
   const [showMore, setShowMore] = React.useState(false);
 
@@ -46,16 +57,37 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
       <div className="flex justify-between items-center">
         <div>
           <div className="font-bold text-lg text-gray-900 dark:text-white">{student.name}</div>
-          <div className="text-sm text-gray-500 dark:text-gray-300">{student.mobile}</div>
+          <div className="flex items-center gap-2 mt-0.5">
+            <span className="text-sm text-gray-500 dark:text-gray-300">{student.mobile}</span>
+            {student.mobile && (
+              <a
+                href={formatWhatsAppUrl(student.mobile)}
+                target="_blank"
+                rel="noopener noreferrer"
+                title="Contact via WhatsApp"
+                className="text-emerald-500 hover:text-emerald-600 transition-colors p-0.5"
+              >
+                <WhatsAppIcon className="h-4 w-4" />
+              </a>
+            )}
+          </div>
           <div className="text-xs text-gray-400">{student.university} | {student.city}</div>
         </div>
         <div className="flex flex-col gap-2 items-end">
-          <button onClick={() => handleEdit(student)} title="Edit" className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"><Edit className="h-5 w-5" /></button>
-          <button onClick={() => handleDelete(student.id)} title="Delete" className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"><Trash2 className="h-5 w-5" /></button>
-          <button onClick={() => openInfoModal(student)} title="Info" className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"><Info className="h-5 w-5" /></button>
-          {student.registration_status === 'registered' && (student.patients_in_progress || 0) < (student as StudentWithDetails).effective_limit && (
-            <button onClick={() => openAddPatientModal(student)} title="Add Patient" className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"><Plus className="h-5 w-5" /></button>
-          )}
+          <div className="flex items-center gap-1.5">
+            <button onClick={() => openNotesModal(student)} title="Notes" className="relative text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300">
+              <FileText className="h-5 w-5" />
+              {hasNotes && (
+                <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-amber-500 rounded-full ring-2 ring-white dark:ring-gray-800 animate-pulse" />
+              )}
+            </button>
+            <button onClick={() => handleEdit(student)} title="Edit" className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300"><Edit className="h-5 w-5" /></button>
+            <button onClick={() => handleDelete(student.id)} title="Delete" className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300"><Trash2 className="h-5 w-5" /></button>
+            <button onClick={() => openInfoModal(student)} title="Info" className="text-blue-600 hover:text-blue-900 dark:text-blue-400 dark:hover:text-blue-300"><Info className="h-5 w-5" /></button>
+            {student.registration_status === 'registered' && (student.patients_in_progress || 0) < (student as StudentWithDetails).effective_limit && (
+              <button onClick={() => openAddPatientModal(student)} title="Add Patient" className="text-green-600 hover:text-green-900 dark:text-green-400 dark:hover:text-green-300"><Plus className="h-5 w-5" /></button>
+            )}
+          </div>
         </div>
       </div>
       <div className="flex items-center gap-2 mt-2">
@@ -93,18 +125,131 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
   );
 }
 
+
 export function StudentsPage() {
   const { t, language } = useLanguage();
   const [searchParams, setSearchParams] = useSearchParams();
   const editStudentId = searchParams.get('edit');
-  const { organizationId } = useAuth();
+  const { organizationId, user } = useAuth();
   const [students, setStudents] = useState<Student[]>([]);
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
+
+  // State for student notes
+  const [isNotesModalOpen, setIsNotesModalOpen] = useState(false);
+  const [notesStudent, setNotesStudent] = useState<Student | null>(null);
+  const [studentNotesList, setStudentNotesList] = useState<StudentNote[]>([]);
+  const [notesLoading, setNotesLoading] = useState(false);
+  const [notesError, setNotesError] = useState('');
+  const [newNoteContent, setNewNoteContent] = useState('');
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingContent, setEditingContent] = useState('');
+  const [studentsWithNotes, setStudentsWithNotes] = useState<Set<string>>(new Set());
+
   // Add new state for class year filter
   const [selectedClassYearFilter, setSelectedClassYearFilter] = useState<string>(() => {
     return localStorage.getItem('studentClassYearFilter') || 'all';
   });
+
+  const openNotesModal = async (student: Student) => {
+    setNotesStudent(student);
+    setIsNotesModalOpen(true);
+    setNotesLoading(true);
+    setNotesError('');
+    try {
+      const { data, error } = await supabase
+        .from('student_notes')
+        .select('*')
+        .eq('student_id', student.id)
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      setStudentNotesList(data || []);
+    } catch {
+      setNotesError('Failed to load notes');
+    } finally {
+      setNotesLoading(false);
+    }
+  };
+
+  const closeNotesModal = () => {
+    setIsNotesModalOpen(false);
+    setStudentNotesList([]);
+    setNewNoteContent('');
+    setNotesStudent(null);
+    setNotesError('');
+    setEditingNoteId(null);
+    setEditingContent('');
+  };
+
+  const handleAddNote = async () => {
+    if (!newNoteContent.trim() || !notesStudent) return;
+    setNotesError('');
+    try {
+      const { data, error } = await supabase
+        .from('student_notes')
+        .insert({
+          student_id: notesStudent.id,
+          content: newNoteContent.trim(),
+          created_by: user?.user_metadata?.name || user?.user_metadata?.username || user?.email || 'Unknown',
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setStudentNotesList([data, ...studentNotesList]);
+      setNewNoteContent('');
+      setStudentsWithNotes(prev => new Set(prev).add(notesStudent.id));
+    } catch {
+      setNotesError('Failed to add note');
+    }
+  };
+
+  const handleEditNote = (note: StudentNote) => {
+    setEditingNoteId(note.id);
+    setEditingContent(note.content);
+  };
+
+  const handleSaveEditNote = async (noteId: string) => {
+    if (!editingContent.trim()) return;
+    setNotesError('');
+    try {
+      const now = new Date().toISOString();
+      const { error } = await supabase
+        .from('student_notes')
+        .update({ content: editingContent.trim(), edited_at: now })
+        .eq('id', noteId);
+      if (error) throw error;
+      setStudentNotesList(studentNotesList.map(n => n.id === noteId ? { ...n, content: editingContent.trim(), edited_at: now } : n));
+      setEditingNoteId(null);
+      setEditingContent('');
+    } catch {
+      setNotesError('Failed to update note');
+    }
+  };
+
+  const handleCancelEditNote = () => {
+    setEditingNoteId(null);
+    setEditingContent('');
+  };
+
+  const handleDeleteNote = async (noteId: string) => {
+    setNotesError('');
+    try {
+      const { error } = await supabase
+        .from('student_notes')
+        .delete()
+        .eq('id', noteId);
+      if (error) throw error;
+      const updatedNotes = studentNotesList.filter(n => n.id !== noteId);
+      setStudentNotesList(updatedNotes);
+      if (updatedNotes.length === 0 && notesStudent) {
+        const newSet = new Set(studentsWithNotes);
+        newSet.delete(notesStudent.id);
+        setStudentsWithNotes(newSet);
+      }
+    } catch {
+      setNotesError('Failed to delete note');
+    }
+  };
   // Add the missing state variable for dropdown
   const [isClassYearDropdownOpen, setIsClassYearDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -185,7 +330,7 @@ export function StudentsPage() {
       }
 
       // Fetch global limit and student-specific limits
-      const [studentsResult, workingDaysResult, classYearsResult, globalLimitResult, studentLimitsResult] = await Promise.all([
+      const [studentsResult, workingDaysResult, classYearsResult, globalLimitResult, studentLimitsResult, notesResult] = await Promise.all([
         supabase
           .from('students')
           .select('*, working_days:working_days_id (name, days)')
@@ -207,7 +352,10 @@ export function StudentsPage() {
           .maybeSingle(),
         supabase
           .from('student_limits')
-          .select('student_id, max_patients')
+          .select('student_id, max_patients'),
+        supabase
+          .from('student_notes')
+          .select('student_id')
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
@@ -231,6 +379,10 @@ export function StudentsPage() {
         effective_limit: studentLimitsMap[student.id] || globalLimit
       }));
 
+      if (!notesResult.error && notesResult.data) {
+        setStudentsWithNotes(new Set(notesResult.data.map(n => n.student_id)));
+      }
+
       setStudents(studentsWithLimits);
       setWorkingDays(workingDaysResult.data || []);
       setClassYears(classYearsResult.data || []);
@@ -240,6 +392,7 @@ export function StudentsPage() {
     } finally {
       setLoading(false);
     }
+
   }, [organizationId]);
 
   const fetchStudentPeriods = useCallback(async (studentId: string) => {
@@ -2395,7 +2548,22 @@ export function StudentsPage() {
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">{student.name}</td>
                     )}
                     {selectedColumns.includes('mobile') && (
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.mobile}</td>
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        <div className="flex items-center gap-2">
+                          <span>{student.mobile}</span>
+                          {student.mobile && (
+                            <a
+                              href={formatWhatsAppUrl(student.mobile)}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              title={t('contactWhatsApp')}
+                              className="text-emerald-500 hover:text-emerald-600 transition-colors p-1"
+                            >
+                              <WhatsAppIcon className="h-4 w-4" />
+                            </a>
+                          )}
+                        </div>
+                      </td>
                     )}
                     {selectedColumns.includes('city') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">{student.city}</td>
@@ -2463,12 +2631,23 @@ export function StudentsPage() {
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
                       <div className="flex items-center gap-2">
                         <button
+                          onClick={() => openNotesModal(student)}
+                          className="relative text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors duration-200"
+                          title={t('notes')}
+                        >
+                          <FileText className="h-5 w-5" />
+                          {studentsWithNotes.has(student.id) && (
+                            <span className="absolute -top-1 -right-1 h-2.5 w-2.5 bg-amber-500 rounded-full ring-2 ring-white dark:ring-gray-800 animate-pulse" />
+                          )}
+                        </button>
+                        <button
                           onClick={() => handleEdit(student)}
                           className="text-indigo-600 hover:text-indigo-900 dark:text-indigo-400 dark:hover:text-indigo-300 transition-colors duration-200"
                           title="Edit"
                         >
                           <Edit className="h-5 w-5" />
                         </button>
+
                         <button
                           onClick={() => handleDelete(student.id)}
                           className="text-red-600 hover:text-red-900 dark:text-red-400 dark:hover:text-red-300 transition-colors duration-200"
@@ -2901,8 +3080,22 @@ export function StudentsPage() {
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Mobile</label>
-                  <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedStudent.mobile}</p>
+                  <div className="flex items-center gap-3">
+                    <p className="text-sm sm:text-base text-gray-900 dark:text-white">{selectedStudent.mobile}</p>
+                    {selectedStudent.mobile && (
+                      <a
+                        href={formatWhatsAppUrl(selectedStudent.mobile)}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold rounded-md transition-colors shadow-sm"
+                      >
+                        <WhatsAppIcon className="h-3.5 w-3.5" />
+                        <span>{t('contactWhatsApp')}</span>
+                      </a>
+                    )}
+                  </div>
                 </div>
+
 
                 <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">University</label>
@@ -3319,8 +3512,11 @@ export function StudentsPage() {
                 handleDelete={handleDelete}
                 openInfoModal={openInfoModal}
                 openAddPatientModal={openAddPatientModal}
+                openNotesModal={openNotesModal}
+                hasNotes={studentsWithNotes.has(student.id)}
               />
             ))
+
           )}
           {/* Pagination Controls for Mobile */}
           {mobileTotalPages > 1 && (
@@ -3590,7 +3786,7 @@ export function StudentsPage() {
                   className="mt-3 w-full inline-flex justify-center rounded-md border border-gray-300 shadow-sm px-4 py-2 bg-white dark:bg-gray-700 text-base font-medium text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 sm:mt-0 sm:ml-3 sm:w-auto sm:text-sm"
                   onClick={() => {
                     // Remove status filter reset
-                    setRegistrationFilter('registered');
+                    setRegistrationFilter('all');
                     setWorkingDaysFilter('all');
                     setUniversityFilter('all');
                     setCityFilter('all');
@@ -3605,9 +3801,153 @@ export function StudentsPage() {
           </div>
         </div>
       )}
+
+
+
+      {/* Student Notes Modal */}
+
+
+      {isNotesModalOpen && notesStudent && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full p-6">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
+              <div className="flex items-center gap-2">
+                <FileText className="h-6 w-6 text-amber-500" />
+                <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                  {t('studentNotesFor')} <span className="text-indigo-600 dark:text-indigo-400">{notesStudent.name}</span>
+                </h2>
+              </div>
+              <button
+                onClick={closeNotesModal}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {notesError && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 rounded-md text-sm">
+                {notesError}
+              </div>
+            )}
+
+            {/* Add new note section */}
+            <div className="mb-6">
+              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                {t('addNote')}
+              </label>
+              <div className="flex flex-col gap-2">
+                <textarea
+                  value={newNoteContent}
+                  onChange={(e) => setNewNoteContent(e.target.value)}
+                  placeholder={t('writeNote')}
+                  rows={3}
+                  className="w-full p-3 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500"
+                />
+                <div className="flex justify-end">
+                  <button
+                    onClick={handleAddNote}
+                    disabled={!newNoteContent.trim()}
+                    className="px-4 py-2 bg-indigo-600 text-white text-sm font-medium rounded-md hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                  >
+                    {t('addNote')}
+                  </button>
+                </div>
+              </div>
+            </div>
+
+            {/* Notes List */}
+            <div className="space-y-3 max-h-72 overflow-y-auto pr-1">
+              {notesLoading ? (
+                <div className="text-center py-6 text-gray-500 dark:text-gray-400">
+                  {t('loadingNotes')}
+                </div>
+              ) : studentNotesList.length === 0 ? (
+                <div className="text-center py-6 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-lg">
+                  {t('noNotesForStudent')}
+                </div>
+              ) : (
+                studentNotesList.map((note) => (
+                  <div
+                    key={note.id}
+                    className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-lg border border-gray-200 dark:border-gray-700 transition-colors"
+                  >
+                    {editingNoteId === note.id ? (
+                      <div className="space-y-2">
+                        <textarea
+                          value={editingContent}
+                          onChange={(e) => setEditingContent(e.target.value)}
+                          className="w-full p-2 border rounded-md dark:bg-gray-800 dark:border-gray-600 dark:text-white text-sm"
+                          rows={3}
+                        />
+                        <div className="flex justify-end gap-2">
+                          <button
+                            onClick={() => handleSaveEditNote(note.id)}
+                            className="px-3 py-1 bg-green-600 text-white text-xs font-semibold rounded hover:bg-green-700"
+                          >
+                            Save
+                          </button>
+                          <button
+                            onClick={handleCancelEditNote}
+                            className="px-3 py-1 bg-gray-300 text-gray-700 dark:bg-gray-600 dark:text-gray-200 text-xs font-semibold rounded hover:bg-gray-400"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    ) : (
+                      <>
+                        <div className="flex justify-between items-start mb-2">
+                          <div className="text-xs text-gray-500 dark:text-gray-400">
+                            <span className="font-semibold text-gray-700 dark:text-gray-300">{note.created_by || 'Unknown'}</span>
+                            <span className="mx-1">•</span>
+                            <span>{new Date(note.created_at).toLocaleString('en-GB', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                            {note.edited_at && (
+                              <span className="ml-1 text-amber-600 dark:text-amber-400">(edited)</span>
+                            )}
+                          </div>
+                          <div className="flex items-center gap-1">
+                            <button
+                              onClick={() => handleEditNote(note)}
+                              className="p-1 text-indigo-600 hover:text-indigo-800 dark:text-indigo-400 dark:hover:text-indigo-300"
+                              title="Edit note"
+                            >
+                              <Edit className="h-4 w-4" />
+                            </button>
+                            <button
+                              onClick={() => handleDeleteNote(note.id)}
+                              className="p-1 text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300"
+                              title="Delete note"
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </button>
+                          </div>
+                        </div>
+                        <p className="text-sm text-gray-800 dark:text-gray-200 whitespace-pre-wrap">
+                          {note.content}
+                        </p>
+                      </>
+                    )}
+                  </div>
+                ))
+              )}
+            </div>
+
+            <div className="mt-6 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={closeNotesModal}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+
 // Add effective_limit to Student type for temporary demonstration
 declare module "../types" {
   export type Student = {

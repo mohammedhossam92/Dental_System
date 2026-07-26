@@ -111,3 +111,13 @@ export interface WaitingListEntry {
   organization_id: string;
   created_at: string;
 }
+
+export interface StudentNote {
+  id: string;
+  student_id: string;
+  content: string;
+  created_by?: string;
+  created_at: string;
+  edited_at?: string | null;
+}
+
