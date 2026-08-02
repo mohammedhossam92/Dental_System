@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare, CalendarX, Calendar, AlertTriangle } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote, StudentAbsence } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
@@ -23,7 +23,7 @@ function WhatsAppIcon({ className = "h-5 w-5" }: { className?: string }) {
 }
 
 // StudentCard component OUTSIDE StudentsPage
-function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal, openNotesModal, hasNotes }: {
+function StudentCard({ student, workingDays, classYears, handleEdit, handleDelete, openInfoModal, openAddPatientModal, openNotesModal, openAbsenceModal, hasNotes, absenceStats }: {
   student: Student,
   workingDays: WorkingDays[],
   classYears: ClassYear[],
@@ -32,7 +32,9 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
   openInfoModal: (student: Student) => void,
   openAddPatientModal: (student: Student) => void,
   openNotesModal: (student: Student) => void,
+  openAbsenceModal?: (student: Student) => void,
   hasNotes?: boolean,
+  absenceStats?: { count: number; totalWeight: number },
 }) {
   const [showMore, setShowMore] = React.useState(false);
 
@@ -75,6 +77,20 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
         </div>
         <div className="flex flex-col gap-2 items-end">
           <div className="flex items-center gap-1.5">
+            {openAbsenceModal && (
+              <button
+                onClick={() => openAbsenceModal(student)}
+                title="Absence Report"
+                className="relative text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 transition-colors"
+              >
+                <CalendarX className="h-5 w-5" />
+                {absenceStats && absenceStats.totalWeight > 0 && (
+                  <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-4 text-[10px] font-bold text-white bg-rose-600 rounded-full flex items-center justify-center px-1 animate-pulse">
+                    {absenceStats.totalWeight}
+                  </span>
+                )}
+              </button>
+            )}
             <button onClick={() => openNotesModal(student)} title="Notes" className="relative text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300">
               <FileText className="h-5 w-5" />
               {hasNotes && (
@@ -90,12 +106,21 @@ function StudentCard({ student, workingDays, classYears, handleEdit, handleDelet
           </div>
         </div>
       </div>
-      <div className="flex items-center gap-2 mt-2">
+      <div className="flex flex-wrap items-center gap-2 mt-2">
         <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${student.registration_status === 'registered' ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200' : student.registration_status === 'unregistered' ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200' : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'}`}>{student.registration_status.charAt(0).toUpperCase() + student.registration_status.slice(1)}</span>
         {student.registration_status === 'registered' && (
            <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${getPatientCountColor()}`}>
               Patients: {student.patients_in_progress || 0} / {(student as StudentWithDetails).effective_limit}
             </span>
+        )}
+        {absenceStats && absenceStats.totalWeight > 0 && (
+          <span
+            onClick={() => openAbsenceModal?.(student)}
+            className="inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2 py-1 bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 cursor-pointer hover:bg-rose-200 transition-colors"
+          >
+            <CalendarX className="h-3 w-3" />
+            Absence: {absenceStats.totalWeight} days
+          </span>
         )}
       </div>
       <button className="mt-2 text-xs text-indigo-600 dark:text-indigo-300 underline" onClick={() => setShowMore(m => !m)}>{showMore ? 'Show Less' : 'Show More'}</button>
@@ -250,6 +275,168 @@ export function StudentsPage() {
       setNotesError('Failed to delete note');
     }
   };
+
+  // Student Absences State
+  const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
+  const [absenceStudent, setAbsenceStudent] = useState<Student | null>(null);
+  const [studentAbsencesList, setStudentAbsencesList] = useState<StudentAbsence[]>([]);
+  const [absenceLoading, setAbsenceLoading] = useState(false);
+  const [absenceError, setAbsenceError] = useState<string | null>(null);
+  const [newAbsenceDate, setNewAbsenceDate] = useState<string>('');
+  const [newAbsenceWeight, setNewAbsenceWeight] = useState<number>(1.0);
+  const [newAbsenceReason, setNewAbsenceReason] = useState<string>('');
+  const [studentAbsenceStats, setStudentAbsenceStats] = useState<{ [studentId: string]: { count: number; totalWeight: number } }>({});
+
+  const fetchStudentAbsences = useCallback(async (studentId: string) => {
+    setAbsenceLoading(true);
+    setAbsenceError(null);
+    try {
+      const { data, error } = await supabase
+        .from('student_absences')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('date', { ascending: false });
+
+      if (error) throw error;
+      setStudentAbsencesList(data || []);
+    } catch (err: any) {
+      console.error('Error fetching student absences:', err);
+      setAbsenceError(err.message || 'Failed to load absences');
+    } finally {
+      setAbsenceLoading(false);
+    }
+  }, []);
+
+  const openAbsenceModal = async (student: Student) => {
+    setAbsenceStudent(student);
+    const today = new Date().toISOString().split('T')[0];
+    setNewAbsenceDate(today);
+    setNewAbsenceWeight(1.0);
+    setNewAbsenceReason('');
+    setIsAbsenceModalOpen(true);
+    await fetchStudentAbsences(student.id);
+  };
+
+  const closeAbsenceModal = () => {
+    setIsAbsenceModalOpen(false);
+    setAbsenceStudent(null);
+    setStudentAbsencesList([]);
+  };
+
+  const handleAddAbsence = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!absenceStudent) return;
+    if (!newAbsenceDate) {
+      Swal.fire({ icon: 'error', title: 'Missing Date', text: 'Please select an absence date' });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('student_absences')
+        .insert({
+          student_id: absenceStudent.id,
+          organization_id: organizationId || null,
+          date: newAbsenceDate,
+          weight: newAbsenceWeight,
+          reason: newAbsenceReason.trim() || null,
+        });
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: t('absenceAddedSuccess'),
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      setNewAbsenceReason('');
+      await fetchStudentAbsences(absenceStudent.id);
+      memoizedFetchData();
+    } catch (err: any) {
+      console.error('Error adding absence:', err);
+      Swal.fire({
+        icon: 'error',
+        title: t('absenceAddedError'),
+        text: err.message || 'Failed to record absence',
+      });
+    }
+  };
+
+  const handleDeleteAbsence = async (absenceId: string) => {
+    const confirm = await Swal.fire({
+      title: t('areYouSure'),
+      text: t('absenceDeleteConfirm'),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: t('yesDelete'),
+      cancelButtonText: t('cancel'),
+    });
+
+    if (confirm.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('student_absences')
+          .delete()
+          .eq('id', absenceId);
+
+        if (error) throw error;
+
+        Swal.fire({
+          icon: 'success',
+          title: t('absenceDeletedSuccess'),
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
+        if (absenceStudent) {
+          await fetchStudentAbsences(absenceStudent.id);
+        }
+        memoizedFetchData();
+      } catch (err: any) {
+        console.error('Error deleting absence:', err);
+        Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Failed to delete absence record' });
+      }
+    }
+  };
+
+  // Group absences by month for the monthly summary report
+  const monthlyAbsenceSummary = useMemo(() => {
+    const map: { [monthKey: string]: { monthName: string; count: number; totalWeight: number } } = {};
+
+    studentAbsencesList.forEach((record) => {
+      if (!record.date) return;
+      const parts = record.date.split('-');
+      if (parts.length < 2) return;
+      const year = parseInt(parts[0]);
+      const monthIdx = parseInt(parts[1]) - 1;
+      const monthKey = `${year}-${String(monthIdx + 1).padStart(2, '0')}`;
+
+      const d = new Date(year, monthIdx, 1);
+      const monthName = d.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+        year: 'numeric',
+        month: 'long',
+      });
+
+      if (!map[monthKey]) {
+        map[monthKey] = { monthName, count: 0, totalWeight: 0 };
+      }
+      map[monthKey].count += 1;
+      map[monthKey].totalWeight += Number(record.weight) || 0;
+    });
+
+    return Object.entries(map)
+      .sort((a, b) => b[0].localeCompare(a[0]))
+      .map(([key, val]) => ({ monthKey: key, ...val }));
+  }, [studentAbsencesList, language]);
+
+  const grandTotalAbsenceWeight = useMemo(() => {
+    return studentAbsencesList.reduce((sum, r) => sum + (Number(r.weight) || 0), 0);
+  }, [studentAbsencesList]);
+
   // Add the missing state variable for dropdown
   const [isClassYearDropdownOpen, setIsClassYearDropdownOpen] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -260,7 +447,7 @@ export function StudentsPage() {
   const [error, setError] = useState('');
   const [isFilterModalOpen, setIsFilterModalOpen] = useState(false);
   const [selectedColumns, setSelectedColumns] = useState<string[]>([
-    'name', 'mobile', 'working_days', 'status', 'registration'
+    'name', 'mobile', 'working_days', 'status', 'absences', 'registration'
   ]);
   const [isInfoModalOpen, setIsInfoModalOpen] = useState(false);
 
@@ -317,6 +504,7 @@ export function StudentsPage() {
     { id: 'university_type', label: 'University Type' }, // <-- Added
     { id: 'working_days', label: 'Working Days' },
     { id: 'status', label: 'Status' },
+    { id: 'absences', label: 'Absences' },
     { id: 'registration', label: 'Registration' },
     { id: 'registration_end_date', label: 'Registration End Date' }, // <-- Added
   ];
@@ -329,8 +517,8 @@ export function StudentsPage() {
         return;
       }
 
-      // Fetch global limit and student-specific limits
-      const [studentsResult, workingDaysResult, classYearsResult, globalLimitResult, studentLimitsResult, notesResult] = await Promise.all([
+      // Fetch global limit, student-specific limits, notes, and absences
+      const [studentsResult, workingDaysResult, classYearsResult, globalLimitResult, studentLimitsResult, notesResult, absencesResult] = await Promise.all([
         supabase
           .from('students')
           .select('*, working_days:working_days_id (name, days)')
@@ -355,7 +543,11 @@ export function StudentsPage() {
           .select('student_id, max_patients'),
         supabase
           .from('student_notes')
-          .select('student_id')
+          .select('student_id'),
+        supabase
+          .from('student_absences')
+          .select('student_id, weight')
+          .eq('organization_id', organizationId)
       ]);
 
       if (studentsResult.error) throw studentsResult.error;
@@ -382,6 +574,18 @@ export function StudentsPage() {
       if (!notesResult.error && notesResult.data) {
         setStudentsWithNotes(new Set(notesResult.data.map(n => n.student_id)));
       }
+
+      const absenceStatsMap: { [studentId: string]: { count: number; totalWeight: number } } = {};
+      if (!absencesResult.error && absencesResult.data) {
+        absencesResult.data.forEach((item: { student_id: string; weight: number }) => {
+          if (!absenceStatsMap[item.student_id]) {
+            absenceStatsMap[item.student_id] = { count: 0, totalWeight: 0 };
+          }
+          absenceStatsMap[item.student_id].count += 1;
+          absenceStatsMap[item.student_id].totalWeight += Number(item.weight) || 0;
+        });
+      }
+      setStudentAbsenceStats(absenceStatsMap);
 
       setStudents(studentsWithLimits);
       setWorkingDays(workingDaysResult.data || []);
@@ -2525,6 +2729,11 @@ export function StudentsPage() {
                     </div>
                   </th>
                 )}
+                {selectedColumns.includes('absences') && (
+                  <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">
+                    Absences
+                  </th>
+                )}
                 <th className="px-4 sm:px-6 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-300 uppercase tracking-wider whitespace-nowrap">Actions</th>
               </tr>
             </thead>
@@ -2623,6 +2832,22 @@ export function StudentsPage() {
                         </span>
                       </td>
                     )}
+                    {selectedColumns.includes('absences') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
+                        <button
+                          onClick={() => openAbsenceModal(student)}
+                          className={`inline-flex items-center gap-1 text-xs font-semibold rounded-full px-2.5 py-1 transition-colors ${
+                            (studentAbsenceStats[student.id]?.totalWeight || 0) > 0
+                              ? 'bg-rose-100 text-rose-800 dark:bg-rose-950 dark:text-rose-300 hover:bg-rose-200'
+                              : 'bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 hover:bg-gray-200'
+                          }`}
+                          title={t('absenceReport')}
+                        >
+                          <CalendarX className="h-3.5 w-3.5 text-rose-500" />
+                          <span>{studentAbsenceStats[student.id]?.totalWeight || 0} days</span>
+                        </button>
+                      </td>
+                    )}
                     {selectedColumns.includes('registration_end_date') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
                         {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
@@ -2630,6 +2855,18 @@ export function StudentsPage() {
                     )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
                       <div className="flex items-center gap-2">
+                        <button
+                          onClick={() => openAbsenceModal(student)}
+                          className="relative text-rose-500 hover:text-rose-600 dark:text-rose-400 dark:hover:text-rose-300 transition-colors duration-200"
+                          title={t('absenceReport')}
+                        >
+                          <CalendarX className="h-5 w-5" />
+                          {studentAbsenceStats[student.id]?.totalWeight > 0 && (
+                            <span className="absolute -top-1.5 -right-1.5 min-w-[1.1rem] h-4 text-[10px] font-bold text-white bg-rose-600 rounded-full flex items-center justify-center px-1 animate-pulse">
+                              {studentAbsenceStats[student.id].totalWeight}
+                            </span>
+                          )}
+                        </button>
                         <button
                           onClick={() => openNotesModal(student)}
                           className="relative text-amber-500 hover:text-amber-600 dark:text-amber-400 dark:hover:text-amber-300 transition-colors duration-200"
@@ -3148,6 +3385,20 @@ export function StudentsPage() {
                   <p className="text-sm sm:text-base text-gray-900 dark:text-white">
                     {selectedStudent.registration_end_date ? new Date(selectedStudent.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
                   </p>
+                </div>
+
+                <div className="pt-2">
+                  <button
+                    onClick={() => {
+                      const target = selectedStudent;
+                      setIsInfoModalOpen(false);
+                      openAbsenceModal(target);
+                    }}
+                    className="flex items-center gap-2 px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+                  >
+                    <CalendarX className="h-4 w-4" />
+                    <span>{t('absenceReport')}</span>
+                  </button>
                 </div>
 
                  {/* Updated status display */}
@@ -3937,6 +4188,182 @@ export function StudentsPage() {
               <button
                 onClick={closeNotesModal}
                 className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+              >
+                Close
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Student Absence Report & Management Modal */}
+      {isAbsenceModalOpen && absenceStudent && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full p-6 relative">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
+              <div className="flex items-center gap-2">
+                <CalendarX className="h-6 w-6 text-rose-500" />
+                <div>
+                  <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+                    {t('absenceReport')} — <span className="text-indigo-600 dark:text-indigo-400">{absenceStudent.name}</span>
+                  </h2>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">
+                    {t('totalAbsenceDays')}: <strong className="text-rose-600 dark:text-rose-400">{grandTotalAbsenceWeight} {t('weightedDays')}</strong> ({studentAbsencesList.length} records)
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={closeAbsenceModal}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+              >
+                <X size={24} />
+              </button>
+            </div>
+
+            {absenceError && (
+              <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 rounded-lg text-sm">
+                {absenceError}
+              </div>
+            )}
+
+            {/* Record New Absence Form */}
+            <form onSubmit={handleAddAbsence} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 space-y-3">
+              <h3 className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                <Calendar className="h-4 w-4 text-indigo-500" />
+                {t('recordAbsence')}
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t('absenceDate')}
+                  </label>
+                  <input
+                    type="date"
+                    required
+                    value={newAbsenceDate}
+                    onChange={(e) => setNewAbsenceDate(e.target.value)}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {t('dayWeight')} ({t('dayWeightHint')})
+                  </label>
+                  <select
+                    value={newAbsenceWeight}
+                    onChange={(e) => setNewAbsenceWeight(parseFloat(e.target.value))}
+                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                  >
+                    <option value={1.0}>1 Day (1.0)</option>
+                    <option value={1.5}>1.5 Days (1.5)</option>
+                    <option value={2.0}>2 Days (2.0)</option>
+                    <option value={2.5}>2.5 Days (2.5)</option>
+                    <option value={3.0}>3 Days (3.0)</option>
+                  </select>
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('absenceReason')}
+                </label>
+                <input
+                  type="text"
+                  placeholder={t('absenceReasonPlaceholder')}
+                  value={newAbsenceReason}
+                  onChange={(e) => setNewAbsenceReason(e.target.value)}
+                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                />
+              </div>
+
+              <div className="flex justify-end pt-1">
+                <button
+                  type="submit"
+                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+                >
+                  {t('recordAbsence')}
+                </button>
+              </div>
+            </form>
+
+            {/* Monthly Summary Section */}
+            {monthlyAbsenceSummary.length > 0 && (
+              <div className="mb-6">
+                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  {t('monthlySummary')}
+                </h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  {monthlyAbsenceSummary.map((m) => (
+                    <div
+                      key={m.monthKey}
+                      className="flex justify-between items-center p-3 bg-rose-50/70 dark:bg-rose-950/30 border border-rose-200 dark:border-rose-900/50 rounded-xl"
+                    >
+                      <span className="text-sm font-medium text-gray-800 dark:text-gray-200">{m.monthName}</span>
+                      <span className="text-xs font-bold text-rose-700 dark:text-rose-400 bg-rose-100 dark:bg-rose-900/60 px-2.5 py-1 rounded-full">
+                        {m.totalWeight} {t('weightedDays')} ({m.count} records)
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {/* Absence Records Log List */}
+            <div>
+              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                Absence Log
+              </h3>
+
+              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                {absenceLoading ? (
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+                    {t('loading')}
+                  </div>
+                ) : studentAbsencesList.length === 0 ? (
+                  <div className="text-center py-6 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-sm">
+                    {t('noAbsencesRecorded')}
+                  </div>
+                ) : (
+                  studentAbsencesList.map((record) => (
+                    <div
+                      key={record.id}
+                      className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700"
+                    >
+                      <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                          <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                            {new Date(record.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB')}
+                          </span>
+                          <span className="text-xs font-bold px-2 py-0.5 bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-full">
+                            {record.weight} Day{record.weight > 1 ? 's' : ''}
+                          </span>
+                        </div>
+                        {record.reason && (
+                          <p className="text-xs text-gray-600 dark:text-gray-300">
+                            <strong>Reason:</strong> {record.reason}
+                          </p>
+                        )}
+                      </div>
+
+                      <button
+                        onClick={() => handleDeleteAbsence(record.id)}
+                        className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                        title={t('delete')}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+
+            <div className="mt-6 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
+              <button
+                onClick={closeAbsenceModal}
+                className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
               >
                 Close
               </button>

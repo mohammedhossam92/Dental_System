@@ -121,3 +121,14 @@ export interface StudentNote {
   edited_at?: string | null;
 }
 
+export interface StudentAbsence {
+  id: string;
+  student_id: string;
+  organization_id?: string | null;
+  date: string;
+  weight: number;
+  reason?: string | null;
+  created_at: string;
+}
+
+

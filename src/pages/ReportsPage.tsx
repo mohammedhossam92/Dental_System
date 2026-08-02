@@ -1,9 +1,10 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Patient, Treatment, Student } from '../types';
-import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit } from 'lucide-react';
+import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import Swal from 'sweetalert2';
 import { useLanguage } from '../context/LanguageContext';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
@@ -20,6 +21,11 @@ export function ReportsPage() {
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered'>('treatments');
   const { t, language } = useLanguage();
+
+  const [selectedStudentForReRegister, setSelectedStudentForReRegister] = useState<Student | null>(null);
+  const [reRegisterStartDate, setReRegisterStartDate] = useState<string>('');
+  const [reRegisterEndDate, setReRegisterEndDate] = useState<string>('');
+  const [isReRegistering, setIsReRegistering] = useState<boolean>(false);
 
   const formatDate = (dateString: string | null) => {
     if (!dateString) return 'N/A';
@@ -84,71 +90,133 @@ export function ReportsPage() {
        students.reduce((sum, s) => sum + s.patients_completed + s.patients_in_progress, 1) * 100).toFixed(1)
     : 0;
 
-  useEffect(() => {
-    async function fetchData() {
-      setIsLoading(true);
-      setError(null);
+  const fetchData = useCallback(async () => {
+    setIsLoading(true);
+    setError(null);
+    
+    try {
+      let unregisteredQuery = supabase
+        .from('students')
+        .select('*')
+        .eq('registration_status', 'unregistered');
       
-      try {
-        let unregisteredQuery = supabase
-          .from('students')
-          .select('*')
-          .eq('registration_status', 'unregistered');
-        
-        if (dateRange.start) {
-          unregisteredQuery = unregisteredQuery.gte('unregistered_at', `${dateRange.start}T00:00:00.000Z`);
-        }
-        if (dateRange.end) {
-          unregisteredQuery = unregisteredQuery.lte('unregistered_at', `${dateRange.end}T23:59:59.999Z`);
-        }
-
-        const [treatmentsRes, studentsRes, unregisteredRes] = await Promise.all([
-          supabase.from('treatments').select('*').order('name'),
-          supabase.from('students').select('*').eq('registration_status', 'registered').order('name'),
-          unregisteredQuery
-        ]);
-
-        if (treatmentsRes.error) throw treatmentsRes.error;
-        if (studentsRes.error) throw studentsRes.error;
-        if (unregisteredRes.error) throw unregisteredRes.error;
-
-        setTreatments(treatmentsRes.data || []);
-        setStudents(studentsRes.data || []);
-        setUnregisteredStudents(unregisteredRes.data || []);
-
-        let patientsQuery = supabase
-          .from('patients')
-          .select('treatment_id');
-
-        if (dateRange.start) {
-          patientsQuery = patientsQuery.gte('created_at', `${dateRange.start}T00:00:00.000Z`);
-        }
-        if (dateRange.end) {
-          patientsQuery = patientsQuery.lte('created_at', `${dateRange.end}T23:59:59.999Z`);
-        }
-
-        const { data: patientsData, error: patientsError } = await patientsQuery;
-        if (patientsError) throw patientsError;
-
-        const stats: { [key: string]: number } = {};
-        patientsData?.forEach(p => {
-          if (p.treatment_id) {
-            stats[p.treatment_id] = (stats[p.treatment_id] || 0) + 1;
-          }
-        });
-        setTreatmentStats(stats);
-      } catch (err: any) {
-        console.error('Error fetching report data:', err);
-        setError(err.message || 'Failed to load report data');
-      } finally {
-        setIsLoading(false);
+      if (dateRange.start) {
+        unregisteredQuery = unregisteredQuery.gte('unregistered_at', `${dateRange.start}T00:00:00.000Z`);
       }
-    }
+      if (dateRange.end) {
+        unregisteredQuery = unregisteredQuery.lte('unregistered_at', `${dateRange.end}T23:59:59.999Z`);
+      }
 
+      const [treatmentsRes, studentsRes, unregisteredRes] = await Promise.all([
+        supabase.from('treatments').select('*').order('name'),
+        supabase.from('students').select('*').eq('registration_status', 'registered').order('name'),
+        unregisteredQuery
+      ]);
+
+      if (treatmentsRes.error) throw treatmentsRes.error;
+      if (studentsRes.error) throw studentsRes.error;
+      if (unregisteredRes.error) throw unregisteredRes.error;
+
+      setTreatments(treatmentsRes.data || []);
+      setStudents(studentsRes.data || []);
+      setUnregisteredStudents(unregisteredRes.data || []);
+
+      let patientsQuery = supabase
+        .from('patients')
+        .select('treatment_id');
+
+      if (dateRange.start) {
+        patientsQuery = patientsQuery.gte('created_at', `${dateRange.start}T00:00:00.000Z`);
+      }
+      if (dateRange.end) {
+        patientsQuery = patientsQuery.lte('created_at', `${dateRange.end}T23:59:59.999Z`);
+      }
+
+      const { data: patientsData, error: patientsError } = await patientsQuery;
+      if (patientsError) throw patientsError;
+
+      const stats: { [key: string]: number } = {};
+      patientsData?.forEach(p => {
+        if (p.treatment_id) {
+          stats[p.treatment_id] = (stats[p.treatment_id] || 0) + 1;
+        }
+      });
+      setTreatmentStats(stats);
+    } catch (err: any) {
+      console.error('Error fetching report data:', err);
+      setError(err.message || 'Failed to load report data');
+    } finally {
+      setIsLoading(false);
+    }
+  }, [dateRange]);
+
+  useEffect(() => {
     if (dateRange.start || datePreset !== 'custom') {
       fetchData();
     }
-  }, [dateRange, datePreset]);
+  }, [dateRange, datePreset, fetchData]);
+
+  const openReRegisterModal = (student: Student) => {
+    const today = new Date().toISOString().split('T')[0];
+    setSelectedStudentForReRegister(student);
+    setReRegisterStartDate(today);
+    setReRegisterEndDate('');
+  };
+
+  const handleReRegisterSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!selectedStudentForReRegister) return;
+    setIsReRegistering(true);
+
+    try {
+      const startDateVal = reRegisterStartDate ? new Date(reRegisterStartDate).toISOString() : new Date().toISOString();
+      const endDateVal = reRegisterEndDate ? new Date(reRegisterEndDate).toISOString() : null;
+
+      // 1. Update student record
+      const { error: updateError } = await supabase
+        .from('students')
+        .update({
+          registration_status: 'registered',
+          registration_start_date: startDateVal,
+          registration_end_date: endDateVal,
+          unregistered_at: null,
+        })
+        .eq('id', selectedStudentForReRegister.id);
+
+      if (updateError) throw updateError;
+
+      // 2. Record period history in student_registration_periods if organization_id exists
+      if (selectedStudentForReRegister.organization_id) {
+        await supabase
+          .from('student_registration_periods')
+          .insert({
+            student_id: selectedStudentForReRegister.id,
+            organization_id: selectedStudentForReRegister.organization_id,
+            start_date: startDateVal,
+            end_date: endDateVal,
+          });
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: t('reRegisterSuccess'),
+        timer: 2000,
+        showConfirmButton: false,
+      });
+
+      setSelectedStudentForReRegister(null);
+      fetchData();
+    } catch (err: any) {
+      console.error('Error re-registering student:', err);
+      Swal.fire({
+        icon: 'error',
+        title: t('reRegisterError'),
+        text: err.message || 'Failed to re-register student',
+      });
+    } finally {
+      setIsReRegistering(false);
+    }
+  };
 
   const exportToExcel = () => {
     const data = [
@@ -568,13 +636,23 @@ export function ReportsPage() {
                               </span>
                               <span className="text-xs text-gray-500 dark:text-gray-400">In Progress</span>
                             </div>
-                            <button
-                              onClick={() => navigate(`/students?edit=${student.id}`)}
-                              className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 text-indigo-600 dark:text-indigo-400 rounded-lg transition-colors"
-                              title="Edit Student"
-                            >
-                              <Edit className="h-4 w-4" />
-                            </button>
+                            <div className="flex items-center gap-2">
+                              <button
+                                onClick={() => openReRegisterModal(student)}
+                                className="flex items-center gap-1 px-3 py-1.5 bg-green-600 hover:bg-green-700 text-white rounded-lg transition-colors text-xs font-semibold shadow-sm"
+                                title={t('reRegisterStudent')}
+                              >
+                                <UserCheck className="h-4 w-4" />
+                                <span>{t('reRegister')}</span>
+                              </button>
+                              <button
+                                onClick={() => navigate(`/students?edit=${student.id}`)}
+                                className="p-2 hover:bg-gray-200 dark:hover:bg-gray-600 text-indigo-600 dark:text-indigo-400 rounded-lg transition-colors"
+                                title="Edit Student"
+                              >
+                                <Edit className="h-4 w-4" />
+                              </button>
+                            </div>
                           </div>
                         </div>
                       </div>
@@ -584,6 +662,78 @@ export function ReportsPage() {
               )}
             </div>
           )}
+        </div>
+      )}
+
+      {/* Re-Register Student Modal */}
+      {selectedStudentForReRegister && (
+        <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-md w-full p-6 relative animate-in fade-in zoom-in duration-150">
+            <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
+              <div className="flex items-center gap-2">
+                <UserCheck className="h-6 w-6 text-green-600 dark:text-green-400" />
+                <h2 className="text-xl font-bold text-gray-800 dark:text-white">
+                  {t('reRegisterStudent')}
+                </h2>
+              </div>
+              <button
+                onClick={() => setSelectedStudentForReRegister(null)}
+                className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors"
+              >
+                <X size={20} />
+              </button>
+            </div>
+
+            <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
+              {t('studentName')}: <strong className="text-indigo-600 dark:text-indigo-400">{selectedStudentForReRegister.name}</strong>
+            </p>
+
+            <form onSubmit={handleReRegisterSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('startDate')}
+                </label>
+                <input
+                  type="date"
+                  required
+                  value={reRegisterStartDate}
+                  onChange={(e) => setReRegisterStartDate(e.target.value)}
+                  className="w-full px-3 py-2 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-green-500 transition-colors"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('endDate')} ({t('customPreset')})
+                </label>
+                <input
+                  type="date"
+                  value={reRegisterEndDate}
+                  onChange={(e) => setReRegisterEndDate(e.target.value)}
+                  min={reRegisterStartDate}
+                  className="w-full px-3 py-2 border rounded-xl dark:bg-gray-700 dark:border-gray-600 dark:text-white focus:ring-2 focus:ring-green-500 transition-colors"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4 border-t border-gray-200 dark:border-gray-700">
+                <button
+                  type="button"
+                  onClick={() => setSelectedStudentForReRegister(null)}
+                  className="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-sm font-medium rounded-xl hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors"
+                >
+                  {t('cancel')}
+                </button>
+                <button
+                  type="submit"
+                  disabled={isReRegistering}
+                  className="flex items-center gap-2 px-4 py-2 bg-green-600 hover:bg-green-700 text-white text-sm font-medium rounded-xl disabled:opacity-50 transition-colors"
+                >
+                  {isReRegistering && <Loader2 className="h-4 w-4 animate-spin" />}
+                  {t('reRegister')}
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>
