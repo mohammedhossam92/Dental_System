@@ -131,4 +131,17 @@ export interface StudentAbsence {
   created_at: string;
 }
 
+export interface StudentAbsenceExcuse {
+  id: string;
+  student_id: string;
+  organization_id?: string | null;
+  absence_date: string;
+  reported_date: string;
+  excuse: string;
+  status: 'pending' | 'approved' | 'rejected';
+  notes?: string | null;
+  created_at: string;
+}
+
+
 

@@ -17,6 +17,7 @@ DECLARE
         'student_registration_periods',
         'student_notes',
         'student_absences',
+        'student_absence_excuses',
         'waiting_list',
         'organization_settings',
         'student_limits',

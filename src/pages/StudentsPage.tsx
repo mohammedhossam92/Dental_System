@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare, CalendarX, Calendar, AlertTriangle } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare, CalendarX, Calendar, AlertTriangle, Layers, FileCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
 import { supabase } from '../lib/supabase';
-import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote, StudentAbsence } from '../types';
+import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote, StudentAbsence, StudentAbsenceExcuse } from '../types';
 import * as XLSX from 'xlsx';
 import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
@@ -276,7 +276,8 @@ export function StudentsPage() {
     }
   };
 
-  // Student Absences State
+  // Student Absences & Excuses State
+  const [activeAbsenceTab, setActiveAbsenceTab] = useState<'single' | 'bulk' | 'excuses'>('single');
   const [isAbsenceModalOpen, setIsAbsenceModalOpen] = useState(false);
   const [absenceStudent, setAbsenceStudent] = useState<Student | null>(null);
   const [studentAbsencesList, setStudentAbsencesList] = useState<StudentAbsence[]>([]);
@@ -286,6 +287,25 @@ export function StudentsPage() {
   const [newAbsenceWeight, setNewAbsenceWeight] = useState<number>(1.0);
   const [newAbsenceReason, setNewAbsenceReason] = useState<string>('');
   const [studentAbsenceStats, setStudentAbsenceStats] = useState<{ [studentId: string]: { count: number; totalWeight: number } }>({});
+
+  // Bulk Absences State
+  interface BulkAbsenceRow {
+    month: string;
+    daysCount: number;
+    reason: string;
+  }
+  const [bulkRows, setBulkRows] = useState<BulkAbsenceRow[]>([
+    { month: new Date().toISOString().slice(0, 7), daysCount: 1, reason: '' }
+  ]);
+  const [isSubmittingBulk, setIsSubmittingBulk] = useState(false);
+
+  // Absence Excuses State
+  const [studentExcusesList, setStudentExcusesList] = useState<StudentAbsenceExcuse[]>([]);
+  const [excuseLoading, setExcuseLoading] = useState(false);
+  const [newExcuseAbsenceDate, setNewExcuseAbsenceDate] = useState<string>('');
+  const [newExcuseReportedDate, setNewExcuseReportedDate] = useState<string>('');
+  const [newExcuseText, setNewExcuseText] = useState<string>('');
+  const [newExcuseStatus, setNewExcuseStatus] = useState<'pending' | 'approved' | 'rejected'>('pending');
 
   const fetchStudentAbsences = useCallback(async (studentId: string) => {
     setAbsenceLoading(true);
@@ -307,20 +327,196 @@ export function StudentsPage() {
     }
   }, []);
 
+  const fetchStudentExcuses = useCallback(async (studentId: string) => {
+    setExcuseLoading(true);
+    try {
+      const { data, error } = await supabase
+        .from('student_absence_excuses')
+        .select('*')
+        .eq('student_id', studentId)
+        .order('absence_date', { ascending: false });
+
+      if (error) throw error;
+      setStudentExcusesList(data || []);
+    } catch (err: any) {
+      console.error('Error fetching student excuses:', err);
+    } finally {
+      setExcuseLoading(false);
+    }
+  }, []);
+
   const openAbsenceModal = async (student: Student) => {
     setAbsenceStudent(student);
     const today = new Date().toISOString().split('T')[0];
+    const currentMonth = today.slice(0, 7);
     setNewAbsenceDate(today);
     setNewAbsenceWeight(1.0);
     setNewAbsenceReason('');
+    setBulkRows([{ month: currentMonth, daysCount: 1, reason: '' }]);
+    setNewExcuseAbsenceDate(today);
+    setNewExcuseReportedDate(today);
+    setNewExcuseText('');
+    setNewExcuseStatus('pending');
+    setActiveAbsenceTab('single');
     setIsAbsenceModalOpen(true);
-    await fetchStudentAbsences(student.id);
+
+    await Promise.all([
+      fetchStudentAbsences(student.id),
+      fetchStudentExcuses(student.id)
+    ]);
   };
 
   const closeAbsenceModal = () => {
     setIsAbsenceModalOpen(false);
     setAbsenceStudent(null);
     setStudentAbsencesList([]);
+    setStudentExcusesList([]);
+  };
+
+  const handleAddBulkAbsences = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!absenceStudent) return;
+
+    const validRows = bulkRows.filter(r => r.month && r.daysCount > 0);
+    if (validRows.length === 0) {
+      Swal.fire({ icon: 'error', title: 'Invalid Input', text: 'Please specify at least one valid month and days count' });
+      return;
+    }
+
+    setIsSubmittingBulk(true);
+    try {
+      const recordsToInsert = validRows.map(r => ({
+        student_id: absenceStudent.id,
+        organization_id: organizationId || null,
+        date: `${r.month}-01`,
+        weight: Number(r.daysCount),
+        reason: r.reason.trim() || null,
+      }));
+
+      const { error } = await supabase
+        .from('student_absences')
+        .insert(recordsToInsert);
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: t('bulkAbsenceSuccess'),
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      const currentMonth = new Date().toISOString().slice(0, 7);
+      setBulkRows([{ month: currentMonth, daysCount: 1, reason: '' }]);
+      await fetchStudentAbsences(absenceStudent.id);
+      memoizedFetchData();
+    } catch (err: any) {
+      console.error('Error adding bulk absences:', err);
+      Swal.fire({
+        icon: 'error',
+        title: t('bulkAbsenceError'),
+        text: err.message || 'Failed to record bulk absences',
+      });
+    } finally {
+      setIsSubmittingBulk(false);
+    }
+  };
+
+  const handleAddExcuse = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!absenceStudent) return;
+    if (!newExcuseAbsenceDate || !newExcuseReportedDate || !newExcuseText.trim()) {
+      Swal.fire({ icon: 'error', title: 'Missing Information', text: 'Please fill in all required excuse fields' });
+      return;
+    }
+
+    try {
+      const { error } = await supabase
+        .from('student_absence_excuses')
+        .insert({
+          student_id: absenceStudent.id,
+          organization_id: organizationId || null,
+          absence_date: newExcuseAbsenceDate,
+          reported_date: newExcuseReportedDate,
+          excuse: newExcuseText.trim(),
+          status: newExcuseStatus,
+        });
+
+      if (error) throw error;
+
+      Swal.fire({
+        icon: 'success',
+        title: t('excuseAddedSuccess'),
+        timer: 1500,
+        showConfirmButton: false,
+      });
+
+      setNewExcuseText('');
+      await fetchStudentExcuses(absenceStudent.id);
+    } catch (err: any) {
+      console.error('Error recording excuse:', err);
+      Swal.fire({
+        icon: 'error',
+        title: t('excuseAddedError'),
+        text: err.message || 'Failed to record excuse',
+      });
+    }
+  };
+
+  const handleDeleteExcuse = async (excuseId: string) => {
+    const confirm = await Swal.fire({
+      title: t('areYouSure'),
+      text: t('excuseDeleteConfirm'),
+      icon: 'warning',
+      showCancelButton: true,
+      confirmButtonColor: '#d33',
+      cancelButtonColor: '#3085d6',
+      confirmButtonText: t('yesDelete'),
+      cancelButtonText: t('cancel'),
+    });
+
+    if (confirm.isConfirmed) {
+      try {
+        const { error } = await supabase
+          .from('student_absence_excuses')
+          .delete()
+          .eq('id', excuseId);
+
+        if (error) throw error;
+
+        Swal.fire({
+          icon: 'success',
+          title: t('excuseDeletedSuccess'),
+          timer: 1500,
+          showConfirmButton: false,
+        });
+
+        if (absenceStudent) {
+          await fetchStudentExcuses(absenceStudent.id);
+        }
+      } catch (err: any) {
+        console.error('Error deleting excuse:', err);
+        Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Failed to delete excuse record' });
+      }
+    }
+  };
+
+  const handleUpdateExcuseStatus = async (excuseId: string, newStatus: 'pending' | 'approved' | 'rejected') => {
+    try {
+      const { error } = await supabase
+        .from('student_absence_excuses')
+        .update({ status: newStatus })
+        .eq('id', excuseId);
+
+      if (error) throw error;
+
+      if (absenceStudent) {
+        await fetchStudentExcuses(absenceStudent.id);
+      }
+    } catch (err: any) {
+      console.error('Error updating excuse status:', err);
+      Swal.fire({ icon: 'error', title: 'Error', text: err.message || 'Failed to update excuse status' });
+    }
   };
 
   const handleAddAbsence = async (e: React.FormEvent) => {
@@ -4200,6 +4396,7 @@ export function StudentsPage() {
       {isAbsenceModalOpen && absenceStudent && (
         <div className="fixed inset-0 z-50 overflow-auto bg-black bg-opacity-50 flex items-center justify-center p-4">
           <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-xl max-w-2xl w-full p-6 relative">
+            {/* Header */}
             <div className="flex justify-between items-center mb-4 border-b border-gray-200 dark:border-gray-700 pb-3">
               <div className="flex items-center gap-2">
                 <CalendarX className="h-6 w-6 text-rose-500" />
@@ -4207,8 +4404,10 @@ export function StudentsPage() {
                   <h2 className="text-xl font-bold text-gray-900 dark:text-white">
                     {t('absenceReport')} — <span className="text-indigo-600 dark:text-indigo-400">{absenceStudent.name}</span>
                   </h2>
-                  <p className="text-xs text-gray-500 dark:text-gray-400">
-                    {t('totalAbsenceDays')}: <strong className="text-rose-600 dark:text-rose-400">{grandTotalAbsenceWeight} {t('weightedDays')}</strong> ({studentAbsencesList.length} records)
+                  <p className="text-xs text-gray-500 dark:text-gray-400 flex items-center gap-2 mt-0.5">
+                    <span>{t('totalAbsenceDays')}: <strong className="text-rose-600 dark:text-rose-400">{grandTotalAbsenceWeight} {t('weightedDays')}</strong> ({studentAbsencesList.length} records)</span>
+                    <span className="text-gray-300 dark:text-gray-600">•</span>
+                    <span>{t('totalExcuses')}: <strong className="text-amber-600 dark:text-amber-400">{studentExcusesList.length}</strong></span>
                   </p>
                 </div>
               </div>
@@ -4220,76 +4419,375 @@ export function StudentsPage() {
               </button>
             </div>
 
+            {/* Modal Navigation Tabs */}
+            <div className="flex border-b border-gray-200 dark:border-gray-700 mb-5">
+              <button
+                onClick={() => setActiveAbsenceTab('single')}
+                className={`py-2 px-4 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                  activeAbsenceTab === 'single'
+                    ? 'border-rose-600 text-rose-600 dark:border-rose-400 dark:text-rose-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Calendar className="h-4 w-4" />
+                {t('singleAbsenceTab')}
+              </button>
+              <button
+                onClick={() => setActiveAbsenceTab('bulk')}
+                className={`py-2 px-4 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                  activeAbsenceTab === 'bulk'
+                    ? 'border-rose-600 text-rose-600 dark:border-rose-400 dark:text-rose-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <Layers className="h-4 w-4" />
+                {t('bulkAbsenceTab')}
+              </button>
+              <button
+                onClick={() => setActiveAbsenceTab('excuses')}
+                className={`py-2 px-4 text-xs font-semibold border-b-2 flex items-center gap-1.5 transition-colors ${
+                  activeAbsenceTab === 'excuses'
+                    ? 'border-amber-600 text-amber-600 dark:border-amber-400 dark:text-amber-400'
+                    : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300'
+                }`}
+              >
+                <FileCheck className="h-4 w-4" />
+                {t('excusesTab')} ({studentExcusesList.length})
+              </button>
+            </div>
+
             {absenceError && (
               <div className="mb-4 p-3 bg-red-100 dark:bg-red-900/30 border border-red-400 text-red-700 dark:text-red-300 rounded-lg text-sm">
                 {absenceError}
               </div>
             )}
 
-            {/* Record New Absence Form */}
-            <form onSubmit={handleAddAbsence} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 space-y-3">
-              <h3 className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
-                <Calendar className="h-4 w-4 text-indigo-500" />
-                {t('recordAbsence')}
-              </h3>
+            {/* TAB 1: Single Day Absence Entry */}
+            {activeAbsenceTab === 'single' && (
+              <>
+                <form onSubmit={handleAddAbsence} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                    <Calendar className="h-4 w-4 text-indigo-500" />
+                    {t('recordAbsence')}
+                  </h3>
 
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('absenceDate')}
-                  </label>
-                  <input
-                    type="date"
-                    required
-                    value={newAbsenceDate}
-                    onChange={(e) => setNewAbsenceDate(e.target.value)}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
-                  />
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('absenceDate')}
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={newAbsenceDate}
+                        onChange={(e) => setNewAbsenceDate(e.target.value)}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('dayWeight')} ({t('dayWeightHint')})
+                      </label>
+                      <select
+                        value={newAbsenceWeight}
+                        onChange={(e) => setNewAbsenceWeight(parseFloat(e.target.value))}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                      >
+                        <option value={1.0}>1 Day (1.0)</option>
+                        <option value={1.5}>1.5 Days (1.5)</option>
+                        <option value={2.0}>2 Days (2.0)</option>
+                        <option value={2.5}>2.5 Days (2.5)</option>
+                        <option value={3.0}>3 Days (3.0)</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('absenceReason')}
+                    </label>
+                    <input
+                      type="text"
+                      placeholder={t('absenceReasonPlaceholder')}
+                      value={newAbsenceReason}
+                      onChange={(e) => setNewAbsenceReason(e.target.value)}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+                    >
+                      {t('recordAbsence')}
+                    </button>
+                  </div>
+                </form>
+              </>
+            )}
+
+            {/* TAB 2: Bulk Monthly Absences Entry */}
+            {activeAbsenceTab === 'bulk' && (
+              <form onSubmit={handleAddBulkAbsences} className="bg-gray-50 dark:bg-gray-700/50 p-4 rounded-xl border border-gray-200 dark:border-gray-700 mb-6 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                    <Layers className="h-4 w-4 text-rose-500" />
+                    {t('bulkAbsenceTitle')}
+                  </h3>
+                  <span className="text-xs text-gray-500 dark:text-gray-400">
+                    e.g. 4 days in June, 3 days in July
+                  </span>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                    {t('dayWeight')} ({t('dayWeightHint')})
-                  </label>
-                  <select
-                    value={newAbsenceWeight}
-                    onChange={(e) => setNewAbsenceWeight(parseFloat(e.target.value))}
-                    className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
+                <div className="space-y-3">
+                  {bulkRows.map((row, index) => (
+                    <div key={index} className="p-3 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-12 gap-2 items-end">
+                      <div className="sm:col-span-4">
+                        <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          {t('selectMonth')}
+                        </label>
+                        <input
+                          type="month"
+                          required
+                          value={row.month}
+                          onChange={(e) => {
+                            const newRows = [...bulkRows];
+                            newRows[index].month = e.target.value;
+                            setBulkRows(newRows);
+                          }}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-3">
+                        <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          {t('absentDaysCount')}
+                        </label>
+                        <input
+                          type="number"
+                          min="0.5"
+                          step="0.5"
+                          required
+                          value={row.daysCount}
+                          onChange={(e) => {
+                            const newRows = [...bulkRows];
+                            newRows[index].daysCount = parseFloat(e.target.value) || 0;
+                            setBulkRows(newRows);
+                          }}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-4">
+                        <label className="block text-[11px] font-medium text-gray-600 dark:text-gray-400 mb-1">
+                          {t('absenceReason')}
+                        </label>
+                        <input
+                          type="text"
+                          placeholder="Optional reason"
+                          value={row.reason}
+                          onChange={(e) => {
+                            const newRows = [...bulkRows];
+                            newRows[index].reason = e.target.value;
+                            setBulkRows(newRows);
+                          }}
+                          className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-md dark:bg-gray-700 dark:text-white text-xs"
+                        />
+                      </div>
+
+                      <div className="sm:col-span-1 flex justify-end">
+                        {bulkRows.length > 1 && (
+                          <button
+                            type="button"
+                            onClick={() => setBulkRows(bulkRows.filter((_, i) => i !== index))}
+                            className="p-2 text-red-500 hover:text-red-700 dark:hover:text-red-300"
+                            title={t('removeRow')}
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <div className="flex justify-between items-center pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const currentMonth = new Date().toISOString().slice(0, 7);
+                      setBulkRows([...bulkRows, { month: currentMonth, daysCount: 1, reason: '' }]);
+                    }}
+                    className="px-3 py-1.5 text-xs font-semibold text-indigo-600 dark:text-indigo-400 bg-indigo-50 dark:bg-indigo-950/40 border border-indigo-200 dark:border-indigo-800 rounded-lg hover:bg-indigo-100 transition-colors"
                   >
-                    <option value={1.0}>1 Day (1.0)</option>
-                    <option value={1.5}>1.5 Days (1.5)</option>
-                    <option value={2.0}>2 Days (2.0)</option>
-                    <option value={2.5}>2.5 Days (2.5)</option>
-                    <option value={3.0}>3 Days (3.0)</option>
-                  </select>
+                    {t('addMonthRow')}
+                  </button>
+
+                  <button
+                    type="submit"
+                    disabled={isSubmittingBulk}
+                    className="px-4 py-2 bg-rose-600 hover:bg-rose-700 disabled:opacity-50 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+                  >
+                    {isSubmittingBulk ? t('loading') : t('recordBulkAbsences')}
+                  </button>
+                </div>
+              </form>
+            )}
+
+            {/* TAB 3: Absence Excuses */}
+            {activeAbsenceTab === 'excuses' && (
+              <div className="space-y-6 mb-6">
+                {/* Submit New Excuse Form */}
+                <form onSubmit={handleAddExcuse} className="bg-amber-50/60 dark:bg-amber-950/20 p-4 rounded-xl border border-amber-200 dark:border-amber-900/50 space-y-3">
+                  <h3 className="text-sm font-semibold text-gray-800 dark:text-white flex items-center gap-1.5">
+                    <FileCheck className="h-4 w-4 text-amber-500" />
+                    {t('recordExcuse')}
+                  </h3>
+
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('absenceDateForExcuse')} *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={newExcuseAbsenceDate}
+                        onChange={(e) => setNewExcuseAbsenceDate(e.target.value)}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('reportedDateForExcuse')} *
+                      </label>
+                      <input
+                        type="date"
+                        required
+                        value={newExcuseReportedDate}
+                        onChange={(e) => setNewExcuseReportedDate(e.target.value)}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-amber-500"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        {t('excuseStatus')}
+                      </label>
+                      <select
+                        value={newExcuseStatus}
+                        onChange={(e) => setNewExcuseStatus(e.target.value as any)}
+                        className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-amber-500"
+                      >
+                        <option value="pending">{t('excusePending')}</option>
+                        <option value="approved">{t('excuseApproved')}</option>
+                        <option value="rejected">{t('excuseRejected')}</option>
+                      </select>
+                    </div>
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('excuseDetails')} *
+                    </label>
+                    <textarea
+                      required
+                      rows={2}
+                      placeholder={t('excuseDetailsPlaceholder')}
+                      value={newExcuseText}
+                      onChange={(e) => setNewExcuseText(e.target.value)}
+                      className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-amber-500"
+                    />
+                  </div>
+
+                  <div className="flex justify-end pt-1">
+                    <button
+                      type="submit"
+                      className="px-4 py-2 bg-amber-600 hover:bg-amber-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
+                    >
+                      {t('recordExcuse')}
+                    </button>
+                  </div>
+                </form>
+
+                {/* Excuses Log List */}
+                <div>
+                  <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                    {t('excusesTitle')}
+                  </h3>
+
+                  <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                    {excuseLoading ? (
+                      <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+                        {t('loading')}
+                      </div>
+                    ) : studentExcusesList.length === 0 ? (
+                      <div className="text-center py-6 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-sm">
+                        {t('noExcusesRecorded')}
+                      </div>
+                    ) : (
+                      studentExcusesList.map((excuse) => (
+                        <div
+                          key={excuse.id}
+                          className="p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700 space-y-2"
+                        >
+                          <div className="flex justify-between items-start">
+                            <div className="space-y-1">
+                              <div className="flex items-center gap-2 flex-wrap">
+                                <span className="text-xs font-semibold text-gray-800 dark:text-white">
+                                  Absent: <strong>{new Date(excuse.absence_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB')}</strong>
+                                </span>
+                                <span className="text-xs text-gray-400">•</span>
+                                <span className="text-xs text-gray-500 dark:text-gray-400">
+                                  Reported: {new Date(excuse.reported_date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB')}
+                                </span>
+                              </div>
+                            </div>
+
+                            <div className="flex items-center gap-2">
+                              {/* Status badge / selector */}
+                              <select
+                                value={excuse.status}
+                                onChange={(e) => handleUpdateExcuseStatus(excuse.id, e.target.value as any)}
+                                className={`text-xs font-bold px-2 py-0.5 rounded-full border cursor-pointer ${
+                                  excuse.status === 'approved'
+                                    ? 'bg-emerald-100 text-emerald-800 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-800'
+                                    : excuse.status === 'rejected'
+                                    ? 'bg-rose-100 text-rose-800 border-rose-300 dark:bg-rose-950/60 dark:text-rose-300 dark:border-rose-800'
+                                    : 'bg-amber-100 text-amber-800 border-amber-300 dark:bg-amber-950/60 dark:text-amber-300 dark:border-amber-800'
+                                }`}
+                              >
+                                <option value="pending">{t('excusePending')}</option>
+                                <option value="approved">{t('excuseApproved')}</option>
+                                <option value="rejected">{t('excuseRejected')}</option>
+                              </select>
+
+                              <button
+                                onClick={() => handleDeleteExcuse(excuse.id)}
+                                className="p-1 text-red-500 hover:text-red-700 dark:hover:text-red-300 rounded transition-colors"
+                                title={t('delete')}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </button>
+                            </div>
+                          </div>
+
+                          <p className="text-xs text-gray-800 dark:text-gray-200 bg-white dark:bg-gray-800 p-2.5 rounded-lg border border-gray-100 dark:border-gray-700/60 whitespace-pre-wrap">
+                            {excuse.excuse}
+                          </p>
+                        </div>
+                      ))
+                    )}
+                  </div>
                 </div>
               </div>
+            )}
 
-              <div>
-                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                  {t('absenceReason')}
-                </label>
-                <input
-                  type="text"
-                  placeholder={t('absenceReasonPlaceholder')}
-                  value={newAbsenceReason}
-                  onChange={(e) => setNewAbsenceReason(e.target.value)}
-                  className="w-full p-2 border border-gray-300 dark:border-gray-600 rounded-lg dark:bg-gray-700 dark:text-white text-sm focus:ring-2 focus:ring-rose-500"
-                />
-              </div>
-
-              <div className="flex justify-end pt-1">
-                <button
-                  type="submit"
-                  className="px-4 py-2 bg-rose-600 hover:bg-rose-700 text-white text-xs font-semibold rounded-lg shadow transition-colors"
-                >
-                  {t('recordAbsence')}
-                </button>
-              </div>
-            </form>
-
-            {/* Monthly Summary Section */}
-            {monthlyAbsenceSummary.length > 0 && (
+            {/* Monthly Summary Section (visible on single and bulk tabs) */}
+            {activeAbsenceTab !== 'excuses' && monthlyAbsenceSummary.length > 0 && (
               <div className="mb-6">
                 <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
                   {t('monthlySummary')}
@@ -4310,55 +4808,57 @@ export function StudentsPage() {
               </div>
             )}
 
-            {/* Absence Records Log List */}
-            <div>
-              <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
-                Absence Log
-              </h3>
+            {/* Absence Records Log List (visible on single and bulk tabs) */}
+            {activeAbsenceTab !== 'excuses' && (
+              <div>
+                <h3 className="text-xs font-bold text-gray-500 dark:text-gray-400 uppercase tracking-wider mb-2">
+                  Absence Log
+                </h3>
 
-              <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
-                {absenceLoading ? (
-                  <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
-                    {t('loading')}
-                  </div>
-                ) : studentAbsencesList.length === 0 ? (
-                  <div className="text-center py-6 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-sm">
-                    {t('noAbsencesRecorded')}
-                  </div>
-                ) : (
-                  studentAbsencesList.map((record) => (
-                    <div
-                      key={record.id}
-                      className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700"
-                    >
-                      <div className="space-y-0.5">
-                        <div className="flex items-center gap-2">
-                          <span className="text-sm font-semibold text-gray-800 dark:text-white">
-                            {new Date(record.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB')}
-                          </span>
-                          <span className="text-xs font-bold px-2 py-0.5 bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-full">
-                            {record.weight} Day{record.weight > 1 ? 's' : ''}
-                          </span>
-                        </div>
-                        {record.reason && (
-                          <p className="text-xs text-gray-600 dark:text-gray-300">
-                            <strong>Reason:</strong> {record.reason}
-                          </p>
-                        )}
-                      </div>
-
-                      <button
-                        onClick={() => handleDeleteAbsence(record.id)}
-                        className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
-                        title={t('delete')}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </button>
+                <div className="space-y-2 max-h-60 overflow-y-auto pr-1">
+                  {absenceLoading ? (
+                    <div className="text-center py-6 text-gray-500 dark:text-gray-400 text-sm">
+                      {t('loading')}
                     </div>
-                  ))
-                )}
+                  ) : studentAbsencesList.length === 0 ? (
+                    <div className="text-center py-6 text-gray-500 dark:text-gray-400 border border-dashed border-gray-300 dark:border-gray-700 rounded-xl text-sm">
+                      {t('noAbsencesRecorded')}
+                    </div>
+                  ) : (
+                    studentAbsencesList.map((record) => (
+                      <div
+                        key={record.id}
+                        className="flex justify-between items-center p-3 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-700"
+                      >
+                        <div className="space-y-0.5">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-semibold text-gray-800 dark:text-white">
+                              {new Date(record.date).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-GB')}
+                            </span>
+                            <span className="text-xs font-bold px-2 py-0.5 bg-rose-100 dark:bg-rose-900/60 text-rose-700 dark:text-rose-300 rounded-full">
+                              {record.weight} Day{record.weight > 1 ? 's' : ''}
+                            </span>
+                          </div>
+                          {record.reason && (
+                            <p className="text-xs text-gray-600 dark:text-gray-300">
+                              <strong>Reason:</strong> {record.reason}
+                            </p>
+                          )}
+                        </div>
+
+                        <button
+                          onClick={() => handleDeleteAbsence(record.id)}
+                          className="p-1.5 text-red-500 hover:text-red-700 dark:hover:text-red-300 hover:bg-red-50 dark:hover:bg-red-900/30 rounded-lg transition-colors"
+                          title={t('delete')}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      </div>
+                    ))
+                  )}
+                </div>
               </div>
-            </div>
+            )}
 
             <div className="mt-6 pt-3 border-t border-gray-200 dark:border-gray-700 flex justify-end">
               <button
