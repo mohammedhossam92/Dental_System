@@ -1,25 +1,30 @@
 import React, { useState, useEffect } from 'react';
 import { supabase } from '../lib/supabase';
-import type { WorkingDays, ToothClass, Treatment, ClassYear, Student } from '../types';
-import { Trash2, Plus, X, Users, Settings, Edit3, RotateCcw } from 'lucide-react';
+import type { WorkingDays, ToothClass, Treatment, ClassYear, Student, University, CertificateType } from '../types';
+import { Trash2, Plus, X, Users, Settings, Edit3, RotateCcw, Building, Award } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
 
 export function SettingsPage() {
-  const { t } = useLanguage();
+  const { t, language } = useLanguage();
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
+  const [universities, setUniversities] = useState<University[]>([]);
+  const [certificateTypes, setCertificateTypes] = useState<CertificateType[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [globalLimit, setGlobalLimit] = useState<number>(1);
   const [studentLimits, setStudentLimits] = useState<{[key: string]: number}>({});
   const [error, setError] = useState('');
+
 
   // Modal states
   const [isWorkingDaysModalOpen, setIsWorkingDaysModalOpen] = useState(false);
   const [isToothClassModalOpen, setIsToothClassModalOpen] = useState(false);
   const [isTreatmentModalOpen, setIsTreatmentModalOpen] = useState(false);
   const [isClassYearModalOpen, setIsClassYearModalOpen] = useState(false);
+  const [isUniversityModalOpen, setIsUniversityModalOpen] = useState(false);
+  const [isCertTypeModalOpen, setIsCertTypeModalOpen] = useState(false);
   const [isGlobalLimitModalOpen, setIsGlobalLimitModalOpen] = useState(false);
   const [isStudentLimitModalOpen, setIsStudentLimitModalOpen] = useState(false);
   const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
@@ -29,12 +34,14 @@ export function SettingsPage() {
   const [newToothClass, setNewToothClass] = useState('');
   const [newTreatment, setNewTreatment] = useState('');
   const [newClassYear, setNewClassYear] = useState({ startYear: '', endYear: '' });
+  const [newUniversity, setNewUniversity] = useState({ name: '', country: 'مصر' });
+  const [newCertType, setNewCertType] = useState('');
   const [newGlobalLimit, setNewGlobalLimit] = useState<number>(1);
   const [newStudentLimit, setNewStudentLimit] = useState<number>(1);
 
   // Add these new states near the top of the component with other state declarations
   const [editingItem, setEditingItem] = useState<{
-    type: 'workingDays' | 'toothClass' | 'treatment' | 'classYear' | null,
+    type: 'workingDays' | 'toothClass' | 'treatment' | 'classYear' | 'university' | 'certificateType' | null,
     id?: string,
     data: any
   }>({ type: null, data: null });
@@ -44,8 +51,11 @@ export function SettingsPage() {
     toothClasses: false,
     treatments: false,
     classYears: false,
+    universities: false,
+    certificateTypes: false,
     studentLimits: false
   });
+
 
   useEffect(() => {
     fetchSettings();
@@ -55,11 +65,20 @@ export function SettingsPage() {
 
   async function fetchSettings() {
     try {
-      const [workingDaysResult, toothClassesResult, treatmentsResult, classYearsResult] = await Promise.all([
+      const [
+        workingDaysResult,
+        toothClassesResult,
+        treatmentsResult,
+        classYearsResult,
+        universitiesResult,
+        certTypesResult
+      ] = await Promise.all([
         supabase.from('working_days').select('*'),
         supabase.from('tooth_classes').select('*'),
         supabase.from('treatments').select('*'),
-        supabase.from('class_years').select('*')
+        supabase.from('class_years').select('*'),
+        supabase.from('universities').select('*').order('name'),
+        supabase.from('certificate_types').select('*').order('name')
       ]);
 
       if (workingDaysResult.error) throw workingDaysResult.error;
@@ -71,11 +90,14 @@ export function SettingsPage() {
       setToothClasses(toothClassesResult.data || []);
       setTreatments(treatmentsResult.data || []);
       setClassYears(classYearsResult.data || []);
+      setUniversities(universitiesResult.data || []);
+      setCertificateTypes(certTypesResult.data || []);
     } catch (error) {
       console.error('Error fetching settings:', error);
       setError('Failed to load settings');
     }
   }
+
 
   async function fetchStudents() {
     try {
@@ -872,7 +894,125 @@ export function SettingsPage() {
             </button>
           </div>
         </div>
+
+        {/* Universities Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-md dark:hover:border-gray-600">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Building className="h-5 w-5 text-emerald-600 dark:text-emerald-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {language === 'ar' ? 'الجامعات والجهات المانحة' : 'Universities'}
+                </h3>
+              </div>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-emerald-100 text-emerald-800 dark:bg-emerald-900 dark:text-emerald-200">
+                {universities.length} {language === 'ar' ? 'جامعة' : 'Univs'}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {(expandedSections.universities ? universities : universities.slice(0, 5)).map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <div>
+                    <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
+                    {item.country && (
+                      <span className="text-xs text-gray-400 ml-2 rtl:ml-0 rtl:mr-2">({item.country})</span>
+                    )}
+                  </div>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`${language === 'ar' ? 'حذف الجامعة' : 'Delete'} ${item.name}؟`)) {
+                        await supabase.from('universities').delete().eq('id', item.id);
+                        fetchSettings();
+                      }
+                    }}
+                    className="ml-2 p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              {universities.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-2 text-center">No universities</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 flex justify-between border-t border-gray-100 dark:border-gray-700">
+            <button
+              onClick={() => toggleSection('universities')}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
+              {expandedSections.universities ? 'Show Less' : `View All ${universities.length}`}
+            </button>
+            <button
+              onClick={() => setIsUniversityModalOpen(true)}
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add
+            </button>
+          </div>
+        </div>
+
+        {/* Certificate Types Card */}
+        <div className="bg-white dark:bg-gray-800 rounded-xl shadow-sm border border-gray-100 dark:border-gray-700 overflow-hidden transition-all duration-200 hover:shadow-md dark:hover:border-gray-600">
+          <div className="p-5">
+            <div className="flex items-center justify-between mb-4">
+              <div className="flex items-center gap-2">
+                <Award className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <h3 className="text-lg font-semibold text-gray-900 dark:text-white">
+                  {language === 'ar' ? 'أنواع الشهادات العلمية' : 'Certificate Types'}
+                </h3>
+              </div>
+              <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-purple-100 text-purple-800 dark:bg-purple-900 dark:text-purple-200">
+                {certificateTypes.length} {language === 'ar' ? 'نوع' : 'Types'}
+              </span>
+            </div>
+
+            <div className="space-y-2 max-h-48 overflow-y-auto">
+              {(expandedSections.certificateTypes ? certificateTypes : certificateTypes.slice(0, 5)).map((item) => (
+                <div key={item.id} className="flex items-center justify-between p-2 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700/50">
+                  <span className="text-sm font-medium text-gray-900 dark:text-white">{item.name}</span>
+                  <button
+                    onClick={async (e) => {
+                      e.stopPropagation();
+                      if (window.confirm(`${language === 'ar' ? 'حذف نوع الشهادة' : 'Delete'} ${item.name}؟`)) {
+                        await supabase.from('certificate_types').delete().eq('id', item.id);
+                        fetchSettings();
+                      }
+                    }}
+                    className="ml-2 p-1 text-gray-400 hover:text-red-500 dark:text-gray-500 dark:hover:text-red-400 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <Trash2 className="h-4 w-4" />
+                  </button>
+                </div>
+              ))}
+              {certificateTypes.length === 0 && (
+                <p className="text-sm text-gray-500 dark:text-gray-400 py-2 text-center">No types</p>
+              )}
+            </div>
+          </div>
+
+          <div className="bg-gray-50 dark:bg-gray-800/50 px-4 py-3 sm:px-6 flex justify-between border-t border-gray-100 dark:border-gray-700">
+            <button
+              onClick={() => toggleSection('certificateTypes')}
+              className="text-xs font-medium text-indigo-600 hover:text-indigo-500 dark:text-indigo-400"
+            >
+              {expandedSections.certificateTypes ? 'Show Less' : `View All ${certificateTypes.length}`}
+            </button>
+            <button
+              onClick={() => setIsCertTypeModalOpen(true)}
+              className="inline-flex items-center px-3 py-1.5 border border-transparent text-xs font-medium rounded-md shadow-sm text-gray-700 dark:text-gray-200 bg-white dark:bg-gray-700 hover:bg-gray-50 dark:hover:bg-gray-600"
+            >
+              <Plus className="h-3.5 w-3.5 mr-1.5" />
+              Add
+            </button>
+          </div>
+        </div>
       </div>
+
 
       {/* Global Limit Modal */}
       {isGlobalLimitModalOpen && (
@@ -1218,6 +1358,156 @@ export function SettingsPage() {
           </div>
         </div>
       )}
+      {/* University Modal */}
+      {isUniversityModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-lg mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {language === 'ar' ? 'إضافة جامعة / جهة مانحة' : 'Add University'}
+              </h2>
+              <button
+                onClick={() => setIsUniversityModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 p-2 rounded-full"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newUniversity.name.trim()) return;
+                try {
+                  const { error } = await supabase.from('universities').insert([{
+                    name: newUniversity.name.trim(),
+                    country: newUniversity.country.trim() || 'مصر'
+                  }]);
+                  if (error) throw error;
+                  setNewUniversity({ name: '', country: 'مصر' });
+                  setIsUniversityModalOpen(false);
+                  fetchSettings();
+                } catch (err: any) {
+                  setError(err.message || 'Failed to add university');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {language === 'ar' ? 'اسم الجامعة' : 'University Name'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newUniversity.name}
+                  onChange={(e) => setNewUniversity({ ...newUniversity, name: e.target.value })}
+                  placeholder={language === 'ar' ? 'جامعة المنصورة' : 'Mansoura University'}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {language === 'ar' ? 'الدولة' : 'Country'}
+                </label>
+                <input
+                  type="text"
+                  value={newUniversity.country}
+                  onChange={(e) => setNewUniversity({ ...newUniversity, country: e.target.value })}
+                  placeholder={language === 'ar' ? 'مصر' : 'Egypt'}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsUniversityModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-emerald-600 text-white rounded-lg text-sm font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Certificate Type Modal */}
+      {isCertTypeModalOpen && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center p-4 z-50">
+          <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-semibold text-gray-900 dark:text-white">
+                {language === 'ar' ? 'إضافة نوع شهادة' : 'Add Certificate Type'}
+              </h2>
+              <button
+                onClick={() => setIsCertTypeModalOpen(false)}
+                className="text-gray-500 hover:text-gray-700 dark:text-gray-400 p-2 rounded-full"
+              >
+                <X className="h-6 w-6" />
+              </button>
+            </div>
+
+            <form
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!newCertType.trim()) return;
+                try {
+                  const { error } = await supabase.from('certificate_types').insert([{
+                    name: newCertType.trim()
+                  }]);
+                  if (error) throw error;
+                  setNewCertType('');
+                  setIsCertTypeModalOpen(false);
+                  fetchSettings();
+                } catch (err: any) {
+                  setError(err.message || 'Failed to add certificate type');
+                }
+              }}
+              className="space-y-4"
+            >
+              <div>
+                <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {language === 'ar' ? 'نوع الشهادة' : 'Certificate Type Name'}
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={newCertType}
+                  onChange={(e) => setNewCertType(e.target.value)}
+                  placeholder={language === 'ar' ? 'دكتوراه فخرية / زمالة' : 'Fellowship'}
+                  className="w-full p-3 border rounded-lg dark:bg-gray-700 dark:border-gray-600 dark:text-white"
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-4">
+                <button
+                  type="button"
+                  onClick={() => setIsCertTypeModalOpen(false)}
+                  className="px-4 py-2 bg-gray-100 dark:bg-gray-700 rounded-lg text-sm"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-5 py-2 bg-purple-600 text-white rounded-lg text-sm font-semibold"
+                >
+                  Save
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
+

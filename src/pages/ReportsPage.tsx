@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import type { Patient, Treatment, Student } from '../types';
-import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X } from 'lucide-react';
+import type { Patient, Treatment, Student, DoctorWithDetails } from '../types';
+import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X, Award, Stethoscope, Sparkles } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useLanguage } from '../context/LanguageContext';
+import { getCertificateSummary, getCurrentEmploymentStatus } from '../utils/doctorUtils';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
@@ -16,11 +17,13 @@ export function ReportsPage() {
   const [treatments, setTreatments] = useState<Treatment[]>([]);
   const [students, setStudents] = useState<Student[]>([]);
   const [unregisteredStudents, setUnregisteredStudents] = useState<Student[]>([]);
+  const [doctorsList, setDoctorsList] = useState<DoctorWithDetails[]>([]);
   const [treatmentStats, setTreatmentStats] = useState<{ [key: string]: number }>({});
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered'>('treatments');
+  const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered' | 'doctors'>('treatments');
   const { t, language } = useLanguage();
+
 
   const [selectedStudentForReRegister, setSelectedStudentForReRegister] = useState<Student | null>(null);
   const [reRegisterStartDate, setReRegisterStartDate] = useState<string>('');
@@ -107,10 +110,20 @@ export function ReportsPage() {
         unregisteredQuery = unregisteredQuery.lte('unregistered_at', `${dateRange.end}T23:59:59.999Z`);
       }
 
-      const [treatmentsRes, studentsRes, unregisteredRes] = await Promise.all([
-        supabase.from('treatments').select('*').order('name'),
-        supabase.from('students').select('*').eq('registration_status', 'registered').order('name'),
-        unregisteredQuery
+      const [
+        treatmentsRes,
+        studentsRes,
+        unregisteredRes,
+        doctorsRes,
+        historyRes,
+        certsRes
+      ] = await Promise.all([
+        supabase.from('treatments').select('*'),
+        supabase.from('students').select('*').eq('registration_status', 'registered'),
+        unregisteredQuery,
+        supabase.from('doctors').select('*'),
+        supabase.from('doctor_employment_history').select('*'),
+        supabase.from('doctor_certificates').select('*')
       ]);
 
       if (treatmentsRes.error) throw treatmentsRes.error;
@@ -120,6 +133,19 @@ export function ReportsPage() {
       setTreatments(treatmentsRes.data || []);
       setStudents(studentsRes.data || []);
       setUnregisteredStudents(unregisteredRes.data || []);
+
+      const rawDocs = doctorsRes.data || [];
+      const rawHist = historyRes.data || [];
+      const rawCerts = certsRes.data || [];
+
+      const mergedDocs: DoctorWithDetails[] = rawDocs.map(d => ({
+        ...d,
+        employment_history: rawHist.filter(h => h.doctor_id === d.id),
+        certificates: rawCerts.filter(c => c.doctor_id === d.id),
+        current_status: getCurrentEmploymentStatus(rawHist.filter(h => h.doctor_id === d.id))
+      }));
+      setDoctorsList(mergedDocs);
+
 
       let patientsQuery = supabase
         .from('patients')
@@ -450,8 +476,21 @@ export function ReportsPage() {
           >
             Recently Unregistered
           </button>
+          <button
+            onClick={() => setActiveTab('doctors')}
+            className={`py-4 px-1 border-b-2 font-medium text-sm flex items-center gap-1.5 ${
+              activeTab === 'doctors'
+                ? 'border-indigo-500 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400'
+                : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-gray-600'
+            }`}
+          >
+            <Stethoscope className="w-4 h-4" />
+            <span>{language === 'ar' ? 'الأطباء والمؤهلات العلمية' : 'Doctors & Qualifications'}</span>
+          </button>
         </nav>
       </div>
+
+
 
       {isLoading ? (
         renderLoadingState()
@@ -585,11 +624,11 @@ export function ReportsPage() {
                 </div>
               )}
             </div>
-          ) : (
+          ) : activeTab === 'unregistered' ? (
             <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-lg p-6">
               <div className="flex items-center justify-between mb-6">
                 <div className="flex items-center">
-                  <Users className="h-5 w-5 text-red-600 dark:text-red-400 mr-2" />
+                  <Users className="h-5 w-5 text-red-600 dark:text-red-400 mr-2 rtl:mr-0 rtl:ml-2" />
                   <h2 className="text-lg font-semibold text-gray-800 dark:text-white">Recently Unregistered Students</h2>
                 </div>
                 <span className="text-sm text-gray-500 dark:text-gray-400">
@@ -619,11 +658,11 @@ export function ReportsPage() {
                                 <strong>University:</strong> {student.university} ({student.university_type})
                               </span>
                               <span className="text-red-600 dark:text-red-400 font-medium">
-                                <strong>Unregistered:</strong> {formatDate(student.unregistered_at)}
+                                <strong>Unregistered:</strong> {formatDate(student.unregistered_at, language)}
                               </span>
                             </div>
                           </div>
-                          <div className="flex items-center space-x-6">
+                          <div className="flex items-center space-x-6 rtl:space-x-reverse">
                             <div className="text-center">
                               <span className="block text-xl font-bold text-gray-700 dark:text-gray-300">
                                 {student.patients_completed}
@@ -660,6 +699,97 @@ export function ReportsPage() {
                   })}
                 </div>
               )}
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Degree Distribution Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800">
+                  <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
+                    {language === 'ar' ? 'حملة الدكتوراه' : 'PhD Holders'}
+                  </span>
+                  <p className="text-2xl font-bold text-purple-900 dark:text-purple-100 mt-1">
+                    {doctorsList.filter(d => d.certificates?.some(c => c.status === 'obtained' && c.certificate_type.includes('دكتوراه'))).length}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-indigo-50 dark:bg-indigo-950/40 rounded-2xl border border-indigo-200 dark:border-indigo-800">
+                  <span className="text-xs font-semibold text-indigo-700 dark:text-indigo-300">
+                    {language === 'ar' ? 'حملة الماجستير' : 'Master Holders'}
+                  </span>
+                  <p className="text-2xl font-bold text-indigo-900 dark:text-indigo-100 mt-1">
+                    {doctorsList.filter(d => d.certificates?.some(c => c.status === 'obtained' && c.certificate_type.includes('ماجستير'))).length}
+                  </p>
+                </div>
+
+
+                <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800">
+                  <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                    {language === 'ar' ? 'حملة الدبلوم والزمالة' : 'Diploma & Fellowship'}
+                  </span>
+                  <p className="text-2xl font-bold text-emerald-900 dark:text-emerald-100 mt-1">
+                    {doctorsList.filter(d => d.certificates?.some(c => c.status === 'obtained' && (c.certificate_type.includes('دبلوم') || c.certificate_type.includes('زمالة')))).length}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-blue-50 dark:bg-blue-950/40 rounded-2xl border border-blue-200 dark:border-blue-800">
+                  <span className="text-xs font-semibold text-blue-700 dark:text-blue-300">
+                    {language === 'ar' ? 'قيد الدراسة حالياً' : 'In Active Studies'}
+                  </span>
+                  <p className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
+                    {doctorsList.filter(d => d.certificates?.some(c => c.status === 'in_progress')).length}
+                  </p>
+                </div>
+              </div>
+
+              {/* In Progress Studies Table */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+                <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Sparkles className="w-5 h-5 text-indigo-600" />
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                      {language === 'ar' ? 'الأطباء المسجلون بدراسات عليا (قيد الدراسة)' : 'Doctors in Active Studies'}
+                    </h3>
+                  </div>
+                  <button
+                    onClick={() => navigate('/doctors')}
+                    className="text-xs font-semibold text-indigo-600 hover:text-indigo-700 dark:text-indigo-400"
+                  >
+                    {language === 'ar' ? 'الانتقال لسجل الأطباء &rarr;' : 'Go to Doctors &rarr;'}
+                  </button>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-right rtl:text-right ltr:text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">
+                      <tr>
+                        <th className="px-4 py-3">{t('doctorName')}</th>
+                        <th className="px-4 py-3">{t('certificateType')}</th>
+                        <th className="px-4 py-3">{t('certificateTitle')}</th>
+                        <th className="px-4 py-3">{t('university')}</th>
+                        <th className="px-4 py-3">{t('studyStartDate')}</th>
+                        <th className="px-4 py-3">{t('expectedDate')}</th>
+                        <th className="px-4 py-3">{t('generatedSummary')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {doctorsList
+                        .flatMap(d => (d.certificates || []).filter(c => c.status === 'in_progress').map(c => ({ doc: d, cert: c })))
+                        .map(({ doc, cert }) => (
+                          <tr key={cert.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                            <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{doc.name}</td>
+                            <td className="px-4 py-3 font-semibold text-indigo-600 dark:text-indigo-400">{cert.certificate_type}</td>
+                            <td className="px-4 py-3">{cert.certificate_title}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{cert.university_name}</td>
+                            <td className="px-4 py-3 text-xs">{cert.study_start_date || '---'}</td>
+                            <td className="px-4 py-3 text-xs font-semibold text-blue-600">{cert.expected_date || '---'}</td>
+                            <td className="px-4 py-3 text-xs italic text-gray-500 max-w-xs">{getCertificateSummary(cert, language)}</td>
+                          </tr>
+                        ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
             </div>
           )}
         </div>

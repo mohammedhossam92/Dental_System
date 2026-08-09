@@ -143,5 +143,128 @@ export interface StudentAbsenceExcuse {
   created_at: string;
 }
 
+export type EmploymentStatusType = 
+  | 'قوة أساسية'
+  | 'انتداب'
+  | 'إعارة'
+  | 'إجازة'
+  | 'ندب'
+  | 'إنهاء خدمة'
+  | 'أخرى';
 
+export interface University {
+  id: string;
+  name: string;
+  country: string;
+  organization_id?: string | null;
+  created_at?: string;
+}
 
+export interface CertificateType {
+  id: string;
+  name: string;
+  organization_id?: string | null;
+  created_at?: string;
+}
+
+export interface Doctor {
+  id: string;
+  name: string;
+  national_id: string | null;
+  birth_date: string | null;
+  graduation_date: string | null;
+  hire_date: string | null;
+  address: string | null;
+  phone: string | null;
+  notes: string | null;
+  organization_id?: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DoctorEmploymentHistory {
+  id: string;
+  doctor_id: string;
+  organization_id?: string | null;
+  status_type: EmploymentStatusType | string;
+  deputation_direction?: 'منتدب إلى المستشفى' | 'منتدب من المستشفى إلى الخارج' | 'incoming' | 'outgoing' | string | null;
+  deputation_facility?: string | null;
+  start_date: string;
+  end_date: string | null;
+  notes: string | null;
+  created_at?: string;
+}
+
+export interface DoctorCertificate {
+  id: string;
+  doctor_id: string;
+  organization_id?: string | null;
+  certificate_type: string;
+  certificate_title: string;
+  university_name: string;
+  university_country: string;
+  university_id?: string | null;
+  status: 'obtained' | 'in_progress';
+  obtained_date: string | null;
+  study_start_date: string | null;
+  expected_date: string | null;
+  file_url: string | null;
+  file_name?: string | null;
+  notes: string | null;
+  created_at?: string;
+  updated_at?: string;
+}
+
+export interface DoctorPromotion {
+  id: string;
+  doctor_id: string;
+  organization_id?: string | null;
+  promotion_type: string;
+  promotion_date: string;
+  notes: string | null;
+  document_url: string | null;
+  document_name?: string | null;
+  created_at?: string;
+}
+
+export interface DoctorFinancialGrade {
+  id: string;
+  doctor_id: string;
+  organization_id?: string | null;
+  financial_grade: string;
+  start_date: string;
+  end_date: string | null;
+  notes: string | null;
+  created_at?: string;
+}
+
+export interface DoctorDocument {
+  id: string;
+  doctor_id: string;
+  organization_id?: string | null;
+  title: string;
+  file_url: string;
+  file_name: string | null;
+  file_type: string | null;
+  notes?: string | null;
+  created_at?: string;
+}
+
+export interface DoctorWithDetails extends Doctor {
+  current_status?: DoctorEmploymentHistory | null;
+  employment_history?: DoctorEmploymentHistory[];
+  certificates?: DoctorCertificate[];
+  promotions?: DoctorPromotion[];
+  financial_grades?: DoctorFinancialGrade[];
+  documents?: DoctorDocument[];
+  current_financial_grade?: DoctorFinancialGrade | null;
+}
+
+export interface DoctorFilterState {
+  search: string;
+  employmentStatus: string;
+  certificateType: string;
+  certificateStatus: string;
+  university: string;
+  obtainedYear: string;
+}

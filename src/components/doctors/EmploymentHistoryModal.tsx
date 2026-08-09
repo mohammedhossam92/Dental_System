@@ -1,0 +1,376 @@
+import React, { useState, useEffect } from 'react';
+import { X, Clock, Calendar, FileText, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
+import { supabase } from '../../lib/supabase';
+import type { DoctorEmploymentHistory, EmploymentStatusType } from '../../types';
+import { useLanguage } from '../../context/LanguageContext';
+import { useAuth } from '../../context/AuthContext';
+import { validateEmploymentPeriod } from '../../utils/doctorUtils';
+import Swal from 'sweetalert2';
+
+interface EmploymentHistoryModalProps {
+  isOpen: boolean;
+  onClose: () => void;
+  onSuccess: () => void;
+  doctorId: string;
+  historyRecord?: DoctorEmploymentHistory | null;
+  existingHistory?: DoctorEmploymentHistory[];
+}
+
+const STATUS_OPTIONS: EmploymentStatusType[] = [
+  'قوة أساسية',
+  'انتداب',
+  'إعارة',
+  'إجازة',
+  'ندب',
+  'إنهاء خدمة',
+  'أخرى'
+];
+
+export function EmploymentHistoryModal({
+  isOpen,
+  onClose,
+  onSuccess,
+  doctorId,
+  historyRecord,
+  existingHistory = []
+}: EmploymentHistoryModalProps) {
+  const { t, language } = useLanguage();
+  const { organizationId } = useAuth();
+  const [loading, setLoading] = useState(false);
+
+  const [statusType, setStatusType] = useState<EmploymentStatusType | string>('قوة أساسية');
+  const [customStatus, setCustomStatus] = useState('');
+  const [deputationDirection, setDeputationDirection] = useState<'منتدب إلى المستشفى' | 'منتدب من المستشفى إلى الخارج'>('منتدب إلى المستشفى');
+  const [deputationFacility, setDeputationFacility] = useState('');
+  const [startDate, setStartDate] = useState('');
+  const [endDate, setEndDate] = useState('');
+  const [isOngoing, setIsOngoing] = useState(true);
+  const [notes, setNotes] = useState('');
+
+  useEffect(() => {
+    if (historyRecord) {
+      if (STATUS_OPTIONS.includes(historyRecord.status_type as EmploymentStatusType)) {
+        setStatusType(historyRecord.status_type);
+        setCustomStatus('');
+      } else {
+        setStatusType('أخرى');
+        setCustomStatus(historyRecord.status_type);
+      }
+      setDeputationDirection((historyRecord.deputation_direction as any) || 'منتدب إلى المستشفى');
+      setDeputationFacility(historyRecord.deputation_facility || '');
+      setStartDate(historyRecord.start_date || '');
+      setEndDate(historyRecord.end_date || '');
+      setIsOngoing(!historyRecord.end_date);
+      setNotes(historyRecord.notes || '');
+    } else {
+      setStatusType('قوة أساسية');
+      setCustomStatus('');
+      setDeputationDirection('منتدب إلى المستشفى');
+      setDeputationFacility('');
+      setStartDate(new Date().toISOString().split('T')[0]);
+      setEndDate('');
+      setIsOngoing(true);
+      setNotes('');
+    }
+  }, [historyRecord, isOpen]);
+
+  if (!isOpen) return null;
+
+  const isDeputation = statusType === 'انتداب' || statusType === 'ندب';
+  const finalStatusType = statusType === 'أخرى' && customStatus.trim() ? customStatus.trim() : statusType;
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+
+    if (!startDate) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'تنبيه',
+        text: 'تاريخ بداية الحالة مطلوب',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    const finalEndDate = isOngoing ? null : (endDate || null);
+
+    // Validate period overlaps
+    const validation = validateEmploymentPeriod(existingHistory, {
+      id: historyRecord?.id,
+      start_date: startDate,
+      end_date: finalEndDate,
+      status_type: finalStatusType
+    });
+
+    if (!validation.valid) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'تنبيه تعارض التواريخ',
+        text: validation.message || 'يوجد تعارض في التواريخ مع فترة وظيفية أخرى',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    try {
+      setLoading(true);
+
+      const payload = {
+        doctor_id: doctorId,
+        organization_id: organizationId || null,
+        status_type: finalStatusType,
+        deputation_direction: isDeputation ? deputationDirection : null,
+        deputation_facility: isDeputation ? (deputationFacility.trim() || null) : null,
+        start_date: startDate,
+        end_date: finalEndDate,
+        notes: notes.trim() || null
+      };
+
+      if (historyRecord?.id) {
+        const { error } = await supabase
+          .from('doctor_employment_history')
+          .update(payload)
+          .eq('id', historyRecord.id);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from('doctor_employment_history')
+          .insert([payload]);
+        if (error) throw error;
+      }
+
+      Swal.fire({
+        icon: 'success',
+        title: t('success'),
+        text: t('successSaved'),
+        timer: 1500,
+        showConfirmButton: false
+      });
+      onSuccess();
+      onClose();
+    } catch (err: any) {
+      console.error('Error saving employment history:', err);
+      Swal.fire({
+        icon: 'error',
+        title: t('error'),
+        text: err.message || t('errorSaving'),
+        confirmButtonColor: '#4f46e5'
+      });
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+        {/* Header */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-gray-800 dark:to-gray-800">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse">
+            <div className="p-2 bg-blue-600 rounded-lg text-white">
+              <Clock className="w-5 h-5" />
+            </div>
+            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+              {historyRecord ? t('edit') : t('addStatusPeriod')}
+            </h2>
+          </div>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
+        </div>
+
+        {/* Form */}
+        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+          
+          {/* Status Type */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              {t('statusType')} <span className="text-red-500">*</span>
+            </label>
+            <select
+              value={statusType}
+              onChange={(e) => setStatusType(e.target.value as EmploymentStatusType)}
+              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+            >
+              {STATUS_OPTIONS.map((opt) => (
+                <option key={opt} value={opt}>
+                  {opt}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {/* If Deputation (انتداب أو ندب): Show Direction and Facility */}
+          {isDeputation && (
+            <div className="p-4 bg-blue-50/70 dark:bg-blue-950/40 rounded-xl border border-blue-200 dark:border-blue-800/60 space-y-3 animate-in fade-in duration-200">
+              <label className="block text-xs font-bold text-blue-900 dark:text-blue-200">
+                {t('deputationDirection')} <span className="text-red-500">*</span>
+              </label>
+
+              <div className="space-y-2">
+                <label
+                  onClick={() => setDeputationDirection('منتدب إلى المستشفى')}
+                  className={`flex items-center p-2.5 rounded-lg border cursor-pointer text-xs font-semibold transition-colors ${
+                    deputationDirection === 'منتدب إلى المستشفى'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deputation_direction"
+                    checked={deputationDirection === 'منتدب إلى المستشفى'}
+                    onChange={() => setDeputationDirection('منتدب إلى المستشفى')}
+                    className="hidden"
+                  />
+                  <span>👉 {t('incomingDeputation')}</span>
+                </label>
+
+                <label
+                  onClick={() => setDeputationDirection('منتدب من المستشفى إلى الخارج')}
+                  className={`flex items-center p-2.5 rounded-lg border cursor-pointer text-xs font-semibold transition-colors ${
+                    deputationDirection === 'منتدب من المستشفى إلى الخارج'
+                      ? 'bg-blue-600 text-white border-blue-600 shadow-sm'
+                      : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-gray-50'
+                  }`}
+                >
+                  <input
+                    type="radio"
+                    name="deputation_direction"
+                    checked={deputationDirection === 'منتدب من المستشفى إلى الخارج'}
+                    onChange={() => setDeputationDirection('منتدب من المستشفى إلى الخارج')}
+                    className="hidden"
+                  />
+                  <span>👈 {t('outgoingDeputation')}</span>
+                </label>
+              </div>
+
+              <div>
+                <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                  {t('deputationFacility')}
+                </label>
+                <input
+                  type="text"
+                  value={deputationFacility}
+                  onChange={(e) => setDeputationFacility(e.target.value)}
+                  placeholder={
+                    deputationDirection === 'منتدب إلى المستشفى'
+                      ? (language === 'ar' ? 'الجهة الأصلية للطبيب (مثال: مستشفى المنصورة العام)' : 'Original facility name')
+                      : (language === 'ar' ? 'الجهة المنتدب إليها (مثال: مستشفى الطوارئ الجامعي)' : 'Target facility name')
+                  }
+                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
+                />
+              </div>
+            </div>
+          )}
+
+          {statusType === 'أخرى' && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                {language === 'ar' ? 'حدد نوع الحالة' : 'Specify Status'} <span className="text-red-500">*</span>
+              </label>
+              <input
+                type="text"
+                required
+                value={customStatus}
+                onChange={(e) => setCustomStatus(e.target.value)}
+                placeholder={language === 'ar' ? 'مثال: منتدب جزئي / منحة دراسية' : 'e.g. Partial secondment'}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          )}
+
+
+          {/* Start Date */}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              {t('startDate')} <span className="text-red-500">*</span>
+            </label>
+            <div className="relative">
+              <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+              <input
+                type="date"
+                required
+                value={startDate}
+                onChange={(e) => setStartDate(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+              />
+            </div>
+          </div>
+
+          {/* Ongoing Checkbox */}
+          <div className="flex items-center space-x-2 rtl:space-x-reverse pt-1">
+            <input
+              type="checkbox"
+              id="isOngoingCheck"
+              checked={isOngoing}
+              onChange={(e) => {
+                setIsOngoing(e.target.checked);
+                if (e.target.checked) setEndDate('');
+              }}
+              className="w-4 h-4 text-blue-600 rounded border-gray-300 focus:ring-blue-500"
+            />
+            <label htmlFor="isOngoingCheck" className="text-sm font-medium text-gray-700 dark:text-gray-300 cursor-pointer">
+              {t('isCurrentStatus')} ({language === 'ar' ? 'مستمر حتى الآن بدون تاريخ نهاية' : 'Ongoing'})
+            </label>
+          </div>
+
+          {/* End Date */}
+          {!isOngoing && (
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                {t('endDate')} <span className="text-red-500">*</span>
+              </label>
+              <div className="relative">
+                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                <input
+                  type="date"
+                  required={!isOngoing}
+                  value={endDate}
+                  onChange={(e) => setEndDate(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Notes */}
+          <div>
+            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+              {t('notes')}
+            </label>
+            <textarea
+              rows={2}
+              value={notes}
+              onChange={(e) => setNotes(e.target.value)}
+              placeholder={language === 'ar' ? 'ملاحظات حول هذه الفترة الوظيفية...' : 'Notes...'}
+              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
+
+          {/* Footer Actions */}
+          <div className="flex items-center justify-end space-x-3 rtl:space-x-reverse pt-4 border-t border-gray-200 dark:border-gray-700">
+            <button
+              type="button"
+              onClick={onClose}
+              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors"
+            >
+              {t('cancel')}
+            </button>
+            <button
+              type="submit"
+              disabled={loading}
+              className="px-6 py-2.5 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-semibold flex items-center space-x-2 rtl:space-x-reverse shadow-lg shadow-blue-600/30 transition-all disabled:opacity-50"
+            >
+              {loading && <Loader2 className="w-4 h-4 animate-spin" />}
+              <span>{historyRecord ? t('saveChanges') : t('save')}</span>
+            </button>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}

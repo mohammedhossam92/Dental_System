@@ -5,6 +5,7 @@ import { AuthProvider, useAuth } from './context/AuthContext';
 import { LanguageProvider } from './context/LanguageContext';
 import { Navbar } from './components/Navbar';
 import { StudentsPage } from './pages/StudentsPage';
+import { DoctorsPage } from './pages/DoctorsPage';
 import { PatientsPage } from './pages/PatientsPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { ReportsPage } from './pages/ReportsPage';
@@ -49,6 +50,7 @@ export default function App() {
                       <main className="container mx-auto px-4 py-6">
                         <Routes>
                           <Route path="/" element={<Dashboard />} />
+                          <Route path="/doctors" element={<DoctorsPage />} />
                           <Route path="/students" element={<StudentsPage />} />
                           <Route path="/patients" element={<PatientsPage />} />
                           <Route path="/waiting-list" element={<WaitingListPage />} />

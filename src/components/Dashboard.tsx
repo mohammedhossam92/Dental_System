@@ -39,7 +39,8 @@ export function Dashboard() {
         casesTodayResult,
         pendingCasesResult,
         completedCasesResult,
-        recentCasesResult
+        recentCasesResult,
+        doctorsResult
       ] = await Promise.all([
         supabase.from('students').select('*'),
         supabase.from('patients').select('*').gte('created_at', todayStr),
@@ -53,11 +54,13 @@ export function Dashboard() {
             treatment:treatments(name)
           `)
           .order('created_at', { ascending: false })
-          .limit(5)
+          .limit(5),
+        supabase.from('doctors').select('id')
       ]);
 
       // Calculate stats
       const totalStudents = studentsResult.data?.length || 0;
+      const totalDoctorsCount = doctorsResult.data?.length || 0;
       // Update this line to filter for both registered and available students
       const availableStudents = studentsResult.data?.filter(s => s.is_available && s.registration_status === 'registered').length || 0;
       const casesToday = casesTodayResult.data?.length || 0;
@@ -68,12 +71,13 @@ export function Dashboard() {
 
       setStats({
         totalStudents,
+        totalDoctors: totalDoctorsCount,
         casesToday,
         attendanceRate,
         pendingCases,
         totalCasesDone,
         availableStudents
-      });
+      } as any);
       // Fix this line to use registration_status instead of status:
       setRegisteredStudents(studentsResult.data?.filter(s => s.registration_status === 'registered').length || 0);
       setRecentCases(recentCasesResult.data || []);
@@ -96,7 +100,13 @@ export function Dashboard() {
   return (
     <div className="container mx-auto px-4 sm:px-6 py-6">
       <h1 className="text-2xl sm:text-3xl font-bold mb-6 text-gray-900 dark:text-white">{t('dashboard')}</h1>
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6 mb-8">
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6 mb-8">
+        <DashboardCard
+          icon={<Stethoscope className="h-6 sm:h-8 w-6 sm:w-8 text-indigo-600" />}
+          title={t('doctors')}
+          value={((stats as any).totalDoctors || 0).toString()}
+          subtitle={language === 'ar' ? 'أطباء مسجلين بالنظام' : 'Registered doctors'}
+        />
         <DashboardCard
           icon={<Users className="h-6 sm:h-8 w-6 sm:w-8 text-blue-500" />}
           title={t('totalStudents')}
@@ -110,30 +120,13 @@ export function Dashboard() {
           subtitle={t('registeredStudentsSub')}
         />
         <DashboardCard
-          icon={<UserPlus className="h-6 sm:h-8 w-6 sm:w-8 text-cyan-500" />}
-          title={t('availableStudents')}
-          value={stats.availableStudents.toString()}
-          subtitle={t('availableStudentsSub')}
-        />
-        <DashboardCard
-          icon={<Stethoscope className="h-6 sm:h-8 w-6 sm:w-8 text-green-500" />}
-          title={t('casesToday')}
-          value={stats.casesToday.toString()}
-          subtitle={t('casesTodaySub')}
-        />
-        <DashboardCard
           icon={<CheckCircle className="h-6 sm:h-8 w-6 sm:w-8 text-emerald-500" />}
           title={t('totalCasesDone')}
           value={stats.totalCasesDone.toString()}
           subtitle={t('totalCasesDoneSub')}
         />
-        <DashboardCard
-          icon={<Clock className="h-6 sm:h-8 w-6 sm:w-8 text-purple-500" />}
-          title={t('pendingCases')}
-          value={stats.pendingCases.toString()}
-          subtitle={t('pendingCasesSub')}
-        />
       </div>
+
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         {/* Recent Cases */}
