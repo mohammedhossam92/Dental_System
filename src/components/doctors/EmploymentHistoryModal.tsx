@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type { DoctorEmploymentHistory, EmploymentStatusType } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { validateEmploymentPeriod } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
@@ -457,21 +458,15 @@ export function EmploymentHistoryModal({
           </div>
 
           {/* Start Date */}
-          <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-              {t('startDate')} <span className="text-red-500">*</span>
-            </label>
-            <div className="relative">
-              <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-              <input
-                type="date"
-                required
-                value={startDate}
-                onChange={(e) => setStartDate(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-              />
-            </div>
-          </div>
+          <FlexibleDateInput
+            label={t('startDate')}
+            required
+            value={startDate}
+            onChange={(val) => setStartDate(val)}
+            minYear={1970}
+            maxYear={new Date().getFullYear() + 2}
+            accentColor="blue"
+          />
 
           {/* Ongoing Checkbox */}
           <div className="flex items-center space-x-2 rtl:space-x-reverse pt-1">
@@ -492,21 +487,15 @@ export function EmploymentHistoryModal({
 
           {/* End Date */}
           {!isOngoing && (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                {t('endDate')} <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="date"
-                  required={!isOngoing}
-                  value={endDate}
-                  onChange={(e) => setEndDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500"
-                />
-              </div>
-            </div>
+            <FlexibleDateInput
+              label={t('endDate')}
+              required={!isOngoing}
+              value={endDate}
+              onChange={(val) => setEndDate(val)}
+              minYear={1970}
+              maxYear={new Date().getFullYear() + 5}
+              accentColor="blue"
+            />
           )}
 
           {/* Notes */}

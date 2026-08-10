@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type { Doctor } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import Swal from 'sweetalert2';
 
 interface DoctorFormModalProps {
@@ -255,52 +256,34 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
             </div>
 
             {/* Birth Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('birthDate')}
-              </label>
-              <div className="relative">
-                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.birth_date}
-                  onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
+            <FlexibleDateInput
+              label={t('birthDate')}
+              value={formData.birth_date}
+              onChange={(val) => setFormData({ ...formData, birth_date: val })}
+              minYear={1940}
+              maxYear={new Date().getFullYear()}
+              accentColor="indigo"
+            />
 
             {/* Graduation Date */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('graduationDate')}
-              </label>
-              <div className="relative">
-                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.graduation_date}
-                  onChange={(e) => setFormData({ ...formData, graduation_date: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
+            <FlexibleDateInput
+              label={t('graduationDate')}
+              value={formData.graduation_date}
+              onChange={(val) => setFormData({ ...formData, graduation_date: val })}
+              minYear={1960}
+              maxYear={new Date().getFullYear() + 2}
+              accentColor="indigo"
+            />
 
             {/* Hire Date / Employment commencement */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('hireDate')}
-              </label>
-              <div className="relative">
-                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="date"
-                  value={formData.hire_date}
-                  onChange={(e) => setFormData({ ...formData, hire_date: e.target.value })}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
+            <FlexibleDateInput
+              label={t('hireDate')}
+              value={formData.hire_date}
+              onChange={(val) => setFormData({ ...formData, hire_date: val })}
+              minYear={1960}
+              maxYear={new Date().getFullYear() + 2}
+              accentColor="indigo"
+            />
 
             {/* Address */}
             <div>
