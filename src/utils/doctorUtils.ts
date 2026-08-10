@@ -62,14 +62,18 @@ export function getYearFromDate(dateString: string | null): string {
 }
 
 /**
- * Format certificate date based on precision / date_mode ('month' vs 'full')
+ * Format certificate date based on precision / date_mode ('year' vs 'month' vs 'full')
  */
 export function formatCertificateDate(
   dateString: string | null | undefined,
-  mode: 'month' | 'full' | string = 'month',
+  mode: 'year' | 'month' | 'full' | string = 'month',
   language: string = 'ar'
 ): string {
   if (!dateString) return '';
+  if (mode === 'year') {
+    const y = getYearFromDate(dateString);
+    return language === 'ar' ? `عام ${y}` : `${y}`;
+  }
   if (mode === 'full') {
     return formatDate(dateString, language);
   }
