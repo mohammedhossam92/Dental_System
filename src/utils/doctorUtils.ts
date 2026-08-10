@@ -7,16 +7,19 @@ const arabicMonths = [
 ];
 
 /**
- * Format a date string (YYYY-MM-DD or YYYY-MM) to Month Year in Arabic or English
- * e.g. "2018-08-01" -> "أغسطس 2018"
+ * Format a date string (YYYY, YYYY-MM, or YYYY-MM-DD) to Month Year in Arabic or English
+ * e.g. "2018-08" -> "أغسطس 2018", "2018" -> "عام 2018"
  */
-export function formatMonthYear(dateString: string | null, language: string = 'ar'): string {
+export function formatMonthYear(dateString: string | null | undefined, language: string = 'ar'): string {
   if (!dateString) return '';
   
   try {
     const parts = dateString.split('-');
     const year = parts[0];
-    const monthIndex = parts.length > 1 ? parseInt(parts[1], 10) - 1 : 0;
+    if (parts.length === 1) {
+      return language === 'ar' ? `عام ${year}` : `${year}`;
+    }
+    const monthIndex = parseInt(parts[1], 10) - 1;
 
     if (language === 'ar') {
       if (monthIndex >= 0 && monthIndex < 12) {
@@ -24,9 +27,9 @@ export function formatMonthYear(dateString: string | null, language: string = 'a
       }
       return year;
     } else {
-      const date = new Date(dateString);
-      if (isNaN(date.getTime())) return dateString;
-      return date.toLocaleDateString('en-US', { month: 'long', year: 'numeric' });
+      const monthNamesEn = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+      const monthName = monthNamesEn[monthIndex] || parts[1];
+      return `${monthName} ${year}`;
     }
   } catch {
     return dateString;
@@ -34,20 +37,34 @@ export function formatMonthYear(dateString: string | null, language: string = 'a
 }
 
 /**
- * Format date for standard display
+ * Format date for display supporting Year Only ('YYYY'), Month & Year ('YYYY-MM'), and Full Date ('YYYY-MM-DD')
  */
-export function formatDate(dateString: string | null, language: string = 'ar'): string {
-  if (!dateString) return language === 'ar' ? 'غير محدد' : 'N/A';
+export function formatDate(dateString: string | null | undefined, language: string = 'ar'): string {
+  if (!dateString) return language === 'ar' ? 'غير محدد' : '---';
   
   try {
-    const date = new Date(dateString);
-    if (isNaN(date.getTime())) return dateString;
-    
-    return date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric'
-    });
+    const parts = dateString.split('-');
+    if (parts.length === 1) {
+      // Year only e.g. "2024"
+      return language === 'ar' ? `عام ${parts[0]}` : parts[0];
+    }
+    if (parts.length === 2) {
+      // Month and Year e.g. "2024-08"
+      return formatMonthYear(dateString, language);
+    }
+    // Full date e.g. "2024-08-15"
+    const year = parts[0];
+    const monthIndex = parseInt(parts[1], 10) - 1;
+    const day = parseInt(parts[2], 10);
+
+    if (language === 'ar') {
+      const monthName = arabicMonths[monthIndex] || parts[1];
+      return `${day} ${monthName} ${year}`;
+    } else {
+      const monthNamesEn = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      const monthName = monthNamesEn[monthIndex] || parts[1];
+      return `${day} ${monthName} ${year}`;
+    }
   } catch {
     return dateString;
   }
@@ -125,9 +142,11 @@ export function getCertificateSummary(cert: Partial<DoctorCertificate>, language
 export function getCurrentEmploymentStatus(history: DoctorEmploymentHistory[] = []): DoctorEmploymentHistory | null {
   if (!history || history.length === 0) return null;
 
-  // Sort by start_date descending
+  // Sort by start_date descending (or created_at)
   const sorted = [...history].sort((a, b) => {
-    return new Date(b.start_date).getTime() - new Date(a.start_date).getTime();
+    const timeB = b.start_date ? new Date(b.start_date).getTime() : (b.created_at ? new Date(b.created_at).getTime() : 0);
+    const timeA = a.start_date ? new Date(a.start_date).getTime() : (a.created_at ? new Date(a.created_at).getTime() : 0);
+    return (isNaN(timeB) ? 0 : timeB) - (isNaN(timeA) ? 0 : timeA);
   });
 
   const todayStr = new Date().toISOString().split('T')[0];
@@ -145,29 +164,32 @@ export function getCurrentEmploymentStatus(history: DoctorEmploymentHistory[] = 
  */
 export function validateEmploymentPeriod(
   existingPeriods: DoctorEmploymentHistory[],
-  newPeriod: { id?: string; start_date: string; end_date?: string | null; status_type?: string }
+  newPeriod: { id?: string; start_date?: string | null; end_date?: string | null; status_type?: string }
 ): { valid: boolean; message?: string } {
-  if (!newPeriod.start_date) {
-    return { valid: false, message: 'تاريخ بداية الحالة مطلوب' };
+  // If no start_date is specified, allow saving freely
+  if (!newPeriod.start_date || !newPeriod.start_date.trim()) {
+    return { valid: true };
   }
 
   const newStart = new Date(newPeriod.start_date).getTime();
   const newEnd = newPeriod.end_date ? new Date(newPeriod.end_date).getTime() : Infinity;
 
-  if (newEnd < newStart) {
+  if (!isNaN(newStart) && !isNaN(newEnd) && newEnd < newStart) {
     return { valid: false, message: 'تاريخ النهاية يجب أن يكون بعد تاريخ البداية' };
   }
 
   for (const period of existingPeriods) {
     if (newPeriod.id && period.id === newPeriod.id) continue;
+    if (!period.start_date) continue; // Skip periods with no dates
 
     const pStart = new Date(period.start_date).getTime();
     const pEnd = period.end_date ? new Date(period.end_date).getTime() : Infinity;
 
+    if (isNaN(pStart) || isNaN(pEnd) || isNaN(newStart) || isNaN(newEnd)) continue;
+
     // Check if intervals overlap
     const isOverlapping = (newStart <= pEnd) && (newEnd >= pStart);
     if (isOverlapping) {
-      // If one of the periods is 'إنهاء خدمة' or both are continuous
       return {
         valid: false,
         message: `تتعارض الفترة المدخلة مع فترة سابقة (${period.status_type}: ${period.start_date} إلى ${period.end_date || 'مستمر'})`

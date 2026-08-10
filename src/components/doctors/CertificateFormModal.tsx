@@ -126,9 +126,7 @@ export function CertificateFormModal({
       setCustomCountry('');
       setStatus('obtained');
 
-      const curYear = new Date().getFullYear();
-      const curMonth = String(new Date().getMonth() + 1).padStart(2, '0');
-      setObtainedDate(`${curYear}-${curMonth}-01`);
+      setObtainedDate('');
       setStudyStartDate('');
       setExpectedDate('');
 
@@ -204,19 +202,6 @@ export function CertificateFormModal({
       Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى تحديد نوع الشهادة', confirmButtonColor: '#4f46e5' });
       return;
     }
-    if (!certificateTitle.trim()) {
-      Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى إدخال مسمى الشهادة / التخصص', confirmButtonColor: '#4f46e5' });
-      return;
-    }
-    if (!finalUnivName) {
-      Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى تحديد أو إدخال اسم الجامعة', confirmButtonColor: '#4f46e5' });
-      return;
-    }
-    if (status === 'obtained' && !obtainedDate) {
-      Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'تاريخ الحصول على الشهادة مطلوب', confirmButtonColor: '#4f46e5' });
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -248,6 +233,19 @@ export function CertificateFormModal({
         if (found) matchedUnivId = found.id;
       }
 
+      const getDateMode = (d: string | null | undefined): 'year' | 'month' | 'full' => {
+        if (!d) return 'month';
+        const p = d.trim().split('-');
+        if (p.length === 1) return 'year';
+        if (p.length === 2) return 'month';
+        return 'full';
+      };
+
+      const finalObtainedDate = status === 'obtained' ? (obtainedDate ? obtainedDate.trim() : null) : null;
+      const finalStudyStartDate = status === 'in_progress' ? (studyStartDate ? studyStartDate.trim() : null) : null;
+      const finalExpectedDate = status === 'in_progress' ? (expectedDate ? expectedDate.trim() : null) : null;
+      const dateMode = getDateMode(finalObtainedDate || finalExpectedDate || finalStudyStartDate);
+
       const payload = {
         doctor_id: doctorId,
         organization_id: organizationId || null,
@@ -257,9 +255,10 @@ export function CertificateFormModal({
         university_country: finalCountry || 'مصر',
         university_id: matchedUnivId,
         status,
-        obtained_date: status === 'obtained' ? (obtainedDate || null) : null,
-        study_start_date: status === 'in_progress' ? (studyStartDate || null) : null,
-        expected_date: status === 'in_progress' ? (expectedDate || null) : null,
+        date_mode: dateMode,
+        obtained_date: finalObtainedDate,
+        study_start_date: finalStudyStartDate,
+        expected_date: finalExpectedDate,
         file_url: fileUrl,
         file_name: fileName,
         notes: notes.trim() || null,
@@ -491,7 +490,7 @@ export function CertificateFormModal({
           {status === 'obtained' ? (
             <FlexibleDateInput
               label={t('obtainedDate')}
-              required
+              required={false}
               value={obtainedDate}
               onChange={(val) => setObtainedDate(val)}
               minYear={1960}

@@ -60,7 +60,7 @@ export function FinancialGradeModal({
     } else {
       setFinancialGrade('الدرجة الثالثة');
       setCustomGrade('');
-      setStartDate(new Date().toISOString().split('T')[0]);
+      setStartDate('');
       setEndDate('');
       setIsOngoing(true);
       setNotes('');
@@ -74,16 +74,6 @@ export function FinancialGradeModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!startDate) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'تنبيه',
-        text: 'تاريخ بداية الدرجة المالية مطلوب',
-        confirmButtonColor: '#4f46e5'
-      });
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -91,8 +81,8 @@ export function FinancialGradeModal({
         doctor_id: doctorId,
         organization_id: organizationId || null,
         financial_grade: finalGrade,
-        start_date: startDate,
-        end_date: isOngoing ? null : (endDate || null),
+        start_date: startDate ? startDate.trim() : null,
+        end_date: isOngoing ? null : (endDate ? endDate.trim() : null),
         notes: notes.trim() || null
       };
 
@@ -191,7 +181,7 @@ export function FinancialGradeModal({
           {/* Start Date */}
           <FlexibleDateInput
             label={t('startDate')}
-            required
+            required={false}
             value={startDate}
             onChange={(val) => setStartDate(val)}
             minYear={1970}
@@ -220,7 +210,7 @@ export function FinancialGradeModal({
           {!isOngoing && (
             <FlexibleDateInput
               label={t('endDate')}
-              required={!isOngoing}
+              required={false}
               value={endDate}
               onChange={(val) => setEndDate(val)}
               minYear={1970}

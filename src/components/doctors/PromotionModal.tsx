@@ -62,7 +62,7 @@ export function PromotionModal({
     } else {
       setPromotionType('أخصائي');
       setCustomPromotion('');
-      setPromotionDate(new Date().toISOString().split('T')[0]);
+      setPromotionDate('');
       setDocumentUrl(null);
       setDocumentName(null);
       setNotes('');
@@ -101,16 +101,6 @@ export function PromotionModal({
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
 
-    if (!promotionDate) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'تنبيه',
-        text: 'تاريخ الترقية مطلوب',
-        confirmButtonColor: '#4f46e5'
-      });
-      return;
-    }
-
     try {
       setLoading(true);
 
@@ -118,7 +108,7 @@ export function PromotionModal({
         doctor_id: doctorId,
         organization_id: organizationId || null,
         promotion_type: finalType,
-        promotion_date: promotionDate,
+        promotion_date: promotionDate ? promotionDate.trim() : null,
         document_url: documentUrl,
         document_name: documentName,
         notes: notes.trim() || null
@@ -219,7 +209,7 @@ export function PromotionModal({
           {/* Promotion Date */}
           <FlexibleDateInput
             label={t('promotionDate')}
-            required
+            required={false}
             value={promotionDate}
             onChange={(val) => setPromotionDate(val)}
             minYear={1970}

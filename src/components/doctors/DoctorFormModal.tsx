@@ -76,9 +76,9 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
       const payload = {
         name: formData.name.trim(),
         national_id: formData.national_id.trim() || null,
-        birth_date: formData.birth_date || null,
-        graduation_date: formData.graduation_date || null,
-        hire_date: formData.hire_date || null,
+        birth_date: formData.birth_date ? formData.birth_date.trim() : null,
+        graduation_date: formData.graduation_date ? formData.graduation_date.trim() : null,
+        hire_date: formData.hire_date ? formData.hire_date.trim() : null,
         address: formData.address.trim() || null,
         phone: formData.phone.trim() || null,
         notes: formData.notes.trim() || null,

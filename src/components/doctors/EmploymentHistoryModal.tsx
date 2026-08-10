@@ -111,7 +111,7 @@ export function EmploymentHistoryModal({
       setCustomAdminRole('');
       setAdministrativeFacility('');
 
-      setStartDate(new Date().toISOString().split('T')[0]);
+      setStartDate('');
       setEndDate('');
       setIsOngoing(true);
       setNotes('');
@@ -125,16 +125,6 @@ export function EmploymentHistoryModal({
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-
-    if (!startDate) {
-      Swal.fire({
-        icon: 'warning',
-        title: 'تنبيه',
-        text: 'تاريخ بداية الحالة مطلوب',
-        confirmButtonColor: '#4f46e5'
-      });
-      return;
-    }
 
     if (hasAdministrativeDuty && administrativeRole === 'أخرى' && !customAdminRole.trim()) {
       Swal.fire({
@@ -183,8 +173,8 @@ export function EmploymentHistoryModal({
         administrative_scope: hasAdministrativeDuty ? administrativeScope : null,
         administrative_role: hasAdministrativeDuty ? finalAdminRole : null,
         administrative_facility: (hasAdministrativeDuty && administrativeScope === 'خارج القسم') ? (administrativeFacility.trim() || null) : null,
-        start_date: startDate,
-        end_date: finalEndDate,
+        start_date: startDate ? startDate.trim() : null,
+        end_date: finalEndDate ? finalEndDate.trim() : null,
         notes: notes.trim() || null
       };
 
@@ -460,7 +450,7 @@ export function EmploymentHistoryModal({
           {/* Start Date */}
           <FlexibleDateInput
             label={t('startDate')}
-            required
+            required={false}
             value={startDate}
             onChange={(val) => setStartDate(val)}
             minYear={1970}
@@ -489,7 +479,7 @@ export function EmploymentHistoryModal({
           {!isOngoing && (
             <FlexibleDateInput
               label={t('endDate')}
-              required={!isOngoing}
+              required={false}
               value={endDate}
               onChange={(val) => setEndDate(val)}
               minYear={1970}
