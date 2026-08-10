@@ -209,6 +209,7 @@ export interface DoctorCertificate {
   university_country: string;
   university_id?: string | null;
   status: 'obtained' | 'in_progress';
+  date_mode?: 'month' | 'full' | string | null;
   obtained_date: string | null;
   study_start_date: string | null;
   expected_date: string | null;

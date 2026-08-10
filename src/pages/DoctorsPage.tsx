@@ -898,22 +898,22 @@ export function DoctorsPage() {
 
                   {/* Certificates in card */}
                   {doc.certificates && doc.certificates.length > 0 && (
-                    <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-1.5">
-                      <span className="text-[11px] font-bold text-gray-400 block">{t('certificates')}:</span>
+                    <div className="mt-4 pt-3 border-t border-gray-100 dark:border-gray-700 space-y-2">
+                      <span className="text-[11px] font-bold text-gray-500 dark:text-gray-400 block">{t('certificates')}:</span>
                       {doc.certificates.slice(0, 2).map((c) => (
                         <div
                           key={c.id}
-                          className="text-xs p-2 rounded-xl bg-gray-50 dark:bg-gray-700/50 border border-gray-200 dark:border-gray-600"
+                          className="text-xs p-2.5 rounded-xl bg-slate-50 dark:bg-gray-700/80 border border-slate-200 dark:border-gray-600"
                         >
-                          <div className="font-semibold text-gray-900 dark:text-gray-100 flex items-center justify-between">
+                          <div className="font-bold text-gray-900 dark:text-white flex items-center justify-between">
                             <span>{c.certificate_type} {c.certificate_title}</span>
-                            <span className={`text-[10px] px-1.5 py-0.5 rounded font-bold ${
-                              c.status === 'obtained' ? 'bg-emerald-100 text-emerald-800' : 'bg-blue-100 text-blue-800'
+                            <span className={`text-[10px] px-2 py-0.5 rounded-full font-bold ${
+                              c.status === 'obtained' ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950/80 dark:text-emerald-300' : 'bg-blue-100 text-blue-800 dark:bg-blue-950/80 dark:text-blue-300'
                             }`}>
                               {c.status === 'obtained' ? t('obtained') : t('inProgress')}
                             </span>
                           </div>
-                          <div className="text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                          <div className="text-[11px] text-gray-600 dark:text-gray-300 mt-1 font-medium">
                             {c.university_name}
                           </div>
                         </div>

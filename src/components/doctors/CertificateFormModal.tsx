@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Award, Upload, FileText, Calendar, Building, Globe, CheckCircle2, Clock, Loader2, Sparkles } from 'lucide-react';
+import { X, Award, Upload, FileText, Calendar, Building, Globe, CheckCircle2, Clock, Loader2, Sparkles, CalendarDays } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { DoctorCertificate, University, CertificateType } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -46,6 +46,24 @@ const DEFAULT_COUNTRIES = [
   'أخرى'
 ];
 
+const MONTH_OPTIONS = [
+  { value: '01', labelAr: '01 - يناير', labelEn: '01 - January' },
+  { value: '02', labelAr: '02 - فبراير', labelEn: '02 - February' },
+  { value: '03', labelAr: '03 - مارس', labelEn: '03 - March' },
+  { value: '04', labelAr: '04 - أبريل', labelEn: '04 - April' },
+  { value: '05', labelAr: '05 - مايو', labelEn: '05 - May' },
+  { value: '06', labelAr: '06 - يونيو', labelEn: '06 - June' },
+  { value: '07', labelAr: '07 - يوليو', labelEn: '07 - July' },
+  { value: '08', labelAr: '08 - أغسطس', labelEn: '08 - August' },
+  { value: '09', labelAr: '09 - سبتمبر', labelEn: '09 - September' },
+  { value: '10', labelAr: '10 - أكتوبر', labelEn: '10 - October' },
+  { value: '11', labelAr: '11 - نوفمبر', labelEn: '11 - November' },
+  { value: '12', labelAr: '12 - ديسمبر', labelEn: '12 - December' }
+];
+
+const CURRENT_YEAR = new Date().getFullYear();
+const YEAR_OPTIONS = Array.from({ length: 65 }, (_, i) => String(CURRENT_YEAR + 8 - i));
+
 export function CertificateFormModal({
   isOpen,
   onClose,
@@ -73,11 +91,25 @@ export function CertificateFormModal({
   const [universityCountry, setUniversityCountry] = useState('مصر');
   const [customCountry, setCustomCountry] = useState('');
 
-  // Status & Dates
+  // Status & Date Mode ('month' vs 'full')
   const [status, setStatus] = useState<'obtained' | 'in_progress'>('obtained');
-  const [obtainedDate, setObtainedDate] = useState('');
-  const [studyStartDate, setStudyStartDate] = useState('');
-  const [expectedDate, setExpectedDate] = useState('');
+  const [dateMode, setDateMode] = useState<'month' | 'full'>('month');
+
+  // Obtained Date States
+  const [obtainedYear, setObtainedYear] = useState(String(CURRENT_YEAR));
+  const [obtainedMonth, setObtainedMonth] = useState('08');
+  const [obtainedFullDate, setObtainedFullDate] = useState('');
+
+  // Study Start Date States (for in_progress)
+  const [studyStartYear, setStudyStartYear] = useState(String(CURRENT_YEAR));
+  const [studyStartMonth, setStudyStartMonth] = useState('09');
+  const [studyStartFullDate, setStudyStartFullDate] = useState('');
+
+  // Expected Date States (for in_progress)
+  const [expectedYear, setExpectedYear] = useState(String(CURRENT_YEAR + 2));
+  const [expectedMonth, setExpectedMonth] = useState('06');
+  const [expectedFullDate, setExpectedFullDate] = useState('');
+
   const [fileUrl, setFileUrl] = useState<string | null>(null);
   const [fileName, setFileName] = useState<string | null>(null);
   const [notes, setNotes] = useState('');
@@ -105,9 +137,42 @@ export function CertificateFormModal({
       }
 
       setStatus(certificate.status || 'obtained');
-      setObtainedDate(certificate.obtained_date || '');
-      setStudyStartDate(certificate.study_start_date || '');
-      setExpectedDate(certificate.expected_date || '');
+      const mode = (certificate.date_mode as 'month' | 'full') || 'month';
+      setDateMode(mode);
+
+      if (certificate.obtained_date) {
+        const parts = certificate.obtained_date.split('-');
+        setObtainedYear(parts[0] || String(CURRENT_YEAR));
+        setObtainedMonth(parts[1] || '08');
+        setObtainedFullDate(certificate.obtained_date);
+      } else {
+        setObtainedYear(String(CURRENT_YEAR));
+        setObtainedMonth(String(new Date().getMonth() + 1).padStart(2, '0'));
+        setObtainedFullDate('');
+      }
+
+      if (certificate.study_start_date) {
+        const parts = certificate.study_start_date.split('-');
+        setStudyStartYear(parts[0] || String(CURRENT_YEAR));
+        setStudyStartMonth(parts[1] || '09');
+        setStudyStartFullDate(certificate.study_start_date);
+      } else {
+        setStudyStartYear(String(CURRENT_YEAR));
+        setStudyStartMonth('09');
+        setStudyStartFullDate('');
+      }
+
+      if (certificate.expected_date) {
+        const parts = certificate.expected_date.split('-');
+        setExpectedYear(parts[0] || String(CURRENT_YEAR + 2));
+        setExpectedMonth(parts[1] || '06');
+        setExpectedFullDate(certificate.expected_date);
+      } else {
+        setExpectedYear(String(CURRENT_YEAR + 2));
+        setExpectedMonth('06');
+        setExpectedFullDate('');
+      }
+
       setFileUrl(certificate.file_url || null);
       setFileName(certificate.file_name || null);
       setNotes(certificate.notes || '');
@@ -122,9 +187,21 @@ export function CertificateFormModal({
       setUniversityCountry(universities[0]?.country || 'مصر');
       setCustomCountry('');
       setStatus('obtained');
-      setObtainedDate(new Date().toISOString().split('T')[0]);
-      setStudyStartDate('');
-      setExpectedDate('');
+      setDateMode('month');
+
+      const curMonth = String(new Date().getMonth() + 1).padStart(2, '0');
+      setObtainedYear(String(CURRENT_YEAR));
+      setObtainedMonth(curMonth);
+      setObtainedFullDate(new Date().toISOString().split('T')[0]);
+
+      setStudyStartYear(String(CURRENT_YEAR));
+      setStudyStartMonth('09');
+      setStudyStartFullDate('');
+
+      setExpectedYear(String(CURRENT_YEAR + 2));
+      setExpectedMonth('06');
+      setExpectedFullDate('');
+
       setFileUrl(null);
       setFileName(null);
       setNotes('');
@@ -138,6 +215,19 @@ export function CertificateFormModal({
   const finalCountry = universityCountry === 'custom' ? customCountry.trim() : universityCountry;
   const finalType = certificateType === 'أخرى' && customType.trim() ? customType.trim() : certificateType;
 
+  // Compute actual date values based on dateMode
+  const computedObtainedDate = dateMode === 'month'
+    ? `${obtainedYear}-${obtainedMonth}-01`
+    : (obtainedFullDate || `${obtainedYear}-${obtainedMonth}-01`);
+
+  const computedStudyStartDate = dateMode === 'month'
+    ? `${studyStartYear}-${studyStartMonth}-01`
+    : (studyStartFullDate || null);
+
+  const computedExpectedDate = dateMode === 'month'
+    ? `${expectedYear}-${expectedMonth}-01`
+    : (expectedFullDate || null);
+
   // Live Generated Display Text
   const liveSummary = getCertificateSummary({
     certificate_type: finalType || (language === 'ar' ? 'نوع الشهادة' : 'Degree'),
@@ -145,9 +235,10 @@ export function CertificateFormModal({
     university_name: finalUnivName || (language === 'ar' ? 'الجامعة' : 'University'),
     university_country: finalCountry,
     status,
-    obtained_date: obtainedDate,
-    study_start_date: studyStartDate,
-    expected_date: expectedDate,
+    date_mode: dateMode,
+    obtained_date: computedObtainedDate,
+    study_start_date: computedStudyStartDate,
+    expected_date: computedExpectedDate,
   }, language);
 
   const handleUniversitySelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
@@ -205,7 +296,7 @@ export function CertificateFormModal({
       Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'يرجى تحديد أو إدخال اسم الجامعة', confirmButtonColor: '#4f46e5' });
       return;
     }
-    if (status === 'obtained' && !obtainedDate) {
+    if (status === 'obtained' && !computedObtainedDate) {
       Swal.fire({ icon: 'warning', title: 'تنبيه', text: 'تاريخ الحصول على الشهادة مطلوب', confirmButtonColor: '#4f46e5' });
       return;
     }
@@ -213,7 +304,7 @@ export function CertificateFormModal({
     try {
       setLoading(true);
 
-      // If user typed a new custom university, automatically persist it into the universities table!
+      // If user typed a new custom university, automatically persist it into the universities table
       let matchedUnivId: string | null = null;
       if (isCustomUniversity && customUniversityName.trim()) {
         try {
@@ -250,9 +341,10 @@ export function CertificateFormModal({
         university_country: finalCountry || 'مصر',
         university_id: matchedUnivId,
         status,
-        obtained_date: status === 'obtained' ? (obtainedDate || null) : null,
-        study_start_date: status === 'in_progress' ? (studyStartDate || null) : null,
-        expected_date: status === 'in_progress' ? (expectedDate || null) : null,
+        date_mode: dateMode,
+        obtained_date: status === 'obtained' ? computedObtainedDate : null,
+        study_start_date: status === 'in_progress' ? computedStudyStartDate : null,
+        expected_date: status === 'in_progress' ? computedExpectedDate : null,
         file_url: fileUrl,
         file_name: fileName,
         notes: notes.trim() || null,
@@ -316,7 +408,7 @@ export function CertificateFormModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           
           {/* Certificate Type */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
@@ -480,56 +572,188 @@ export function CertificateFormModal({
             </div>
           </div>
 
-          {/* Conditional Date Fields based on status */}
-          {status === 'obtained' ? (
-            <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                {t('obtainedDate')} <span className="text-red-500">*</span>
-              </label>
-              <div className="relative">
-                <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="date"
-                  required
-                  value={obtainedDate}
-                  onChange={(e) => setObtainedDate(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
-          ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  {t('studyStartDate')}
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                  <input
-                    type="date"
-                    value={studyStartDate}
-                    onChange={(e) => setStudyStartDate(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
-              </div>
+          {/* Date Type Selector (Month & Year vs Full Date) */}
+          <div className="p-4 bg-slate-50/90 dark:bg-gray-750/70 rounded-2xl border border-slate-200 dark:border-gray-700 space-y-3.5">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-2 border-b border-gray-200 dark:border-gray-700">
+              <span className="text-xs font-bold text-gray-800 dark:text-gray-200 flex items-center gap-1.5">
+                <CalendarDays className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+                <span>{language === 'ar' ? 'طريقة إدخال التاريخ' : 'Date Format Preference'}</span>
+              </span>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                  {t('expectedDate')} <span className="text-xs text-gray-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
-                </label>
-                <div className="relative">
-                  <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                  <input
-                    type="date"
-                    value={expectedDate}
-                    onChange={(e) => setExpectedDate(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
-                  />
-                </div>
+              <div className="flex items-center bg-gray-200/80 dark:bg-gray-700 p-1 rounded-xl text-xs font-bold">
+                <button
+                  type="button"
+                  onClick={() => setDateMode('month')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    dateMode === 'month'
+                      ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>🗓️</span>
+                  <span>{language === 'ar' ? 'شهر وسنة فقط' : 'Month & Year'}</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setDateMode('full')}
+                  className={`px-3 py-1.5 rounded-lg transition-all flex items-center gap-1.5 ${
+                    dateMode === 'full'
+                      ? 'bg-emerald-600 text-white shadow-sm font-bold'
+                      : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+                  }`}
+                >
+                  <span>📅</span>
+                  <span>{language === 'ar' ? 'يوم وشهر وسنة' : 'Full Date'}</span>
+                </button>
               </div>
             </div>
-          )}
+
+            {/* Conditional Date Fields based on status */}
+            {status === 'obtained' ? (
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                  {t('obtainedDate')} <span className="text-red-500">*</span>
+                </label>
+
+                {dateMode === 'month' ? (
+                  <div className="grid grid-cols-2 gap-3 animate-in fade-in duration-150">
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {language === 'ar' ? 'الشهر' : 'Month'}
+                      </label>
+                      <select
+                        value={obtainedMonth}
+                        onChange={(e) => setObtainedMonth(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-emerald-500"
+                      >
+                        {MONTH_OPTIONS.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {language === 'ar' ? m.labelAr : m.labelEn}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
+                        {language === 'ar' ? 'السنة' : 'Year'}
+                      </label>
+                      <select
+                        value={obtainedYear}
+                        onChange={(e) => setObtainedYear(e.target.value)}
+                        className="w-full px-3 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm font-medium focus:ring-2 focus:ring-emerald-500 font-mono"
+                      >
+                        {YEAR_OPTIONS.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="relative animate-in fade-in duration-150">
+                    <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                    <input
+                      type="date"
+                      required
+                      value={obtainedFullDate}
+                      onChange={(e) => setObtainedFullDate(e.target.value)}
+                      className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 transition-all font-mono"
+                    />
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                {/* Study Start Date */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                    {t('studyStartDate')}
+                  </label>
+                  {dateMode === 'month' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={studyStartMonth}
+                        onChange={(e) => setStudyStartMonth(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                      >
+                        {MONTH_OPTIONS.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {language === 'ar' ? m.labelAr : m.labelEn}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={studyStartYear}
+                        onChange={(e) => setStudyStartYear(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-blue-500 font-mono"
+                      >
+                        {YEAR_OPTIONS.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        value={studyStartFullDate}
+                        onChange={(e) => setStudyStartFullDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {/* Expected Completion Date */}
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1.5">
+                    {t('expectedDate')} <span className="text-xs text-gray-400 font-normal">({language === 'ar' ? 'اختياري' : 'Optional'})</span>
+                  </label>
+                  {dateMode === 'month' ? (
+                    <div className="grid grid-cols-2 gap-2">
+                      <select
+                        value={expectedMonth}
+                        onChange={(e) => setExpectedMonth(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-blue-500"
+                      >
+                        {MONTH_OPTIONS.map((m) => (
+                          <option key={m.value} value={m.value}>
+                            {language === 'ar' ? m.labelAr : m.labelEn}
+                          </option>
+                        ))}
+                      </select>
+                      <select
+                        value={expectedYear}
+                        onChange={(e) => setExpectedYear(e.target.value)}
+                        className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs font-medium focus:ring-2 focus:ring-blue-500 font-mono"
+                      >
+                        {YEAR_OPTIONS.map((y) => (
+                          <option key={y} value={y}>
+                            {y}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+                  ) : (
+                    <div className="relative">
+                      <Calendar className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                      <input
+                        type="date"
+                        value={expectedFullDate}
+                        onChange={(e) => setExpectedFullDate(e.target.value)}
+                        className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs focus:ring-2 focus:ring-blue-500 font-mono"
+                      />
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Certificate File Upload */}
           <div>
@@ -564,13 +788,13 @@ export function CertificateFormModal({
             </div>
           </div>
 
-          {/* Live Generated Summary Box */}
-          <div className="p-3.5 bg-gradient-to-r from-indigo-50/80 to-purple-50/80 dark:from-indigo-950/40 dark:to-purple-950/40 rounded-xl border border-indigo-200/80 dark:border-indigo-800/80">
-            <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-xs font-bold text-indigo-700 dark:text-indigo-300 mb-1">
-              <Sparkles className="w-3.5 h-3.5" />
+          {/* Live Generated Summary Box with High Contrast */}
+          <div className="p-4 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/80 shadow-sm space-y-1.5">
+            <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-xs font-bold text-emerald-800 dark:text-emerald-300">
+              <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
               <span>{t('generatedSummary')} (Generated Display Text):</span>
             </div>
-            <p className="text-sm font-semibold text-gray-900 dark:text-gray-100">
+            <p className="text-sm font-bold text-gray-900 dark:text-white leading-relaxed">
               {liveSummary || '...'}
             </p>
           </div>

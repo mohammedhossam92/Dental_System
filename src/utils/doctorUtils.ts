@@ -62,39 +62,54 @@ export function getYearFromDate(dateString: string | null): string {
 }
 
 /**
+ * Format certificate date based on precision / date_mode ('month' vs 'full')
+ */
+export function formatCertificateDate(
+  dateString: string | null | undefined,
+  mode: 'month' | 'full' | string = 'month',
+  language: string = 'ar'
+): string {
+  if (!dateString) return '';
+  if (mode === 'full') {
+    return formatDate(dateString, language);
+  }
+  return formatMonthYear(dateString, language);
+}
+
+/**
  * Generate formatted summary text for a certificate (Generated Display Text)
  * Examples:
  * - "دبلوم جراحة الوجه والفكين، جامعة المنصورة، أغسطس 2018"
- * - "دكتوراه طب الأسنان، جامعة المنصورة، قيد الدراسة، متوقع الحصول عليها عام 2027"
+ * - "ماجستير طب الأسنان، جامعة القاهرة، 15 مايو 2021"
+ * - "دكتوراه طب الأسنان، جامعة المنصورة، قيد الدراسة، متوقع الحصول عليها: أغسطس 2027"
  */
 export function getCertificateSummary(cert: Partial<DoctorCertificate>, language: string = 'ar'): string {
   const type = cert.certificate_type || '';
   const title = cert.certificate_title || '';
   const univ = cert.university_name || '';
   const country = cert.university_country && cert.university_country !== 'مصر' ? ` (${cert.university_country})` : '';
+  const mode = cert.date_mode || 'month';
 
   if (language === 'ar') {
     if (cert.status === 'in_progress') {
       let expectedPart = '';
       if (cert.expected_date) {
-        const expYear = getYearFromDate(cert.expected_date);
-        expectedPart = `، متوقع الحصول عليها عام ${expYear || formatMonthYear(cert.expected_date, 'ar')}`;
+        expectedPart = `، متوقع الحصول عليها: ${formatCertificateDate(cert.expected_date, mode, 'ar')}`;
       }
       return `${type} ${title}، ${univ}${country}، قيد الدراسة${expectedPart}`.replace(/\s+/g, ' ').trim();
     } else {
-      const datePart = cert.obtained_date ? `، ${formatMonthYear(cert.obtained_date, 'ar')}` : '';
+      const datePart = cert.obtained_date ? `، ${formatCertificateDate(cert.obtained_date, mode, 'ar')}` : '';
       return `${type} ${title}، ${univ}${country}${datePart}`.replace(/\s+/g, ' ').trim();
     }
   } else {
     if (cert.status === 'in_progress') {
       let expectedPart = '';
       if (cert.expected_date) {
-        const expYear = getYearFromDate(cert.expected_date);
-        expectedPart = `, expected in ${expYear || formatMonthYear(cert.expected_date, 'en')}`;
+        expectedPart = `, expected in ${formatCertificateDate(cert.expected_date, mode, 'en')}`;
       }
       return `${type} in ${title}, ${univ}${country}, In Progress${expectedPart}`.replace(/\s+/g, ' ').trim();
     } else {
-      const datePart = cert.obtained_date ? `, ${formatMonthYear(cert.obtained_date, 'en')}` : '';
+      const datePart = cert.obtained_date ? `, ${formatCertificateDate(cert.obtained_date, mode, 'en')}` : '';
       return `${type} in ${title}, ${univ}${country}${datePart}`.replace(/\s+/g, ' ').trim();
     }
   }

@@ -12,7 +12,7 @@ import type {
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import {
-  formatDate, formatMonthYear, getCertificateSummary,
+  formatDate, formatMonthYear, formatCertificateDate, getCertificateSummary,
   getCurrentEmploymentStatus, uploadDoctorFile
 } from '../../utils/doctorUtils';
 import { DoctorFormModal } from './DoctorFormModal';
@@ -598,49 +598,53 @@ export function DoctorDetailsModal({
                             <th className="px-4 py-3 text-center">{t('actions')}</th>
                           </tr>
                         </thead>
-                        <tbody className="bg-white dark:bg-gray-850 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
+                        <tbody className="bg-white dark:bg-gray-800 divide-y divide-gray-200 dark:divide-gray-700 text-sm">
                           {doctorDetails?.certificates?.map((cert) => {
                             const summaryText = getCertificateSummary(cert, language);
                             const isObtained = cert.status === 'obtained';
                             return (
-                              <tr key={cert.id} className="hover:bg-gray-50 dark:hover:bg-gray-750 transition-colors">
+                              <tr key={cert.id} className="hover:bg-gray-50 dark:hover:bg-gray-700/60 transition-colors">
                                 <td className="px-4 py-3.5 font-bold text-gray-900 dark:text-white whitespace-nowrap">
                                   {cert.certificate_type}
                                 </td>
-                                <td className="px-4 py-3.5 font-semibold text-indigo-600 dark:text-indigo-400">
+                                <td className="px-4 py-3.5 font-bold text-indigo-600 dark:text-indigo-400">
                                   {cert.certificate_title}
                                 </td>
-                                <td className="px-4 py-3.5 text-gray-700 dark:text-gray-300">
-                                  <div>{cert.university_name}</div>
+                                <td className="px-4 py-3.5 text-gray-800 dark:text-gray-200">
+                                  <div className="font-medium">{cert.university_name}</div>
                                   {cert.university_country && (
                                     <span className="text-xs text-gray-400 font-normal">({cert.university_country})</span>
                                   )}
                                 </td>
                                 <td className="px-4 py-3.5 whitespace-nowrap">
                                   {isObtained ? (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/60 dark:text-emerald-300">
-                                      <CheckCircle2 className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1 text-emerald-600" />
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                      <CheckCircle2 className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1 text-emerald-600 dark:text-emerald-400" />
                                       {t('obtained')}
                                     </span>
                                   ) : (
-                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/60 dark:text-blue-300">
-                                      <Clock className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1 text-blue-600" />
+                                    <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                      <Clock className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1 text-blue-600 dark:text-blue-400" />
                                       {t('inProgress')}
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3.5 text-gray-600 dark:text-gray-300 whitespace-nowrap font-medium">
+                                <td className="px-4 py-3.5 text-gray-700 dark:text-gray-200 whitespace-nowrap font-medium font-mono text-xs">
                                   {isObtained ? (
-                                    formatMonthYear(cert.obtained_date, language)
+                                    formatCertificateDate(cert.obtained_date, cert.date_mode, language)
                                   ) : (
-                                    <span>
-                                      {cert.study_start_date ? `بدء: ${formatMonthYear(cert.study_start_date, language)}` : ''}
-                                      {cert.expected_date ? ` | متوقع: ${formatMonthYear(cert.expected_date, language)}` : ''}
+                                    <span className="space-y-0.5 block">
+                                      {cert.study_start_date && (
+                                        <span className="block">{language === 'ar' ? 'بدء:' : 'Start:'} {formatCertificateDate(cert.study_start_date, cert.date_mode, language)}</span>
+                                      )}
+                                      {cert.expected_date && (
+                                        <span className="block text-blue-600 dark:text-blue-400">{language === 'ar' ? 'متوقع:' : 'Exp:'} {formatCertificateDate(cert.expected_date, cert.date_mode, language)}</span>
+                                      )}
                                     </span>
                                   )}
                                 </td>
-                                <td className="px-4 py-3.5 text-xs text-gray-600 dark:text-gray-300 max-w-xs">
-                                  <div className="p-1.5 bg-gray-50 dark:bg-gray-750 rounded-lg border border-gray-200 dark:border-gray-700 italic">
+                                <td className="px-4 py-3.5 max-w-sm">
+                                  <div className="p-2 bg-slate-100/90 dark:bg-gray-700/80 rounded-xl border border-slate-200 dark:border-gray-600 text-xs font-medium text-slate-800 dark:text-slate-100 shadow-sm leading-relaxed">
                                     "{summaryText}"
                                   </div>
                                 </td>
