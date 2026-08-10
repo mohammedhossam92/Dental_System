@@ -44,29 +44,36 @@ export function DoctorsPage() {
   // Filter State
   const [filters, setFilters] = useState<DoctorFilterState>({
     search: '',
+    sortBy: 'recently_added',
     employmentStatus: 'all',
     administrativeDuty: 'all',
     certificateType: 'all',
     certificateStatus: 'all',
     university: 'all',
     obtainedYear: 'all',
+    promotionType: 'all',
+    financialGrade: 'all',
   });
 
   const fetchData = useCallback(async () => {
     try {
       setLoading(true);
 
-      // Fetch doctors, certificates, employment history, universities, and cert types in parallel
+      // Fetch doctors, certificates, employment history, promotions, grades, universities, and cert types in parallel
       const [
         docsRes,
         historyRes,
         certsRes,
+        promsRes,
+        gradesRes,
         univsRes,
         typesRes
       ] = await Promise.all([
-        supabase.from('doctors').select('*').order('name'),
-        supabase.from('doctor_employment_history').select('*').order('start_date', { ascending: false }),
+        supabase.from('doctors').select('*').order('created_at', { ascending: false }),
+        supabase.from('doctor_employment_history').select('*').order('created_at', { ascending: false }),
         supabase.from('doctor_certificates').select('*').order('created_at', { ascending: false }),
+        supabase.from('doctor_promotions').select('*').order('created_at', { ascending: false }),
+        supabase.from('doctor_financial_grades').select('*').order('created_at', { ascending: false }),
         supabase.from('universities').select('*').order('name'),
         supabase.from('certificate_types').select('*').order('name')
       ]);
@@ -76,18 +83,26 @@ export function DoctorsPage() {
       const rawDoctors = docsRes.data || [];
       const allHistory = historyRes.data || [];
       const allCerts = certsRes.data || [];
+      const allProms = promsRes.data || [];
+      const allGrades = gradesRes.data || [];
 
       // Combine relational data for fast searching and structured filtering
       const doctorsWithDetails: DoctorWithDetails[] = rawDoctors.map((doc) => {
         const docHistory = allHistory.filter((h) => h.doctor_id === doc.id);
         const docCerts = allCerts.filter((c) => c.doctor_id === doc.id);
+        const docProms = allProms.filter((p) => p.doctor_id === doc.id);
+        const docGrades = allGrades.filter((g) => g.doctor_id === doc.id);
         const current_status = getCurrentEmploymentStatus(docHistory);
+        const current_financial_grade = docGrades.find(g => !g.end_date) || docGrades[0] || null;
 
         return {
           ...doc,
           employment_history: docHistory,
           certificates: docCerts,
+          promotions: docProms,
+          financial_grades: docGrades,
           current_status,
+          current_financial_grade,
         };
       });
 
@@ -209,7 +224,52 @@ export function DoctorsPage() {
         if (!hasYear) return false;
       }
 
+      // 7. Filter by Promotion / Professional Rank
+      if (filters.promotionType && filters.promotionType !== 'all') {
+        const hasPromotion = doc.promotions?.some((p) =>
+          p.promotion_type.toLowerCase().includes(filters.promotionType!.toLowerCase())
+        );
+        if (!hasPromotion) return false;
+      }
+
+      // 8. Filter by Financial Grade
+      if (filters.financialGrade && filters.financialGrade !== 'all') {
+        const hasGrade = doc.financial_grades?.some((g) =>
+          g.financial_grade.toLowerCase().includes(filters.financialGrade!.toLowerCase())
+        );
+        if (!hasGrade) return false;
+      }
+
       return true;
+    });
+
+    // Apply Sorting
+    const sortBy = filters.sortBy || 'recently_added';
+
+    return [...filtered].sort((a, b) => {
+      if (sortBy === 'recently_added') {
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        return timeB - timeA;
+      }
+      if (sortBy === 'oldest') {
+        const timeB = b.created_at ? new Date(b.created_at).getTime() : 0;
+        const timeA = a.created_at ? new Date(a.created_at).getTime() : 0;
+        return timeA - timeB;
+      }
+      if (sortBy === 'name_asc') {
+        return a.name.localeCompare(b.name, 'ar');
+      }
+      if (sortBy === 'name_desc') {
+        return b.name.localeCompare(a.name, 'ar');
+      }
+      if (sortBy === 'hire_date_desc') {
+        return (b.hire_date || '').localeCompare(a.hire_date || '');
+      }
+      if (sortBy === 'grad_date_desc') {
+        return (b.graduation_date || '').localeCompare(a.graduation_date || '');
+      }
+      return 0;
     });
   }, [doctors, filters]);
 
@@ -478,11 +538,30 @@ export function DoctorsPage() {
             )}
           </div>
 
-          {/* Filter Toggle & View Switcher */}
-          <div className="flex items-center space-x-2 rtl:space-x-reverse w-full md:w-auto justify-between md:justify-end">
+          {/* Filter Toggle & Sort & View Switcher */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+            {/* Sort Selector */}
+            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-700/60 p-1 rounded-xl border border-gray-200 dark:border-gray-600">
+              <span className="text-xs text-gray-500 dark:text-gray-400 px-1 font-semibold">
+                {language === 'ar' ? 'ترتيب:' : 'Sort:'}
+              </span>
+              <select
+                value={filters.sortBy || 'recently_added'}
+                onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
+                className="px-2 py-1.5 rounded-lg border-0 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 shadow-sm"
+              >
+                <option value="recently_added">🕒 {language === 'ar' ? 'الأحدث إضافة (المضافون مؤخراً)' : 'Recently Added'}</option>
+                <option value="oldest">⏳ {language === 'ar' ? 'الأقدم إضافة' : 'Oldest First'}</option>
+                <option value="name_asc">🔤 {language === 'ar' ? 'الاسم أبجدياً (أ - ي)' : 'Name (A to Z)'}</option>
+                <option value="name_desc">🔤 {language === 'ar' ? 'الاسم (ي - أ)' : 'Name (Z to A)'}</option>
+                <option value="hire_date_desc">📅 {language === 'ar' ? 'أحدث تاريخ استلام عمل' : 'Newest Hire Date'}</option>
+                <option value="grad_date_desc">🎓 {language === 'ar' ? 'أحدث تاريخ تخرج' : 'Newest Graduation'}</option>
+              </select>
+            </div>
+
             <button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-4 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 border transition-all ${
+              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 border transition-all ${
                 showAdvancedFilters || activeFiltersCount > 0
                   ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
                   : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50'
@@ -523,7 +602,7 @@ export function DoctorsPage() {
 
         {/* Expandable Advanced Structured Filters */}
         {showAdvancedFilters && (
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 animate-in fade-in duration-150">
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-in fade-in duration-150">
             {/* Filter by Employment Status */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
@@ -563,6 +642,46 @@ export function DoctorsPage() {
                 <option value="outside_dept">🌐 {t('adminOutsideDept')}</option>
                 <option value="head_of_dept">👑 {t('headOfDeptOnly')}</option>
                 <option value="no_admin">{t('noAdminWork')}</option>
+              </select>
+            </div>
+
+            {/* Filter by Promotion / Professional Rank */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                {language === 'ar' ? 'الدرجة والترقية المهنية' : 'Professional Rank'}
+              </label>
+              <select
+                value={filters.promotionType || 'all'}
+                onChange={(e) => setFilters({ ...filters, promotionType: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
+              >
+                <option value="all">{language === 'ar' ? 'كافة الدرجات المهنية' : 'All Ranks'}</option>
+                <option value="طبيب مقيم">طبيب مقيم</option>
+                <option value="مساعد أخصائي">مساعد أخصائي</option>
+                <option value="أخصائي">أخصائي</option>
+                <option value="استشاري مساعد">استشاري مساعد</option>
+                <option value="استشاري">استشاري</option>
+                <option value="رئيس قسم">رئيس قسم</option>
+              </select>
+            </div>
+
+            {/* Filter by Financial Grade */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                {language === 'ar' ? 'الدرجة المالية' : 'Financial Grade'}
+              </label>
+              <select
+                value={filters.financialGrade || 'all'}
+                onChange={(e) => setFilters({ ...filters, financialGrade: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
+              >
+                <option value="all">{language === 'ar' ? 'كافة الدرجات المالية' : 'All Financial Grades'}</option>
+                <option value="الدرجة الثالثة">الدرجة الثالثة</option>
+                <option value="الدرجة الثانية">الدرجة الثانية</option>
+                <option value="الدرجة الأولى">الدرجة الأولى</option>
+                <option value="مدير عام">مدير عام</option>
+                <option value="الدرجة العالية">الدرجة العالية</option>
+                <option value="الدرجة الممتازة">الدرجة الممتازة</option>
               </select>
             </div>
 
@@ -635,10 +754,10 @@ export function DoctorsPage() {
                 {activeFiltersCount > 0 && (
                   <button
                     onClick={clearAllFilters}
-                    className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/50 rounded-xl text-xs font-bold"
+                    className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/50 rounded-xl text-xs font-bold whitespace-nowrap"
                     title={t('clearFilters')}
                   >
-                    <X className="w-4 h-4" />
+                    {language === 'ar' ? 'إعادة ضبط' : 'Reset'}
                   </button>
                 )}
               </div>

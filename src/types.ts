@@ -267,10 +267,13 @@ export interface DoctorWithDetails extends Doctor {
 
 export interface DoctorFilterState {
   search: string;
+  sortBy?: 'recently_added' | 'oldest' | 'name_asc' | 'name_desc' | 'hire_date_desc' | 'grad_date_desc';
   employmentStatus: string;
   administrativeDuty: string;
   certificateType: string;
   certificateStatus: string;
   university: string;
   obtainedYear: string;
+  promotionType?: string;
+  financialGrade?: string;
 }
