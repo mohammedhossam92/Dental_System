@@ -6,6 +6,8 @@ import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { getCertificateSummary, uploadDoctorFile } from '../../utils/doctorUtils';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
+import { AutocompleteInput } from '../common/AutocompleteInput';
+import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
 import Swal from 'sweetalert2';
 
 interface CertificateFormModalProps {
@@ -61,6 +63,15 @@ export function CertificateFormModal({
   const { organizationId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistoricalSuggestions().then((res) => {
+        setTitleSuggestions(res.certificateTitles);
+      });
+    }
+  }, [isOpen]);
 
   // Form State
   const [certificateType, setCertificateType] = useState('ماجستير');
@@ -359,18 +370,16 @@ export function CertificateFormModal({
               </div>
             )}
 
-            {/* Certificate Title / Major */}
+            {/* Certificate Title / Major with Autocomplete */}
             <div className={certificateType === 'أخرى' ? 'md:col-span-2' : ''}>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                {t('certificateTitle')} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
+              <AutocompleteInput
+                label={t('certificateTitle')}
                 required
                 value={certificateTitle}
-                onChange={(e) => setCertificateTitle(e.target.value)}
+                onChange={setCertificateTitle}
+                options={titleSuggestions}
                 placeholder={language === 'ar' ? 'مثال: جراحة الوجه والفكين / علاج الجذور' : 'e.g. Maxillofacial Surgery'}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                accentColor="emerald"
               />
             </div>
           </div>

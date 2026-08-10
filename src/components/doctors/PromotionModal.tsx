@@ -5,6 +5,8 @@ import type { DoctorPromotion } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
+import { AutocompleteInput } from '../common/AutocompleteInput';
+import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
 import { uploadDoctorFile } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
@@ -38,6 +40,15 @@ export function PromotionModal({
   const { organizationId } = useAuth();
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
+  const [promotionSuggestions, setPromotionSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistoricalSuggestions().then((res) => {
+        setPromotionSuggestions(res.promotionTypes);
+      });
+    }
+  }, [isOpen]);
 
   const [promotionType, setPromotionType] = useState('أخصائي');
   const [customPromotion, setCustomPromotion] = useState('');
@@ -192,16 +203,14 @@ export function PromotionModal({
 
           {promotionType === 'أخرى' && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                {language === 'ar' ? 'حدد نوع الترقية' : 'Specify Type'} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
+              <AutocompleteInput
+                label={language === 'ar' ? 'حدد نوع الترقية' : 'Specify Type'}
                 required
                 value={customPromotion}
-                onChange={(e) => setCustomPromotion(e.target.value)}
+                onChange={setCustomPromotion}
+                options={promotionSuggestions}
                 placeholder={language === 'ar' ? 'مثال: استشاري دقيق' : 'e.g. Sub-specialist consultant'}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                accentColor="purple"
               />
             </div>
           )}

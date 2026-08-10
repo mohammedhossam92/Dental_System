@@ -5,6 +5,8 @@ import type { DoctorEmploymentHistory, EmploymentStatusType } from '../../types'
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
+import { AutocompleteInput } from '../common/AutocompleteInput';
+import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
 import { validateEmploymentPeriod } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
@@ -49,6 +51,17 @@ export function EmploymentHistoryModal({
   const { t, language } = useLanguage();
   const { organizationId } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [adminRoleSuggestions, setAdminRoleSuggestions] = useState<string[]>([]);
+  const [facilitySuggestions, setFacilitySuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistoricalSuggestions().then((res) => {
+        setAdminRoleSuggestions(res.administrativeRoles);
+        setFacilitySuggestions(res.administrativeFacilities);
+      });
+    }
+  }, [isOpen]);
 
   const [statusType, setStatusType] = useState<EmploymentStatusType | string>('قوة أساسية');
   const [customStatus, setCustomStatus] = useState('');
@@ -411,35 +424,31 @@ export function EmploymentHistoryModal({
                   </select>
                 </div>
 
-                {/* Custom Role Input if 'أخرى' */}
+                {/* Custom Role Input with Autocomplete */}
                 {administrativeRole === 'أخرى' && (
                   <div>
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {t('specifyCustomRole')} <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                      type="text"
+                    <AutocompleteInput
+                      label={t('specifyCustomRole')}
                       required={hasAdministrativeDuty && administrativeRole === 'أخرى'}
                       value={customAdminRole}
-                      onChange={(e) => setCustomAdminRole(e.target.value)}
+                      onChange={setCustomAdminRole}
+                      options={adminRoleSuggestions}
                       placeholder={language === 'ar' ? 'مثال: مدير وحدة الرنين / منسق الامتحانات' : 'e.g. Exam Coordinator'}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                      accentColor="purple"
                     />
                   </div>
                 )}
 
-                {/* If Outside Department: Facility / Entity name */}
+                {/* If Outside Department: Facility / Entity name with Autocomplete */}
                 {administrativeScope === 'خارج القسم' && (
                   <div className="animate-in fade-in duration-200">
-                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
-                      {t('administrativeFacility')}
-                    </label>
-                    <input
-                      type="text"
+                    <AutocompleteInput
+                      label={t('administrativeFacility')}
                       value={administrativeFacility}
-                      onChange={(e) => setAdministrativeFacility(e.target.value)}
+                      onChange={setAdministrativeFacility}
+                      options={facilitySuggestions}
                       placeholder={language === 'ar' ? 'مثال: عمادة الكلية / إدارة المستشفى / المجلس الصحي' : 'e.g. College Deanery / Hospital Admin'}
-                      className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                      accentColor="purple"
                     />
                   </div>
                 )}

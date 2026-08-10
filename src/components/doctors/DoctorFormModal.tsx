@@ -5,6 +5,8 @@ import type { Doctor } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
+import { AutocompleteInput } from '../common/AutocompleteInput';
+import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
 import Swal from 'sweetalert2';
 
 interface DoctorFormModalProps {
@@ -18,7 +20,7 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
   const { t, language } = useLanguage();
   const { organizationId } = useAuth();
   const [loading, setLoading] = useState(false);
-
+  const [addressSuggestions, setAddressSuggestions] = useState<string[]>([]);
   const [formData, setFormData] = useState({
     name: '',
     national_id: '',
@@ -29,6 +31,14 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
     phone: '',
     notes: '',
   });
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistoricalSuggestions().then((res) => {
+        setAddressSuggestions(res.addresses);
+      });
+    }
+  }, [isOpen]);
 
   useEffect(() => {
     if (doctor) {
@@ -285,22 +295,15 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
               accentColor="indigo"
             />
 
-            {/* Address */}
-            <div>
-              <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                {t('address')}
-              </label>
-              <div className="relative">
-                <MapPin className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-3 w-4 h-4 text-gray-400 pointer-events-none" />
-                <input
-                  type="text"
-                  value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder={language === 'ar' ? 'المنصورة، الدقهلية' : 'Mansoura, Egypt'}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
-                />
-              </div>
-            </div>
+            {/* Address with Autocomplete */}
+            <AutocompleteInput
+              label={t('address')}
+              value={formData.address}
+              onChange={(val) => setFormData({ ...formData, address: val })}
+              options={addressSuggestions}
+              placeholder={language === 'ar' ? 'المنصورة، الدقهلية' : 'Mansoura, Egypt'}
+              accentColor="indigo"
+            />
           </div>
 
           {/* Notes */}

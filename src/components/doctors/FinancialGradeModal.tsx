@@ -5,6 +5,8 @@ import type { DoctorFinancialGrade } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
+import { AutocompleteInput } from '../common/AutocompleteInput';
+import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
 import Swal from 'sweetalert2';
 
 interface FinancialGradeModalProps {
@@ -36,6 +38,15 @@ export function FinancialGradeModal({
   const { t, language } = useLanguage();
   const { organizationId } = useAuth();
   const [loading, setLoading] = useState(false);
+  const [gradeSuggestions, setGradeSuggestions] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (isOpen) {
+      fetchHistoricalSuggestions().then((res) => {
+        setGradeSuggestions(res.financialGrades);
+      });
+    }
+  }, [isOpen]);
 
   const [financialGrade, setFinancialGrade] = useState('الدرجة الثالثة');
   const [customGrade, setCustomGrade] = useState('');
@@ -164,16 +175,14 @@ export function FinancialGradeModal({
 
           {financialGrade === 'أخرى' && (
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
-                {language === 'ar' ? 'حدد الدرجة المالية' : 'Specify Grade'} <span className="text-red-500">*</span>
-              </label>
-              <input
-                type="text"
+              <AutocompleteInput
+                label={language === 'ar' ? 'حدد الدرجة المالية' : 'Specify Grade'}
                 required
                 value={customGrade}
-                onChange={(e) => setCustomGrade(e.target.value)}
+                onChange={setCustomGrade}
+                options={gradeSuggestions}
                 placeholder={language === 'ar' ? 'مثال: الدرجة الرابعة' : 'e.g. Grade 4'}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-amber-500"
+                accentColor="amber"
               />
             </div>
           )}
