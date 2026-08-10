@@ -107,9 +107,10 @@ export function formatCertificateDate(
 export function getCertificateSummary(cert: Partial<DoctorCertificate>, language: string = 'ar'): string {
   const type = cert.certificate_type || '';
   const title = cert.certificate_title || '';
-  const univ = cert.university_name || '';
-  const country = cert.university_country && cert.university_country !== 'مصر' ? ` (${cert.university_country})` : '';
+  const univ = cert.university_name ? cert.university_name.trim() : '';
+  const country = (univ && cert.university_country && cert.university_country !== 'مصر') ? ` (${cert.university_country})` : '';
   const mode = cert.date_mode || 'month';
+  const univPart = univ ? `، ${univ}${country}` : '';
 
   if (language === 'ar') {
     if (cert.status === 'in_progress') {
@@ -117,21 +118,22 @@ export function getCertificateSummary(cert: Partial<DoctorCertificate>, language
       if (cert.expected_date) {
         expectedPart = `، متوقع الحصول عليها: ${formatCertificateDate(cert.expected_date, mode, 'ar')}`;
       }
-      return `${type} ${title}، ${univ}${country}، قيد الدراسة${expectedPart}`.replace(/\s+/g, ' ').trim();
+      return `${type} ${title}${univPart}، قيد الدراسة${expectedPart}`.replace(/\s+/g, ' ').replace(/،\s*،/g, '،').replace(/^،\s*/, '').trim();
     } else {
       const datePart = cert.obtained_date ? `، ${formatCertificateDate(cert.obtained_date, mode, 'ar')}` : '';
-      return `${type} ${title}، ${univ}${country}${datePart}`.replace(/\s+/g, ' ').trim();
+      return `${type} ${title}${univPart}${datePart}`.replace(/\s+/g, ' ').replace(/،\s*،/g, '،').replace(/^،\s*/, '').trim();
     }
   } else {
+    const univPartEn = univ ? `, ${univ}${country}` : '';
     if (cert.status === 'in_progress') {
       let expectedPart = '';
       if (cert.expected_date) {
         expectedPart = `, expected in ${formatCertificateDate(cert.expected_date, mode, 'en')}`;
       }
-      return `${type} in ${title}, ${univ}${country}, In Progress${expectedPart}`.replace(/\s+/g, ' ').trim();
+      return `${type} in ${title}${univPartEn}, In Progress${expectedPart}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/^,\s*/, '').trim();
     } else {
       const datePart = cert.obtained_date ? `, ${formatCertificateDate(cert.obtained_date, mode, 'en')}` : '';
-      return `${type} in ${title}, ${univ}${country}${datePart}`.replace(/\s+/g, ' ').trim();
+      return `${type} in ${title}${univPartEn}${datePart}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/^,\s*/, '').trim();
     }
   }
 }

@@ -119,11 +119,49 @@ export const DEFAULT_ADDRESS_SUGGESTIONS = [
 ];
 
 /**
+ * Standard Egyptian & International Universities presets
+ */
+export const DEFAULT_UNIVERSITIES = [
+  'جامعة المنصورة',
+  'جامعة القاهرة',
+  'جامعة عين شمس',
+  'جامعة الإسكندرية',
+  'جامعة الأزهر',
+  'جامعة أسيوط',
+  'جامعة طنطا',
+  'جامعة الزقازيق',
+  'جامعة كفر الشيخ',
+  'جامعة المنيا',
+  'جامعة بني سويف',
+  'جامعة قناة السويس',
+  'جامعة جنوب الوادي',
+  'جامعة الفيوم',
+  'جامعة حلوان',
+  'جامعة السويس',
+  'جامعة المنوفية',
+  'جامعة بنها',
+  'جامعة المستقبل',
+  'جامعة مصر للعلوم والتكنولوجيا (MUST)',
+  'جامعة 6 أكتوبر',
+  'الجامعة البريطانية في مصر (BUE)',
+  'جامعة الدلتا للعلوم والتكنولوجيا',
+  'جامعة حورس',
+  'جامعة المنصورة الأهلية',
+  'جامعة المنصورة الجديدة',
+  'جامعة الملك عبد العزيز',
+  'جامعة الملك سعود',
+  'الكلية الملكية للجراحين (إنجلترا - RCSEng)',
+  'الكلية الملكية للجراحين (إدنبرة - RCSEd)',
+  'الكلية الملكية للجراحين (أيرلندا - RCSI)'
+];
+
+/**
  * Fetch distinct past values from database tables to merge with presets
  */
 export async function fetchHistoricalSuggestions(): Promise<{
   addresses: string[];
   certificateTitles: string[];
+  universities: string[];
   administrativeRoles: string[];
   administrativeFacilities: string[];
   promotionTypes: string[];
@@ -133,12 +171,14 @@ export async function fetchHistoricalSuggestions(): Promise<{
     const [
       docsRes,
       certsRes,
+      univsRes,
       historyRes,
       promsRes,
       gradesRes
     ] = await Promise.all([
       supabase.from('doctors').select('address'),
-      supabase.from('doctor_certificates').select('certificate_title'),
+      supabase.from('doctor_certificates').select('certificate_title, university_name'),
+      supabase.from('universities').select('name'),
       supabase.from('doctor_employment_history').select('administrative_role, administrative_facility, deputation_facility'),
       supabase.from('doctor_promotions').select('promotion_type'),
       supabase.from('doctor_financial_grades').select('financial_grade')
@@ -150,8 +190,14 @@ export async function fetchHistoricalSuggestions(): Promise<{
     });
 
     const certsSet = new Set<string>(DEFAULT_CERTIFICATE_TITLES);
+    const univsSet = new Set<string>(DEFAULT_UNIVERSITIES);
+    univsRes.data?.forEach((u) => {
+      if (u.name && u.name.trim()) univsSet.add(u.name.trim());
+    });
+
     certsRes.data?.forEach((c) => {
       if (c.certificate_title && c.certificate_title.trim()) certsSet.add(c.certificate_title.trim());
+      if (c.university_name && c.university_name.trim()) univsSet.add(c.university_name.trim());
     });
 
     const rolesSet = new Set<string>(DEFAULT_ADMINISTRATIVE_ROLES);
@@ -175,6 +221,7 @@ export async function fetchHistoricalSuggestions(): Promise<{
     return {
       addresses: Array.from(addressesSet),
       certificateTitles: Array.from(certsSet),
+      universities: Array.from(univsSet),
       administrativeRoles: Array.from(rolesSet),
       administrativeFacilities: Array.from(facilitiesSet),
       promotionTypes: Array.from(promsSet),
@@ -185,6 +232,7 @@ export async function fetchHistoricalSuggestions(): Promise<{
     return {
       addresses: DEFAULT_ADDRESS_SUGGESTIONS,
       certificateTitles: DEFAULT_CERTIFICATE_TITLES,
+      universities: DEFAULT_UNIVERSITIES,
       administrativeRoles: DEFAULT_ADMINISTRATIVE_ROLES,
       administrativeFacilities: DEFAULT_ADMINISTRATIVE_FACILITIES,
       promotionTypes: DEFAULT_PROMOTION_TYPES,

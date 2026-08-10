@@ -64,11 +64,13 @@ export function CertificateFormModal({
   const [loading, setLoading] = useState(false);
   const [uploadingFile, setUploadingFile] = useState(false);
   const [titleSuggestions, setTitleSuggestions] = useState<string[]>([]);
+  const [univSuggestions, setUnivSuggestions] = useState<string[]>([]);
 
   useEffect(() => {
     if (isOpen) {
       fetchHistoricalSuggestions().then((res) => {
         setTitleSuggestions(res.certificateTitles);
+        setUnivSuggestions(res.universities);
       });
     }
   }, [isOpen]);
@@ -78,12 +80,9 @@ export function CertificateFormModal({
   const [customType, setCustomType] = useState('');
   const [certificateTitle, setCertificateTitle] = useState('');
   
-  // University & Country State
-  const [selectedUniversity, setSelectedUniversity] = useState('جامعة المنصورة');
-  const [isCustomUniversity, setIsCustomUniversity] = useState(false);
-  const [customUniversityName, setCustomUniversityName] = useState('');
+  // University & Country State (Completely Optional / Nullable)
+  const [universityName, setUniversityName] = useState('');
   const [universityCountry, setUniversityCountry] = useState('مصر');
-  const [customCountry, setCustomCountry] = useState('');
 
   // Status & Date States
   const [status, setStatus] = useState<'obtained' | 'in_progress'>('obtained');
@@ -104,18 +103,8 @@ export function CertificateFormModal({
     if (certificate) {
       setCertificateType(certificate.certificate_type || 'ماجستير');
       setCertificateTitle(certificate.certificate_title || '');
-      
-      const foundUniv = universities.find(u => u.name === certificate.university_name);
-      if (foundUniv) {
-        setSelectedUniversity(foundUniv.name);
-        setIsCustomUniversity(false);
-        setUniversityCountry(certificate.university_country || foundUniv.country || 'مصر');
-      } else {
-        setSelectedUniversity('custom');
-        setIsCustomUniversity(true);
-        setCustomUniversityName(certificate.university_name || '');
-        setUniversityCountry(certificate.university_country || 'مصر');
-      }
+      setUniversityName(certificate.university_name || '');
+      setUniversityCountry(certificate.university_country || 'مصر');
 
       setStatus(certificate.status || 'obtained');
       setObtainedDate(certificate.obtained_date || '');
@@ -130,11 +119,8 @@ export function CertificateFormModal({
       setCertificateType(allTypes[0] || 'ماجستير');
       setCustomType('');
       setCertificateTitle('');
-      setSelectedUniversity(universities[0]?.name || 'جامعة المنصورة');
-      setIsCustomUniversity(false);
-      setCustomUniversityName('');
-      setUniversityCountry(universities[0]?.country || 'مصر');
-      setCustomCountry('');
+      setUniversityName('');
+      setUniversityCountry('مصر');
       setStatus('obtained');
 
       setObtainedDate('');
@@ -145,21 +131,21 @@ export function CertificateFormModal({
       setFileName(null);
       setNotes('');
     }
-  }, [certificate, isOpen, universities]);
+  }, [certificate, isOpen]);
 
   if (!isOpen) return null;
 
-  // Compute final university name and country
-  const finalUnivName = isCustomUniversity ? customUniversityName.trim() : selectedUniversity;
-  const finalCountry = universityCountry === 'custom' ? customCountry.trim() : universityCountry;
+  // Compute final values
   const finalType = certificateType === 'أخرى' && customType.trim() ? customType.trim() : certificateType;
+  const finalUnivName = universityName.trim() || null;
+  const finalCountry = finalUnivName ? (universityCountry.trim() || 'مصر') : null;
 
   // Live Generated Display Text
   const liveSummary = getCertificateSummary({
     certificate_type: finalType || (language === 'ar' ? 'نوع الشهادة' : 'Degree'),
     certificate_title: certificateTitle || (language === 'ar' ? 'مسمى الشهادة' : 'Major'),
-    university_name: finalUnivName || (language === 'ar' ? 'الجامعة' : 'University'),
-    university_country: finalCountry,
+    university_name: finalUnivName || '',
+    university_country: finalCountry || '',
     status,
     obtained_date: obtainedDate,
     study_start_date: studyStartDate,
@@ -216,32 +202,32 @@ export function CertificateFormModal({
     try {
       setLoading(true);
 
-      // If user typed a new custom university, automatically persist it into the universities table
+      // If user typed a university, check if known or persist
       let matchedUnivId: string | null = null;
-      if (isCustomUniversity && customUniversityName.trim()) {
-        try {
-          const { data: newUniv } = await supabase
-            .from('universities')
-            .upsert([{
-              name: customUniversityName.trim(),
-              country: finalCountry || 'مصر',
-              organization_id: organizationId || null
-            }], { onConflict: 'name, country, organization_id' })
-            .select()
-            .single();
+      if (finalUnivName) {
+        const found = universities.find(u => u.name.toLowerCase() === finalUnivName.toLowerCase());
+        if (found) {
+          matchedUnivId = found.id;
+        } else {
+          try {
+            const { data: newUniv } = await supabase
+              .from('universities')
+              .upsert([{
+                name: finalUnivName,
+                country: finalCountry || 'مصر',
+                organization_id: organizationId || null
+              }], { onConflict: 'name, country, organization_id' })
+              .select()
+              .single();
 
-          if (newUniv) {
-            matchedUnivId = newUniv.id;
-            if (onUniversityAdded) {
-              onUniversityAdded(newUniv);
+            if (newUniv) {
+              matchedUnivId = newUniv.id;
+              if (onUniversityAdded) onUniversityAdded(newUniv);
             }
+          } catch (uErr) {
+            console.warn('Auto insert university caught:', uErr);
           }
-        } catch (uErr) {
-          console.warn('Auto insert university caught:', uErr);
         }
-      } else {
-        const found = universities.find(u => u.name === selectedUniversity);
-        if (found) matchedUnivId = found.id;
       }
 
       const getDateMode = (d: string | null | undefined): 'year' | 'month' | 'full' => {
@@ -384,80 +370,50 @@ export function CertificateFormModal({
             </div>
           </div>
 
-          {/* University & Country */}
+          {/* University & Country (Completely Optional with Autocomplete) */}
           <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 space-y-3">
             <div className="flex items-center space-x-2 rtl:space-x-reverse text-sm font-semibold text-gray-800 dark:text-gray-200">
               <Building className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>{language === 'ar' ? 'الجامعة / الجهة المانحة والدولة' : 'University / Granting Body & Country'}</span>
+              <span>{language === 'ar' ? 'الجامعة / الجهة المانحة (اختياري)' : 'University / Granting Body (Optional)'}</span>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-              {/* Select or type University */}
-              <div>
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {language === 'ar' ? 'اختر من الجامعات المسجلة أو أضف جديدة' : 'Select or Add University'}
-                </label>
-                <select
-                  value={isCustomUniversity ? 'custom' : selectedUniversity}
-                  onChange={handleUniversitySelectChange}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
-                >
-                  {universities.map((u) => (
-                    <option key={u.id || u.name} value={u.name}>
-                      {u.name} {u.country ? `(${u.country})` : ''}
-                    </option>
-                  ))}
-                  <option value="custom">➕ {language === 'ar' ? 'إضافة جامعة / جهة غير موجودة...' : 'Add custom university...'}</option>
-                </select>
+              {/* University with Autocomplete */}
+              <div className={universityName.trim() ? '' : 'md:col-span-2'}>
+                <AutocompleteInput
+                  label={language === 'ar' ? 'اسم الجامعة أو الجهة المانحة' : 'University / Granting Body'}
+                  value={universityName}
+                  onChange={(val) => {
+                    setUniversityName(val);
+                    const found = universities.find(u => u.name.toLowerCase() === val.toLowerCase().trim());
+                    if (found?.country) {
+                      setUniversityCountry(found.country);
+                    }
+                  }}
+                  options={univSuggestions}
+                  placeholder={language === 'ar' ? 'اختر من المقترحات أو اكتب اسم الجامعة (أو اتركها فارغة)...' : 'Type or select university (or leave blank)...'}
+                  accentColor="emerald"
+                  helperText={language === 'ar' ? 'اختياري: يمكنك تركها فارغة والتعديل لاحقاً عند التأكد' : 'Optional: can be left empty'}
+                />
               </div>
 
-              {/* Country Selection */}
-              <div>
-                <label className="block text-xs text-gray-500 dark:text-gray-400 mb-1">
-                  {t('universityCountry')}
-                </label>
-                <select
-                  value={universityCountry}
-                  onChange={(e) => setUniversityCountry(e.target.value)}
-                  className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
-                >
-                  {DEFAULT_COUNTRIES.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-
-              {/* If Custom University Name */}
-              {isCustomUniversity && (
-                <div className="md:col-span-2">
-                  <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
-                    {language === 'ar' ? 'اكتب اسم الجامعة أو الجهة الجديدة' : 'Enter New University Name'} <span className="text-red-500">*</span>
+              {/* Country Selection (shown when university is entered) */}
+              {universityName.trim() && (
+                <div className="animate-in fade-in duration-150">
+                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('universityCountry')}
                   </label>
-                  <input
-                    type="text"
-                    required
-                    value={customUniversityName}
-                    onChange={(e) => setCustomUniversityName(e.target.value)}
-                    placeholder={language === 'ar' ? 'مثال: جامعة المنصورة الأهلية / الكلية الملكية للجراحين' : 'e.g. Mansoura National University'}
-                    className="w-full px-3 py-2 rounded-lg border border-emerald-400 dark:border-emerald-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
-                  />
-                </div>
-              )}
-
-              {universityCountry === 'أخرى' && (
-                <div className="md:col-span-2">
-                  <label className="block text-xs text-gray-600 dark:text-gray-300 mb-1">
-                    {language === 'ar' ? 'حدد دولة الجامعة' : 'Specify Country'}
-                  </label>
-                  <input
-                    type="text"
-                    value={customCountry}
-                    onChange={(e) => setCustomCountry(e.target.value)}
-                    placeholder={language === 'ar' ? 'مثال: فرنسا' : 'e.g. France'}
-                    className="w-full px-3 py-2 rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm"
-                  />
+                  <select
+                    value={universityCountry}
+                    onChange={(e) => setUniversityCountry(e.target.value)}
+                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
+                  >
+                    {DEFAULT_COUNTRIES.map((c) => (
+                      <option key={c} value={c}>
+                        {c}
+                      </option>
+                    ))}
+                  </select>
                 </div>
               )}
             </div>

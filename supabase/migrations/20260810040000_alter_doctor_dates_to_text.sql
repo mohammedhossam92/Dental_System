@@ -1,4 +1,4 @@
--- Migration: Convert doctor date columns to text and drop NOT NULL constraints
+-- Migration: Convert doctor date columns to text and drop NOT NULL constraints on all optional fields
 -- Allows storing Year Only ('YYYY'), Month & Year ('YYYY-MM'), Full Date ('YYYY-MM-DD'), or NULL (Optional)
 
 -- 1. جدول بيانات الأطباء (Doctors)
@@ -24,7 +24,9 @@ ALTER COLUMN obtained_date DROP NOT NULL,
 ALTER COLUMN study_start_date TYPE text,
 ALTER COLUMN study_start_date DROP NOT NULL,
 ALTER COLUMN expected_date TYPE text,
-ALTER COLUMN expected_date DROP NOT NULL;
+ALTER COLUMN expected_date DROP NOT NULL,
+ALTER COLUMN university_name DROP NOT NULL,
+ALTER COLUMN university_country DROP NOT NULL;
 
 -- 4. جدول الترقيات والدرجات المهنية (Promotions)
 ALTER TABLE IF EXISTS public.doctor_promotions
