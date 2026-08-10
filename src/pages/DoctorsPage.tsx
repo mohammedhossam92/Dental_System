@@ -12,6 +12,7 @@ import type {
 } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import {
   getCertificateSummary, getCurrentEmploymentStatus,
   formatDate, getYearFromDate
@@ -732,9 +733,14 @@ export function DoctorsPage() {
                         <div className="font-mono text-xs font-bold text-gray-800 dark:text-gray-200">
                           {doc.national_id || <span className="text-gray-400 font-normal">---</span>}
                         </div>
-                        <div className="font-mono text-xs text-gray-500 dark:text-gray-400 mt-0.5">
-                          {doc.phone || '---'}
-                        </div>
+                        {doc.phone ? (
+                          <div className="flex items-center gap-1.5 mt-1 font-mono text-xs text-gray-700 dark:text-gray-300">
+                            <span>{doc.phone}</span>
+                            <WhatsAppButton phone={doc.phone} size="xs" />
+                          </div>
+                        ) : (
+                          <div className="font-mono text-xs text-gray-400 mt-0.5">---</div>
+                        )}
                       </td>
 
                       {/* Current Employment Status & Admin Duty */}
@@ -883,9 +889,12 @@ export function DoctorsPage() {
                       </div>
                     )}
                     {doc.phone && (
-                      <div className="flex items-center gap-2">
-                        <Phone className="w-3.5 h-3.5 text-gray-400" />
-                        <span className="font-mono">{doc.phone}</span>
+                      <div className="flex items-center justify-between gap-2">
+                        <div className="flex items-center gap-2">
+                          <Phone className="w-3.5 h-3.5 text-gray-400" />
+                          <span className="font-mono">{doc.phone}</span>
+                        </div>
+                        <WhatsAppButton phone={doc.phone} size="xs" />
                       </div>
                     )}
                     {doc.address && (

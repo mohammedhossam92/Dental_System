@@ -6,6 +6,7 @@ import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle,
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useLanguage } from '../context/LanguageContext';
+import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { getCertificateSummary, getCurrentEmploymentStatus } from '../utils/doctorUtils';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
@@ -817,7 +818,16 @@ export function ReportsPage() {
                               <td className="px-4 py-3 text-xs font-semibold text-emerald-600">
                                 {doc.current_status?.status_type || 'قوة أساسية'}
                               </td>
-                              <td className="px-4 py-3 text-xs font-mono text-gray-500">{doc.phone || '---'}</td>
+                              <td className="px-4 py-3 text-xs font-mono text-gray-500">
+                                {doc.phone ? (
+                                  <div className="flex items-center gap-1.5">
+                                    <span>{doc.phone}</span>
+                                    <WhatsAppButton phone={doc.phone} size="xs" />
+                                  </div>
+                                ) : (
+                                  '---'
+                                )}
+                              </td>
                             </tr>
                           ))
                       )}

@@ -4,6 +4,7 @@ import { supabase } from '../lib/supabase';
 import type { WaitingListEntry, Student, Treatment, ToothClass } from '../types';
 import { useLanguage } from '../context/LanguageContext';
 import { useAuth } from '../context/AuthContext';
+import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import Swal from 'sweetalert2';
 
 const DIAGNOSES = ['rct', 'operative', 'scaling', 'pulpotomy', 'pulpectomy', 'impaction'] as const;
@@ -612,7 +613,10 @@ export function WaitingListPage() {
                         {entry.patient_name}
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
-                        {entry.patient_phone}
+                        <div className="flex items-center gap-1.5 font-mono">
+                          <span>{entry.patient_phone}</span>
+                          <WhatsAppButton phone={entry.patient_phone} size="xs" />
+                        </div>
                       </td>
                       <td className="px-4 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-300">
                         {entry.city}
@@ -692,9 +696,12 @@ export function WaitingListPage() {
                 <div className="grid grid-cols-2 gap-2 text-xs border-t border-b dark:border-gray-750 py-2.5 my-2.5">
                   <div>
                     <span className="block text-gray-400 dark:text-gray-500 mb-0.5">{t('patientPhone')}</span>
-                    <a href={`tel:${entry.patient_phone}`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
-                      {entry.patient_phone}
-                    </a>
+                    <div className="flex items-center gap-1.5 font-mono">
+                      <a href={`tel:${entry.patient_phone}`} className="text-indigo-600 dark:text-indigo-400 font-medium hover:underline">
+                        {entry.patient_phone}
+                      </a>
+                      <WhatsAppButton phone={entry.patient_phone} size="xs" />
+                    </div>
                   </div>
                   <div>
                     <span className="block text-gray-400 dark:text-gray-500 mb-0.5">{t('addedDate')}</span>

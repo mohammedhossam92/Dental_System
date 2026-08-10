@@ -11,6 +11,7 @@ import type {
 } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
+import { WhatsAppButton } from '../common/WhatsAppButton';
 import {
   formatDate, formatMonthYear, formatCertificateDate, getCertificateSummary,
   getCurrentEmploymentStatus, uploadDoctorFile
@@ -260,9 +261,15 @@ export function DoctorDetailsModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center gap-3 mt-1">
+              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-3 mt-1">
                 {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
-                {doctorDetails?.phone && <span>{t('phone')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong></span>}
+                {doctorDetails?.phone && (
+                  <span className="inline-flex items-center gap-1.5">
+                    <span>{t('phone')}:</span>
+                    <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong>
+                    <WhatsAppButton phone={doctorDetails.phone} size="xs" />
+                  </span>
+                )}
               </p>
             </div>
           </div>
@@ -409,7 +416,14 @@ export function DoctorDetailsModal({
 
                     <div>
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('phone')}</span>
-                      <p className="text-base font-mono font-bold text-gray-900 dark:text-white">{doctorDetails?.phone || '---'}</p>
+                      {doctorDetails?.phone ? (
+                        <div className="flex items-center gap-2">
+                          <p className="text-base font-mono font-bold text-gray-900 dark:text-white">{doctorDetails.phone}</p>
+                          <WhatsAppButton phone={doctorDetails.phone} variant="button" size="sm" />
+                        </div>
+                      ) : (
+                        <p className="text-base font-mono font-bold text-gray-400">---</p>
+                      )}
                     </div>
 
                     <div>
