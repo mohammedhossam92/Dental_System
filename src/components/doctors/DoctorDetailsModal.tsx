@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import {
   X, User, Award, Clock, TrendingUp, Layers, FileText, Plus, Edit, Trash2,
   Calendar, Phone, MapPin, CreditCard, CheckCircle2, AlertCircle, ExternalLink,
-  Upload, Sparkles, Building, ChevronRight, ShieldCheck, Download
+  Upload, Sparkles, Building, ChevronRight, ShieldCheck, Download, Briefcase
 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type {
@@ -248,6 +248,17 @@ export function DoctorDetailsModal({
                     {doctorDetails.current_status.deputation_direction ? ` (${doctorDetails.current_status.deputation_direction})` : ''}
                   </span>
                 )}
+                {doctorDetails?.current_status?.has_administrative_duty && (
+                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                    <Briefcase className="w-3 h-3" />
+                    <span>{doctorDetails.current_status.administrative_role || t('administrativeDuty')}</span>
+                    <span className="text-[11px] opacity-80">
+                      ({doctorDetails.current_status.administrative_scope === 'خارج القسم' 
+                        ? `${t('outsideDepartment')}${doctorDetails.current_status.administrative_facility ? `: ${doctorDetails.current_status.administrative_facility}` : ''}`
+                        : t('insideDepartment')})
+                    </span>
+                  </span>
+                )}
               </div>
               <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex items-center gap-3 mt-1">
                 {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
@@ -313,7 +324,7 @@ export function DoctorDetailsModal({
               {activeTab === 'basic' && (
                 <div className="space-y-6">
                   {/* Status Banner */}
-                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                  <div className={`grid grid-cols-1 ${doctorDetails?.current_status?.has_administrative_duty ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
                     <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-between">
                       <div>
                         <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{t('currentStatus')}</span>
@@ -332,6 +343,26 @@ export function DoctorDetailsModal({
                         <ShieldCheck className="w-6 h-6" />
                       </div>
                     </div>
+
+                    {doctorDetails?.current_status?.has_administrative_duty && (
+                      <div className="p-4 rounded-2xl bg-gradient-to-br from-purple-50 to-fuchsia-50 dark:from-purple-950/30 dark:to-fuchsia-950/30 border border-purple-100 dark:border-purple-800/40 flex items-center justify-between">
+                        <div>
+                          <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{t('administrativeDuty')}</span>
+                          <h3 className="text-base font-bold text-gray-900 dark:text-white mt-0.5 truncate max-w-[170px]" title={doctorDetails.current_status.administrative_role || ''}>
+                            {doctorDetails.current_status.administrative_role || t('administrativeDuty')}
+                          </h3>
+                          <p className="text-xs text-purple-700 dark:text-purple-300 mt-1 flex items-center gap-1">
+                            <span>{doctorDetails.current_status.administrative_scope || t('insideDepartment')}</span>
+                            {doctorDetails.current_status.administrative_facility && (
+                              <span className="text-[11px] opacity-80 truncate max-w-[100px]">({doctorDetails.current_status.administrative_facility})</span>
+                            )}
+                          </p>
+                        </div>
+                        <div className="p-3 bg-purple-600/10 dark:bg-purple-400/10 rounded-xl text-purple-600 dark:text-purple-400">
+                          <Briefcase className="w-6 h-6" />
+                        </div>
+                      </div>
+                    )}
 
                     <div className="p-4 rounded-2xl bg-gradient-to-br from-amber-50 to-orange-50 dark:from-amber-950/30 dark:to-orange-950/30 border border-amber-100 dark:border-amber-800/40 flex items-center justify-between">
                       <div>
@@ -459,6 +490,17 @@ export function DoctorDetailsModal({
                                   <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${getStatusBadgeColor(period.status_type)}`}>
                                     {period.status_type}
                                   </span>
+                                  {period.has_administrative_duty && (
+                                    <span className="text-xs bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 px-2 py-0.5 rounded-md font-semibold border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                                      <Briefcase className="w-3 h-3" />
+                                      <span>{period.administrative_role || t('administrativeDuty')}</span>
+                                      <span className="text-[11px] opacity-80">
+                                        ({period.administrative_scope === 'خارج القسم'
+                                          ? `${t('outsideDepartment')}${period.administrative_facility ? `: ${period.administrative_facility}` : ''}`
+                                          : t('insideDepartment')})
+                                      </span>
+                                    </span>
+                                  )}
                                   {period.deputation_direction && (
                                     <span className="text-xs bg-blue-100 text-blue-800 dark:bg-blue-900/60 dark:text-blue-200 px-2 py-0.5 rounded-md font-semibold border border-blue-200 dark:border-blue-800">
                                       {period.deputation_direction}

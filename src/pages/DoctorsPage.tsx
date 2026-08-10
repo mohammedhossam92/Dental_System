@@ -3,7 +3,7 @@ import {
   Users, UserPlus, Search, Filter, Download, Award, Clock,
   CheckCircle2, ShieldCheck, ChevronDown, RefreshCw, Layers,
   Phone, CreditCard, Building, Calendar, Edit, Trash2, Eye,
-  Sparkles, X, LayoutGrid, List, MapPin
+  Sparkles, X, LayoutGrid, List, MapPin, Briefcase
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type {
@@ -44,6 +44,7 @@ export function DoctorsPage() {
   const [filters, setFilters] = useState<DoctorFilterState>({
     search: '',
     employmentStatus: 'all',
+    administrativeDuty: 'all',
     certificateType: 'all',
     certificateStatus: 'all',
     university: 'all',
@@ -155,7 +156,26 @@ export function DoctorsPage() {
         }
       }
 
-      // 3. Filter by Certificate Type (e.g. دبلوم, ماجستير, دكتوراه...)
+      // 3. Filter by Administrative Duty
+      if (filters.administrativeDuty !== 'all') {
+        const hasAdmin = doc.current_status?.has_administrative_duty;
+        const scope = doc.current_status?.administrative_scope;
+        const role = doc.current_status?.administrative_role;
+
+        if (filters.administrativeDuty === 'has_admin') {
+          if (!hasAdmin) return false;
+        } else if (filters.administrativeDuty === 'inside_dept') {
+          if (!hasAdmin || scope !== 'داخل القسم') return false;
+        } else if (filters.administrativeDuty === 'outside_dept') {
+          if (!hasAdmin || scope !== 'خارج القسم') return false;
+        } else if (filters.administrativeDuty === 'head_of_dept') {
+          if (!hasAdmin || !role?.includes('رئيس القسم')) return false;
+        } else if (filters.administrativeDuty === 'no_admin') {
+          if (hasAdmin) return false;
+        }
+      }
+
+      // 4. Filter by Certificate Type (e.g. دبلوم, ماجستير, دكتوراه...)
       if (filters.certificateType !== 'all') {
         const hasType = doc.certificates?.some(
           (c) => c.certificate_type === filters.certificateType
@@ -210,8 +230,11 @@ export function DoctorsPage() {
     const inStudy = doctors.filter((d) =>
       d.certificates?.some((c) => c.status === 'in_progress')
     ).length;
+    const adminStaff = doctors.filter(
+      (d) => d.current_status?.has_administrative_duty
+    ).length;
 
-    return { total, coreStaff, onLeaveOrDeputed, higherDegrees, inStudy };
+    return { total, coreStaff, onLeaveOrDeputed, higherDegrees, inStudy, adminStaff };
   }, [doctors]);
 
   // Export to Excel
@@ -228,6 +251,10 @@ export function DoctorsPage() {
           'الحالة الوظيفية الحالية': currentStatus,
           'جهة / اتجاه الانتداب': doc.current_status?.deputation_direction || '',
           'الجهة المنتدب منها / إليها': doc.current_status?.deputation_facility || '',
+          'العمل الإداري': doc.current_status?.has_administrative_duty ? (doc.current_status?.administrative_role || 'نعم') : 'لا',
+          'نطاق العمل الإداري': doc.current_status?.has_administrative_duty ? (doc.current_status?.administrative_scope || '') : '',
+          'المسمى / المنصب الإداري': doc.current_status?.has_administrative_duty ? (doc.current_status?.administrative_role || '') : '',
+          'جهة العمل الإداري الخارجي': (doc.current_status?.has_administrative_duty && doc.current_status?.administrative_scope === 'خارج القسم') ? (doc.current_status?.administrative_facility || '') : '',
           'تاريخ استلام العمل': doc.hire_date || '',
           'تاريخ التخرج': doc.graduation_date || '',
           'تاريخ الميلاد': doc.birth_date || '',
@@ -302,6 +329,7 @@ export function DoctorsPage() {
 
   const activeFiltersCount = [
     filters.employmentStatus !== 'all',
+    filters.administrativeDuty !== 'all',
     filters.certificateType !== 'all',
     filters.certificateStatus !== 'all',
     filters.university !== 'all',
@@ -312,6 +340,7 @@ export function DoctorsPage() {
     setFilters({
       search: '',
       employmentStatus: 'all',
+      administrativeDuty: 'all',
       certificateType: 'all',
       certificateStatus: 'all',
       university: 'all',
@@ -367,7 +396,7 @@ export function DoctorsPage() {
       </div>
 
       {/* Top Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
         {/* Total Doctors */}
         <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
@@ -384,6 +413,15 @@ export function DoctorsPage() {
             <ShieldCheck className="w-4 h-4 text-emerald-600" />
           </div>
           <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{stats.coreStaff}</p>
+        </div>
+
+        {/* Administrative Roles */}
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+            <span className="text-xs font-semibold">{t('administrativeStaff')}</span>
+            <Briefcase className="w-4 h-4 text-purple-600" />
+          </div>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">{stats.adminStaff}</p>
         </div>
 
         {/* On Leave / Secondment */}
@@ -405,7 +443,7 @@ export function DoctorsPage() {
         </div>
 
         {/* Currently Studying */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between col-span-2 sm:col-span-1">
+        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
             <span className="text-xs font-semibold">{t('inStudy')}</span>
             <Sparkles className="w-4 h-4 text-blue-600" />
@@ -484,7 +522,7 @@ export function DoctorsPage() {
 
         {/* Expandable Advanced Structured Filters */}
         {showAdvancedFilters && (
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3 animate-in fade-in duration-150">
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-6 gap-3 animate-in fade-in duration-150">
             {/* Filter by Employment Status */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
@@ -505,6 +543,25 @@ export function DoctorsPage() {
                 <option value="ندب">ندب</option>
                 <option value="إنهاء خدمة">إنهاء خدمة</option>
                 <option value="أخرى">أخرى</option>
+              </select>
+            </div>
+
+            {/* Filter by Administrative Role */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                {t('filterByAdministrative')}
+              </label>
+              <select
+                value={filters.administrativeDuty}
+                onChange={(e) => setFilters({ ...filters, administrativeDuty: e.target.value })}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
+              >
+                <option value="all">{t('allAdministrative')}</option>
+                <option value="has_admin">{t('hasAdminWorkAll')}</option>
+                <option value="inside_dept">🏢 {t('adminInsideDept')}</option>
+                <option value="outside_dept">🌐 {t('adminOutsideDept')}</option>
+                <option value="head_of_dept">👑 {t('headOfDeptOnly')}</option>
+                <option value="no_admin">{t('noAdminWork')}</option>
               </select>
             </div>
 
@@ -680,12 +737,21 @@ export function DoctorsPage() {
                         </div>
                       </td>
 
-                      {/* Current Employment Status */}
+                      {/* Current Employment Status & Admin Duty */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex flex-col gap-1 items-start">
                           <span className={`inline-flex items-center px-3 py-1 rounded-full text-xs font-bold border ${getStatusBadgeColor(currentStatus)}`}>
                             {currentStatus}
                           </span>
+                          {doc.current_status?.has_administrative_duty && (
+                            <span className="text-[11px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-2 py-0.5 rounded border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                              <Briefcase className="w-3 h-3" />
+                              <span>{doc.current_status.administrative_role || t('administrativeDuty')}</span>
+                              <span className="text-[10px] opacity-75">
+                                ({doc.current_status.administrative_scope === 'خارج القسم' ? t('outsideDepartment') : t('insideDepartment')})
+                              </span>
+                            </span>
+                          )}
                           {doc.current_status?.deputation_direction && (
                             <span className="text-[11px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-2 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                               {doc.current_status.deputation_direction}
@@ -792,6 +858,12 @@ export function DoctorsPage() {
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getStatusBadgeColor(currentStatus)}`}>
                             {currentStatus}
                           </span>
+                          {doc.current_status?.has_administrative_duty && (
+                            <span className="text-[10px] font-semibold text-purple-700 dark:text-purple-300 bg-purple-50 dark:bg-purple-950/60 px-1.5 py-0.5 rounded border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                              <Briefcase className="w-2.5 h-2.5" />
+                              <span>{doc.current_status.administrative_role || t('administrativeDuty')}</span>
+                            </span>
+                          )}
                           {doc.current_status?.deputation_direction && (
                             <span className="text-[10px] font-semibold text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-950/60 px-1.5 py-0.5 rounded border border-blue-200 dark:border-blue-800">
                               {doc.current_status.deputation_direction}

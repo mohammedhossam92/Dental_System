@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, Clock, Calendar, FileText, CheckCircle2, Loader2, AlertTriangle } from 'lucide-react';
+import { X, Clock, Calendar, FileText, CheckCircle2, Loader2, AlertTriangle, Building, Briefcase, ChevronRight } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { DoctorEmploymentHistory, EmploymentStatusType } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -26,6 +26,17 @@ const STATUS_OPTIONS: EmploymentStatusType[] = [
   'أخرى'
 ];
 
+const STANDARD_ADMIN_ROLES = [
+  'رئيس القسم',
+  'نائب / وكيل رئيس القسم',
+  'مدير العيادات التعليمية',
+  'مشرف إداري',
+  'منسق الجودة والاعتماد',
+  'منسق التدريب والتعليم الطبي',
+  'رئيس وحدة التعقيم ومكافحة العدوى',
+  'أخرى'
+];
+
 export function EmploymentHistoryModal({
   isOpen,
   onClose,
@@ -42,6 +53,14 @@ export function EmploymentHistoryModal({
   const [customStatus, setCustomStatus] = useState('');
   const [deputationDirection, setDeputationDirection] = useState<'منتدب إلى المستشفى' | 'منتدب من المستشفى إلى الخارج'>('منتدب إلى المستشفى');
   const [deputationFacility, setDeputationFacility] = useState('');
+
+  // Administrative Work Fields
+  const [hasAdministrativeDuty, setHasAdministrativeDuty] = useState(false);
+  const [administrativeScope, setAdministrativeScope] = useState<'داخل القسم' | 'خارج القسم'>('داخل القسم');
+  const [administrativeRole, setAdministrativeRole] = useState('رئيس القسم');
+  const [customAdminRole, setCustomAdminRole] = useState('');
+  const [administrativeFacility, setAdministrativeFacility] = useState('');
+
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [isOngoing, setIsOngoing] = useState(true);
@@ -58,6 +77,23 @@ export function EmploymentHistoryModal({
       }
       setDeputationDirection((historyRecord.deputation_direction as any) || 'منتدب إلى المستشفى');
       setDeputationFacility(historyRecord.deputation_facility || '');
+
+      setHasAdministrativeDuty(!!historyRecord.has_administrative_duty);
+      setAdministrativeScope((historyRecord.administrative_scope as any) || 'داخل القسم');
+      if (historyRecord.administrative_role) {
+        if (STANDARD_ADMIN_ROLES.includes(historyRecord.administrative_role)) {
+          setAdministrativeRole(historyRecord.administrative_role);
+          setCustomAdminRole('');
+        } else {
+          setAdministrativeRole('أخرى');
+          setCustomAdminRole(historyRecord.administrative_role);
+        }
+      } else {
+        setAdministrativeRole('رئيس القسم');
+        setCustomAdminRole('');
+      }
+      setAdministrativeFacility(historyRecord.administrative_facility || '');
+
       setStartDate(historyRecord.start_date || '');
       setEndDate(historyRecord.end_date || '');
       setIsOngoing(!historyRecord.end_date);
@@ -67,6 +103,13 @@ export function EmploymentHistoryModal({
       setCustomStatus('');
       setDeputationDirection('منتدب إلى المستشفى');
       setDeputationFacility('');
+
+      setHasAdministrativeDuty(false);
+      setAdministrativeScope('داخل القسم');
+      setAdministrativeRole('رئيس القسم');
+      setCustomAdminRole('');
+      setAdministrativeFacility('');
+
       setStartDate(new Date().toISOString().split('T')[0]);
       setEndDate('');
       setIsOngoing(true);
@@ -87,6 +130,16 @@ export function EmploymentHistoryModal({
         icon: 'warning',
         title: 'تنبيه',
         text: 'تاريخ بداية الحالة مطلوب',
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    if (hasAdministrativeDuty && administrativeRole === 'أخرى' && !customAdminRole.trim()) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'تنبيه',
+        text: language === 'ar' ? 'يرجى كتابة المسمى الإداري المخصص' : 'Please enter the custom administrative title',
         confirmButtonColor: '#4f46e5'
       });
       return;
@@ -115,12 +168,20 @@ export function EmploymentHistoryModal({
     try {
       setLoading(true);
 
+      const finalAdminRole = hasAdministrativeDuty
+        ? (administrativeRole === 'أخرى' ? customAdminRole.trim() : administrativeRole)
+        : null;
+
       const payload = {
         doctor_id: doctorId,
         organization_id: organizationId || null,
         status_type: finalStatusType,
         deputation_direction: isDeputation ? deputationDirection : null,
         deputation_facility: isDeputation ? (deputationFacility.trim() || null) : null,
+        has_administrative_duty: hasAdministrativeDuty,
+        administrative_scope: hasAdministrativeDuty ? administrativeScope : null,
+        administrative_role: hasAdministrativeDuty ? finalAdminRole : null,
+        administrative_facility: (hasAdministrativeDuty && administrativeScope === 'خارج القسم') ? (administrativeFacility.trim() || null) : null,
         start_date: startDate,
         end_date: finalEndDate,
         notes: notes.trim() || null
@@ -183,7 +244,7 @@ export function EmploymentHistoryModal({
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
           
           {/* Status Type */}
           <div>
@@ -283,6 +344,117 @@ export function EmploymentHistoryModal({
             </div>
           )}
 
+          {/* ========================================================== */}
+          {/* ADMINISTRATIVE WORK SECTION (العمل الإداري داخل أو خارج القسم) */}
+          {/* ========================================================== */}
+          <div className="p-4 bg-gradient-to-br from-purple-50/80 to-indigo-50/80 dark:from-purple-950/30 dark:to-indigo-950/30 rounded-2xl border border-purple-200/80 dark:border-purple-800/60 space-y-3.5 shadow-sm">
+            <div className="flex items-center justify-between">
+              <label htmlFor="adminDutyToggle" className="flex items-center space-x-2.5 rtl:space-x-reverse cursor-pointer">
+                <input
+                  type="checkbox"
+                  id="adminDutyToggle"
+                  checked={hasAdministrativeDuty}
+                  onChange={(e) => setHasAdministrativeDuty(e.target.checked)}
+                  className="w-4 h-4 text-purple-600 rounded border-gray-300 focus:ring-purple-500"
+                />
+                <div className="flex items-center space-x-1.5 rtl:space-x-reverse">
+                  <Briefcase className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span className="text-sm font-bold text-gray-900 dark:text-white">
+                    {t('hasAdministrativeDuty')}
+                  </span>
+                </div>
+              </label>
+            </div>
+
+            {hasAdministrativeDuty && (
+              <div className="space-y-3 pt-2 border-t border-purple-200/60 dark:border-purple-800/50 animate-in fade-in duration-200">
+                {/* Administrative Scope (داخل القسم أم خارج القسم) */}
+                <div>
+                  <label className="block text-xs font-bold text-purple-900 dark:text-purple-200 mb-1.5">
+                    {t('administrativeScope')} <span className="text-red-500">*</span>
+                  </label>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setAdministrativeScope('داخل القسم')}
+                      className={`flex items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                        administrativeScope === 'داخل القسم'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-purple-50'
+                      }`}
+                    >
+                      <Building className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5" />
+                      <span>{t('insideDepartment')}</span>
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setAdministrativeScope('خارج القسم')}
+                      className={`flex items-center justify-center p-2.5 rounded-xl border text-xs font-bold transition-all ${
+                        administrativeScope === 'خارج القسم'
+                          ? 'bg-purple-600 text-white border-purple-600 shadow-sm'
+                          : 'bg-white dark:bg-gray-700 text-gray-700 dark:text-gray-200 border-gray-300 dark:border-gray-600 hover:bg-purple-50'
+                      }`}
+                    >
+                      <Briefcase className="w-3.5 h-3.5 mr-1.5 rtl:mr-0 rtl:ml-1.5" />
+                      <span>{t('outsideDepartment')}</span>
+                    </button>
+                  </div>
+                </div>
+
+                {/* Administrative Role / Title */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('administrativeRole')} <span className="text-red-500">*</span>
+                  </label>
+                  <select
+                    value={administrativeRole}
+                    onChange={(e) => setAdministrativeRole(e.target.value)}
+                    className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                  >
+                    {STANDARD_ADMIN_ROLES.map((role) => (
+                      <option key={role} value={role}>
+                        {role}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* Custom Role Input if 'أخرى' */}
+                {administrativeRole === 'أخرى' && (
+                  <div>
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('specifyCustomRole')} <span className="text-red-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required={hasAdministrativeDuty && administrativeRole === 'أخرى'}
+                      value={customAdminRole}
+                      onChange={(e) => setCustomAdminRole(e.target.value)}
+                      placeholder={language === 'ar' ? 'مثال: مدير وحدة الرنين / منسق الامتحانات' : 'e.g. Exam Coordinator'}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                )}
+
+                {/* If Outside Department: Facility / Entity name */}
+                {administrativeScope === 'خارج القسم' && (
+                  <div className="animate-in fade-in duration-200">
+                    <label className="block text-xs font-medium text-gray-700 dark:text-gray-300 mb-1">
+                      {t('administrativeFacility')}
+                    </label>
+                    <input
+                      type="text"
+                      value={administrativeFacility}
+                      onChange={(e) => setAdministrativeFacility(e.target.value)}
+                      placeholder={language === 'ar' ? 'مثال: عمادة الكلية / إدارة المستشفى / المجلس الصحي' : 'e.g. College Deanery / Hospital Admin'}
+                      className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500"
+                    />
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
 
           {/* Start Date */}
           <div>
@@ -346,7 +518,7 @@ export function EmploymentHistoryModal({
               rows={2}
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
-              placeholder={language === 'ar' ? 'ملاحظات حول هذه الفترة الوظيفية...' : 'Notes...'}
+              placeholder={language === 'ar' ? 'ملاحظات حول هذه الفترة والتكليف...' : 'Notes...'}
               className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-blue-500"
             />
           </div>

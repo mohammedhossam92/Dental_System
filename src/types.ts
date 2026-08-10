@@ -189,6 +189,10 @@ export interface DoctorEmploymentHistory {
   status_type: EmploymentStatusType | string;
   deputation_direction?: 'منتدب إلى المستشفى' | 'منتدب من المستشفى إلى الخارج' | 'incoming' | 'outgoing' | string | null;
   deputation_facility?: string | null;
+  has_administrative_duty?: boolean | null;
+  administrative_scope?: 'داخل القسم' | 'خارج القسم' | string | null;
+  administrative_role?: string | null;
+  administrative_facility?: string | null;
   start_date: string;
   end_date: string | null;
   notes: string | null;
@@ -263,6 +267,7 @@ export interface DoctorWithDetails extends Doctor {
 export interface DoctorFilterState {
   search: string;
   employmentStatus: string;
+  administrativeDuty: string;
   certificateType: string;
   certificateStatus: string;
   university: string;

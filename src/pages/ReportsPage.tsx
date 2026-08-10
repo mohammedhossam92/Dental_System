@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Patient, Treatment, Student, DoctorWithDetails } from '../types';
-import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X, Award, Stethoscope, Sparkles } from 'lucide-react';
+import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X, Award, Stethoscope, Sparkles, Briefcase, Building } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useLanguage } from '../context/LanguageContext';
@@ -702,8 +702,8 @@ export function ReportsPage() {
             </div>
           ) : (
             <div className="space-y-6">
-              {/* Degree Distribution Cards */}
-              <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+              {/* Analytics Summary Cards */}
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800">
                   <span className="text-xs font-semibold text-purple-700 dark:text-purple-300">
                     {language === 'ar' ? 'حملة الدكتوراه' : 'PhD Holders'}
@@ -722,7 +722,6 @@ export function ReportsPage() {
                   </p>
                 </div>
 
-
                 <div className="p-4 bg-emerald-50 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800">
                   <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
                     {language === 'ar' ? 'حملة الدبلوم والزمالة' : 'Diploma & Fellowship'}
@@ -739,6 +738,91 @@ export function ReportsPage() {
                   <p className="text-2xl font-bold text-blue-900 dark:text-blue-100 mt-1">
                     {doctorsList.filter(d => d.certificates?.some(c => c.status === 'in_progress')).length}
                   </p>
+                </div>
+
+                <div className="p-4 bg-fuchsia-50 dark:bg-fuchsia-950/40 rounded-2xl border border-fuchsia-200 dark:border-fuchsia-800">
+                  <span className="text-xs font-semibold text-fuchsia-700 dark:text-fuchsia-300">
+                    {language === 'ar' ? 'عمل إداري داخل القسم' : 'Admin (Inside Dept)'}
+                  </span>
+                  <p className="text-2xl font-bold text-fuchsia-900 dark:text-fuchsia-100 mt-1">
+                    {doctorsList.filter(d => d.current_status?.has_administrative_duty && d.current_status?.administrative_scope === 'داخل القسم').length}
+                  </p>
+                </div>
+
+                <div className="p-4 bg-amber-50 dark:bg-amber-950/40 rounded-2xl border border-amber-200 dark:border-amber-800">
+                  <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                    {language === 'ar' ? 'عمل إداري خارج القسم' : 'Admin (Outside Dept)'}
+                  </span>
+                  <p className="text-2xl font-bold text-amber-900 dark:text-amber-100 mt-1">
+                    {doctorsList.filter(d => d.current_status?.has_administrative_duty && d.current_status?.administrative_scope === 'خارج القسم').length}
+                  </p>
+                </div>
+              </div>
+
+              {/* Administrative Roles Table */}
+              <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 overflow-hidden shadow-sm">
+                <div className="p-5 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <Briefcase className="w-5 h-5 text-purple-600" />
+                    <h3 className="text-base font-bold text-gray-900 dark:text-white">
+                      {language === 'ar' ? 'قائمة الأطباء المكلفين بأعمال ومناصب إدارية' : 'Doctors with Administrative Positions'}
+                    </h3>
+                  </div>
+                  <span className="text-xs text-gray-500 font-semibold">
+                    {doctorsList.filter(d => d.current_status?.has_administrative_duty).length} {language === 'ar' ? 'طبيب مكلف' : 'assigned'}
+                  </span>
+                </div>
+
+                <div className="overflow-x-auto">
+                  <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-right rtl:text-right ltr:text-left text-sm">
+                    <thead className="bg-slate-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase">
+                      <tr>
+                        <th className="px-4 py-3">{t('doctorName')}</th>
+                        <th className="px-4 py-3">{t('administrativeRole')}</th>
+                        <th className="px-4 py-3">{t('administrativeScope')}</th>
+                        <th className="px-4 py-3">{t('administrativeFacility')}</th>
+                        <th className="px-4 py-3">{t('currentStatus')}</th>
+                        <th className="px-4 py-3">{t('phone')}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+                      {doctorsList.filter(d => d.current_status?.has_administrative_duty).length === 0 ? (
+                        <tr>
+                          <td colSpan={6} className="text-center py-6 text-xs text-gray-400">
+                            {language === 'ar' ? 'لا يوجد أطباء مكلفون بأعمال إدارية حالياً' : 'No doctors with active administrative roles'}
+                          </td>
+                        </tr>
+                      ) : (
+                        doctorsList
+                          .filter(d => d.current_status?.has_administrative_duty)
+                          .map((doc) => (
+                            <tr key={doc.id} className="hover:bg-gray-50 dark:hover:bg-gray-750">
+                              <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{doc.name}</td>
+                              <td className="px-4 py-3 font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1.5">
+                                <Briefcase className="w-3.5 h-3.5" />
+                                <span>{doc.current_status?.administrative_role || t('administrativeDuty')}</span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-0.5 rounded-md text-xs font-semibold ${
+                                  doc.current_status?.administrative_scope === 'خارج القسم'
+                                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                    : 'bg-purple-100 text-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                }`}>
+                                  {doc.current_status?.administrative_scope || t('insideDepartment')}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
+                                {doc.current_status?.administrative_facility || '---'}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-semibold text-emerald-600">
+                                {doc.current_status?.status_type || 'قوة أساسية'}
+                              </td>
+                              <td className="px-4 py-3 text-xs font-mono text-gray-500">{doc.phone || '---'}</td>
+                            </tr>
+                          ))
+                      )}
+                    </tbody>
+                  </table>
                 </div>
               </div>
 
