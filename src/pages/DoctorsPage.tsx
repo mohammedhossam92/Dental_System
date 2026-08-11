@@ -3,7 +3,7 @@ import {
   Users, UserPlus, Search, Filter, Download, Award, Clock,
   CheckCircle2, ShieldCheck, ChevronDown, RefreshCw, Layers,
   Phone, CreditCard, Building, Calendar, Edit, Trash2, Eye,
-  Sparkles, X, LayoutGrid, List, MapPin, Briefcase
+  Sparkles, X, LayoutGrid, List, MapPin, Briefcase, ArrowLeftRight, Globe
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type {
@@ -167,6 +167,8 @@ export function DoctorsPage() {
         } else if (filters.employmentStatus === 'انتداب_خارج_المستشفى') {
           if (currentStatusType !== 'انتداب' && currentStatusType !== 'ندب') return false;
           if (currentDeputationDir !== 'منتدب من المستشفى إلى الخارج') return false;
+        } else if (filters.employmentStatus === 'انتداب') {
+          if (currentStatusType !== 'انتداب' && currentStatusType !== 'ندب') return false;
         } else if (currentStatusType !== filters.employmentStatus) {
           return false;
         }
@@ -279,9 +281,17 @@ export function DoctorsPage() {
     const coreStaff = doctors.filter(
       (d) => (d.current_status?.status_type || 'قوة أساسية') === 'قوة أساسية'
     ).length;
-    const onLeaveOrDeputed = doctors.filter((d) => {
+    const deputed = doctors.filter((d) => {
       const st = d.current_status?.status_type;
-      return st === 'إجازة' || st === 'انتداب' || st === 'إعارة' || st === 'ندب';
+      return st === 'انتداب' || st === 'ندب';
+    }).length;
+    const loaned = doctors.filter((d) => {
+      const st = d.current_status?.status_type;
+      return st === 'إعارة';
+    }).length;
+    const onLeave = doctors.filter((d) => {
+      const st = d.current_status?.status_type;
+      return st === 'إجازة';
     }).length;
     const higherDegrees = doctors.filter((d) =>
       d.certificates?.some(
@@ -295,7 +305,7 @@ export function DoctorsPage() {
       (d) => d.current_status?.has_administrative_duty
     ).length;
 
-    return { total, coreStaff, onLeaveOrDeputed, higherDegrees, inStudy, adminStaff };
+    return { total, coreStaff, deputed, loaned, onLeave, higherDegrees, inStudy, adminStaff };
   }, [doctors]);
 
   // Export to Excel
@@ -457,60 +467,150 @@ export function DoctorsPage() {
       </div>
 
       {/* Top Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-3.5">
         {/* Total Doctors */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+        <button
+          type="button"
+          onClick={clearAllFilters}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            activeFiltersCount === 0 && !filters.search
+              ? 'border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'عرض كافة الأطباء' : 'View all doctors'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-xs font-semibold">{t('totalDoctors')}</span>
-            <Users className="w-4 h-4 text-indigo-600" />
+            <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
           </div>
           <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{stats.total}</p>
-        </div>
+        </button>
 
         {/* Core Staff */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'قوة أساسية' ? 'all' : 'قوة أساسية' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.employmentStatus === 'قوة أساسية'
+              ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: قوة أساسية' : 'Filter: Core Staff'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-xs font-semibold">{t('coreStaff')}</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-600" />
+            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
           </div>
           <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{stats.coreStaff}</p>
-        </div>
+        </button>
+
+        {/* Deputation */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'انتداب' ? 'all' : 'انتداب' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.employmentStatus === 'انتداب' || filters.employmentStatus === 'انتداب_إلى_المستشفى' || filters.employmentStatus === 'انتداب_خارج_المستشفى' || filters.employmentStatus === 'ندب'
+              ? 'border-sky-400 dark:border-sky-600 ring-2 ring-sky-500/20 bg-sky-50/30 dark:bg-sky-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: منتدب' : 'Filter: Deputed'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-xs font-semibold">{t('deputation')}</span>
+            <ArrowLeftRight className="w-4 h-4 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform" />
+          </div>
+          <p className="text-2xl font-bold text-sky-600 dark:text-sky-400 mt-2">{stats.deputed}</p>
+        </button>
+
+        {/* Loan */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إعارة' ? 'all' : 'إعارة' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.employmentStatus === 'إعارة'
+              ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/30 dark:bg-purple-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: إعارة' : 'Filter: Loaned'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-xs font-semibold">{t('loaned')}</span>
+            <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+          </div>
+          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">{stats.loaned}</p>
+        </button>
+
+        {/* Leave */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : 'إجازة' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.employmentStatus === 'إجازة'
+              ? 'border-amber-400 dark:border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: في إجازة' : 'Filter: On Leave'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-xs font-semibold">{t('onLeave')}</span>
+            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+          </div>
+          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2">{stats.onLeave}</p>
+        </button>
 
         {/* Administrative Roles */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, administrativeDuty: prev.administrativeDuty === 'has_admin' ? 'all' : 'has_admin' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.administrativeDuty !== 'all' && filters.administrativeDuty !== 'no_admin'
+              ? 'border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: تكليف إداري' : 'Filter: Administrative Duty'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-xs font-semibold">{t('administrativeStaff')}</span>
-            <Briefcase className="w-4 h-4 text-purple-600" />
+            <Briefcase className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform" />
           </div>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">{stats.adminStaff}</p>
-        </div>
-
-        {/* On Leave / Secondment */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
-            <span className="text-xs font-semibold">{t('onLeave')} / {t('deputation')}</span>
-            <Clock className="w-4 h-4 text-amber-600" />
-          </div>
-          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2">{stats.onLeaveOrDeputed}</p>
-        </div>
+          <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-2">{stats.adminStaff}</p>
+        </button>
 
         {/* Higher Degrees */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'obtained' ? 'all' : 'obtained' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.certificateStatus === 'obtained'
+              ? 'border-fuchsia-400 dark:border-fuchsia-600 ring-2 ring-fuchsia-500/20 bg-fuchsia-50/30 dark:bg-fuchsia-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: حاصلين على دراسات عليا' : 'Filter: Higher Degrees'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-xs font-semibold">{t('higherDegrees')}</span>
-            <Award className="w-4 h-4 text-purple-600" />
+            <Award className="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110 transition-transform" />
           </div>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">{stats.higherDegrees}</p>
-        </div>
+          <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 mt-2">{stats.higherDegrees}</p>
+        </button>
 
         {/* Currently Studying */}
-        <div className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between">
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400">
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'in_progress' ? 'all' : 'in_progress' }))}
+          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.certificateStatus === 'in_progress'
+              ? 'border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30 dark:bg-blue-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: قيد الدراسة' : 'Filter: Currently Studying'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-xs font-semibold">{t('inStudy')}</span>
-            <Sparkles className="w-4 h-4 text-blue-600" />
+            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
           </div>
           <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">{stats.inStudy}</p>
-        </div>
+        </button>
       </div>
 
       {/* Search & Filter Control Bar */}
