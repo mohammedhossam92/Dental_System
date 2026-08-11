@@ -21,6 +21,8 @@ import { CertificateFormModal } from './CertificateFormModal';
 import { EmploymentHistoryModal } from './EmploymentHistoryModal';
 import { PromotionModal } from './PromotionModal';
 import { FinancialGradeModal } from './FinancialGradeModal';
+import { DoctorExportModal } from './DoctorExportModal';
+import { DoctorExportDropdown } from './DoctorExportDropdown';
 import Swal from 'sweetalert2';
 
 interface DoctorDetailsModalProps {
@@ -61,6 +63,7 @@ export function DoctorDetailsModal({
   const [selectedPromotion, setSelectedPromotion] = useState<DoctorPromotion | null>(null);
   const [isFinancialModalOpen, setIsFinancialModalOpen] = useState(false);
   const [selectedFinancial, setSelectedFinancial] = useState<DoctorFinancialGrade | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Document upload state
   const [newDocTitle, setNewDocTitle] = useState('');
@@ -275,6 +278,13 @@ export function DoctorDetailsModal({
           </div>
 
           <div className="flex items-center space-x-2 rtl:space-x-reverse">
+            {doctorDetails && (
+              <DoctorExportDropdown
+                doctor={doctorDetails}
+                onOpenPreviewModal={() => setIsExportModalOpen(true)}
+                variant="button"
+              />
+            )}
             <button
               onClick={() => setIsEditDoctorOpen(true)}
               className="px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
@@ -992,6 +1002,14 @@ export function DoctorDetailsModal({
           }}
           doctorId={doctorId}
           gradeRecord={selectedFinancial}
+        />
+      )}
+
+      {isExportModalOpen && doctorDetails && (
+        <DoctorExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => setIsExportModalOpen(false)}
+          doctor={doctorDetails}
         />
       )}
     </div>

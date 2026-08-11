@@ -19,6 +19,8 @@ import {
 } from '../utils/doctorUtils';
 import { DoctorFormModal } from '../components/doctors/DoctorFormModal';
 import { DoctorDetailsModal } from '../components/doctors/DoctorDetailsModal';
+import { DoctorExportModal } from '../components/doctors/DoctorExportModal';
+import { DoctorExportDropdown } from '../components/doctors/DoctorExportDropdown';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 
@@ -40,6 +42,8 @@ export function DoctorsPage() {
   const [isAddDoctorOpen, setIsAddDoctorOpen] = useState(false);
   const [selectedDoctorId, setSelectedDoctorId] = useState<string | null>(null);
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
+  const [selectedDoctorForExport, setSelectedDoctorForExport] = useState<DoctorWithDetails | null>(null);
+  const [isExportModalOpen, setIsExportModalOpen] = useState(false);
 
   // Filter State
   const [filters, setFilters] = useState<DoctorFilterState>({
@@ -1031,6 +1035,15 @@ export function DoctorsPage() {
                         onClick={(e) => e.stopPropagation()}
                       >
                         <div className="flex items-center justify-center space-x-1.5 rtl:space-x-reverse">
+                          <DoctorExportDropdown
+                            doctor={doc}
+                            onOpenPreviewModal={() => {
+                              setSelectedDoctorForExport(doc);
+                              setIsExportModalOpen(true);
+                            }}
+                            variant="icon"
+                            size="md"
+                          />
                           <button
                             onClick={() => {
                               setSelectedDoctorId(doc.id);
@@ -1150,9 +1163,38 @@ export function DoctorsPage() {
                   )}
                 </div>
 
-                <div className="pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs text-indigo-600 dark:text-indigo-400 font-bold">
-                  <span>{t('doctorDetails')}</span>
-                  <Eye className="w-4 h-4" />
+                <div
+                  className="pt-3 border-t border-gray-100 dark:border-gray-700 flex items-center justify-between text-xs"
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  <button
+                    onClick={() => {
+                      setSelectedDoctorId(doc.id);
+                      setIsDetailsOpen(true);
+                    }}
+                    className="flex items-center gap-1 text-indigo-600 dark:text-indigo-400 font-bold hover:underline"
+                  >
+                    <span>{t('doctorDetails')}</span>
+                    <Eye className="w-4 h-4" />
+                  </button>
+
+                  <div className="flex items-center space-x-1 rtl:space-x-reverse">
+                    <DoctorExportDropdown
+                      doctor={doc}
+                      onOpenPreviewModal={() => {
+                        setSelectedDoctorForExport(doc);
+                        setIsExportModalOpen(true);
+                      }}
+                      size="sm"
+                    />
+                    <button
+                      onClick={() => handleDeleteDoctor(doc.id, doc.name)}
+                      className="p-1.5 text-gray-400 hover:text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-xl transition-colors"
+                      title={t('delete')}
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                    </button>
+                  </div>
                 </div>
               </div>
             );
@@ -1184,6 +1226,18 @@ export function DoctorsPage() {
           universities={universities}
           certificateTypes={certificateTypes}
           onUniversityAdded={(newU) => setUniversities((prev) => [...prev, newU])}
+        />
+      )}
+
+      {/* Standalone Doctor Export Modal */}
+      {isExportModalOpen && selectedDoctorForExport && (
+        <DoctorExportModal
+          isOpen={isExportModalOpen}
+          onClose={() => {
+            setIsExportModalOpen(false);
+            setSelectedDoctorForExport(null);
+          }}
+          doctor={selectedDoctorForExport}
         />
       )}
     </div>

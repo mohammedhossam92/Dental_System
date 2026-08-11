@@ -379,6 +379,18 @@ export const translations = {
     basicInfo: "Basic Info",
     timeline: "Timeline",
     overview: "Overview",
+    exportDoctorProfile: "Export Doctor Profile",
+    exportDoctorCard: "Doctor Card (Image PNG)",
+    exportDoctorExcel: "Doctor Dossier (Excel)",
+    exportDoctorText: "Doctor Dossier (Text .txt)",
+    copyDoctorText: "Copy Text Summary",
+    copyDoctorImage: "Copy Card Image",
+    doctorCardPreview: "Doctor Dossier Card Preview",
+    downloadPngImage: "Download PNG Card",
+    printCard: "Print Dossier",
+    exportSingleDoctor: "Export Doctor Data",
+    copiedSuccess: "Copied to clipboard successfully",
+    allDoctorData: "Complete Doctor Data",
   },
 
   ar: {
@@ -762,6 +774,18 @@ export const translations = {
     basicInfo: "البيانات الأساسية",
     timeline: "الخط الزمني",
     overview: "نظرة عامة",
+    exportDoctorProfile: "تصدير ملف الطبيب",
+    exportDoctorCard: "بطاقة الطبيب (صورة PNG)",
+    exportDoctorExcel: "ملف الطبيب (Excel)",
+    exportDoctorText: "ملف الطبيب (نصي .txt)",
+    copyDoctorText: "نسخ النص للحافظة",
+    copyDoctorImage: "نسخ صورة البطاقة",
+    doctorCardPreview: "معاينة بطاقة الطبيب",
+    downloadPngImage: "تحميل البطاقة (PNG)",
+    printCard: "طباعة الملف",
+    exportSingleDoctor: "تصدير بيانات الطبيب",
+    copiedSuccess: "تم النسخ إلى الحافظة بنجاح",
+    allDoctorData: "كافة بيانات الطبيب",
   }
 
 };
