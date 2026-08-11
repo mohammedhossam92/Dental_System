@@ -7,15 +7,38 @@ const arabicMonths = [
 ];
 
 /**
+ * Safely format text values, replacing 'null', 'undefined', empty or placeholder strings with localized 'غير محدد' or 'undefined'
+ */
+export function formatDisplayValue(
+  val: string | number | null | undefined,
+  language: string = 'ar',
+  fallback?: string
+): string {
+  if (val === null || val === undefined) {
+    return fallback !== undefined ? fallback : (language === 'ar' ? 'غير محدد' : 'undefined');
+  }
+  const str = String(val).trim();
+  if (!str || str.toLowerCase() === 'null' || str.toLowerCase() === 'undefined' || str === '---' || str === 'N/A') {
+    return fallback !== undefined ? fallback : (language === 'ar' ? 'غير محدد' : 'undefined');
+  }
+  return str;
+}
+
+/**
  * Format a date string (YYYY, YYYY-MM, or YYYY-MM-DD) to Month Year in Arabic or English
  * e.g. "2018-08" -> "أغسطس 2018", "2018" -> "عام 2018"
  */
 export function formatMonthYear(dateString: string | null | undefined, language: string = 'ar'): string {
   if (!dateString) return '';
+  const cleanStr = String(dateString).trim();
+  if (!cleanStr || cleanStr.toLowerCase() === 'null' || cleanStr.toLowerCase() === 'undefined' || cleanStr === '---' || cleanStr === 'N/A') {
+    return '';
+  }
   
   try {
-    const parts = dateString.split('-');
-    const year = parts[0];
+    const parts = cleanStr.split('-');
+    const year = parts[0].trim();
+    if (!year || isNaN(Number(year))) return '';
     if (parts.length === 1) {
       return language === 'ar' ? `عام ${year}` : `${year}`;
     }
@@ -32,7 +55,7 @@ export function formatMonthYear(dateString: string | null | undefined, language:
       return `${monthName} ${year}`;
     }
   } catch {
-    return dateString;
+    return '';
   }
 }
 
@@ -40,22 +63,30 @@ export function formatMonthYear(dateString: string | null | undefined, language:
  * Format date for display supporting Year Only ('YYYY'), Month & Year ('YYYY-MM'), and Full Date ('YYYY-MM-DD')
  */
 export function formatDate(dateString: string | null | undefined, language: string = 'ar'): string {
-  if (!dateString) return language === 'ar' ? 'غير محدد' : '---';
+  if (!dateString) return language === 'ar' ? 'غير محدد' : 'undefined';
+  const cleanStr = String(dateString).trim();
+  if (!cleanStr || cleanStr.toLowerCase() === 'null' || cleanStr.toLowerCase() === 'undefined' || cleanStr === '---' || cleanStr === 'N/A') {
+    return language === 'ar' ? 'غير محدد' : 'undefined';
+  }
   
   try {
-    const parts = dateString.split('-');
+    const parts = cleanStr.split('-');
     if (parts.length === 1) {
-      // Year only e.g. "2024"
-      return language === 'ar' ? `عام ${parts[0]}` : parts[0];
+      const year = parts[0].trim();
+      if (!year || isNaN(Number(year))) return language === 'ar' ? 'غير محدد' : 'undefined';
+      return language === 'ar' ? `عام ${year}` : year;
     }
     if (parts.length === 2) {
-      // Month and Year e.g. "2024-08"
-      return formatMonthYear(dateString, language);
+      const my = formatMonthYear(cleanStr, language);
+      return my || (language === 'ar' ? 'غير محدد' : 'undefined');
     }
-    // Full date e.g. "2024-08-15"
-    const year = parts[0];
+    const year = parts[0].trim();
     const monthIndex = parseInt(parts[1], 10) - 1;
     const day = parseInt(parts[2], 10);
+
+    if (isNaN(monthIndex) || isNaN(day) || !year || isNaN(Number(year))) {
+      return language === 'ar' ? 'غير محدد' : 'undefined';
+    }
 
     if (language === 'ar') {
       const monthName = arabicMonths[monthIndex] || parts[1];
@@ -66,16 +97,19 @@ export function formatDate(dateString: string | null | undefined, language: stri
       return `${day} ${monthName} ${year}`;
     }
   } catch {
-    return dateString;
+    return language === 'ar' ? 'غير محدد' : 'undefined';
   }
 }
 
 /**
  * Extract Year from Date string
  */
-export function getYearFromDate(dateString: string | null): string {
+export function getYearFromDate(dateString: string | null | undefined): string {
   if (!dateString) return '';
-  return dateString.split('-')[0] || '';
+  const clean = String(dateString).trim();
+  if (!clean || clean.toLowerCase() === 'null' || clean.toLowerCase() === 'undefined' || clean === '---' || clean === 'N/A') return '';
+  const yr = clean.split('-')[0]?.trim() || '';
+  return !isNaN(Number(yr)) ? yr : '';
 }
 
 /**
@@ -87,14 +121,18 @@ export function formatCertificateDate(
   language: string = 'ar'
 ): string {
   if (!dateString) return '';
+  const clean = String(dateString).trim();
+  if (!clean || clean.toLowerCase() === 'null' || clean.toLowerCase() === 'undefined' || clean === '---' || clean === 'N/A') return '';
   if (mode === 'year') {
-    const y = getYearFromDate(dateString);
+    const y = getYearFromDate(clean);
+    if (!y) return '';
     return language === 'ar' ? `عام ${y}` : `${y}`;
   }
   if (mode === 'full') {
-    return formatDate(dateString, language);
+    const formatted = formatDate(clean, language);
+    return formatted === (language === 'ar' ? 'غير محدد' : 'undefined') ? '' : formatted;
   }
-  return formatMonthYear(dateString, language);
+  return formatMonthYear(clean, language);
 }
 
 /**
@@ -105,34 +143,45 @@ export function formatCertificateDate(
  * - "دكتوراه طب الأسنان، جامعة المنصورة، قيد الدراسة، متوقع الحصول عليها: أغسطس 2027"
  */
 export function getCertificateSummary(cert: Partial<DoctorCertificate>, language: string = 'ar'): string {
-  const type = cert.certificate_type || '';
-  const title = cert.certificate_title || '';
-  const univ = cert.university_name ? cert.university_name.trim() : '';
-  const country = (univ && cert.university_country && cert.university_country !== 'مصر') ? ` (${cert.university_country})` : '';
+  const cleanVal = (v?: string | null) => {
+    if (!v) return '';
+    const s = String(v).trim();
+    return (s.toLowerCase() === 'null' || s.toLowerCase() === 'undefined' || s === '---' || s === 'N/A') ? '' : s;
+  };
+
+  const type = cleanVal(cert.certificate_type);
+  const title = cleanVal(cert.certificate_title);
+  const univ = cleanVal(cert.university_name);
+  const countryVal = cleanVal(cert.university_country);
+  const country = (univ && countryVal && countryVal !== 'مصر' && countryVal.toLowerCase() !== 'egypt') ? ` (${countryVal})` : '';
   const mode = cert.date_mode || 'month';
   const univPart = univ ? `، ${univ}${country}` : '';
 
   if (language === 'ar') {
     if (cert.status === 'in_progress') {
       let expectedPart = '';
-      if (cert.expected_date) {
-        expectedPart = `، متوقع الحصول عليها: ${formatCertificateDate(cert.expected_date, mode, 'ar')}`;
+      const expDate = formatCertificateDate(cert.expected_date, mode, 'ar');
+      if (expDate) {
+        expectedPart = `، متوقع الحصول عليها: ${expDate}`;
       }
       return `${type} ${title}${univPart}، قيد الدراسة${expectedPart}`.replace(/\s+/g, ' ').replace(/،\s*،/g, '،').replace(/^،\s*/, '').trim();
     } else {
-      const datePart = cert.obtained_date ? `، ${formatCertificateDate(cert.obtained_date, mode, 'ar')}` : '';
+      const obtDate = formatCertificateDate(cert.obtained_date, mode, 'ar');
+      const datePart = obtDate ? `، ${obtDate}` : '';
       return `${type} ${title}${univPart}${datePart}`.replace(/\s+/g, ' ').replace(/،\s*،/g, '،').replace(/^،\s*/, '').trim();
     }
   } else {
     const univPartEn = univ ? `, ${univ}${country}` : '';
     if (cert.status === 'in_progress') {
       let expectedPart = '';
-      if (cert.expected_date) {
-        expectedPart = `, expected in ${formatCertificateDate(cert.expected_date, mode, 'en')}`;
+      const expDate = formatCertificateDate(cert.expected_date, mode, 'en');
+      if (expDate) {
+        expectedPart = `, expected in ${expDate}`;
       }
       return `${type} in ${title}${univPartEn}, In Progress${expectedPart}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/^,\s*/, '').trim();
     } else {
-      const datePart = cert.obtained_date ? `, ${formatCertificateDate(cert.obtained_date, mode, 'en')}` : '';
+      const obtDate = formatCertificateDate(cert.obtained_date, mode, 'en');
+      const datePart = obtDate ? `, ${obtDate}` : '';
       return `${type} in ${title}${univPartEn}${datePart}`.replace(/\s+/g, ' ').replace(/,\s*,/g, ',').replace(/^,\s*/, '').trim();
     }
   }

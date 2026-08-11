@@ -15,7 +15,7 @@ import { useAuth } from '../context/AuthContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import {
   getCertificateSummary, getCurrentEmploymentStatus,
-  formatDate, getYearFromDate
+  formatDate, getYearFromDate, formatDisplayValue
 } from '../utils/doctorUtils';
 import { DoctorFormModal } from '../components/doctors/DoctorFormModal';
 import { DoctorDetailsModal } from '../components/doctors/DoctorDetailsModal';
@@ -954,15 +954,19 @@ export function DoctorsPage() {
                       {/* National ID & Phone */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="font-mono text-xs font-bold text-gray-800 dark:text-gray-200">
-                          {doc.national_id || <span className="text-gray-400 font-normal">---</span>}
+                          {doc.national_id && doc.national_id !== 'null' && doc.national_id !== 'undefined' ? (
+                            doc.national_id
+                          ) : (
+                            <span className="text-gray-400 font-normal">{language === 'ar' ? 'غير محدد' : 'undefined'}</span>
+                          )}
                         </div>
-                        {doc.phone ? (
+                        {doc.phone && doc.phone !== 'null' && doc.phone !== 'undefined' ? (
                           <div className="flex items-center gap-1.5 mt-1 font-mono text-xs text-gray-700 dark:text-gray-300">
                             <span>{doc.phone}</span>
                             <WhatsAppButton phone={doc.phone} size="xs" />
                           </div>
                         ) : (
-                          <div className="font-mono text-xs text-gray-400 mt-0.5">---</div>
+                          <div className="font-mono text-xs text-gray-400 mt-0.5">{language === 'ar' ? 'غير محدد' : 'undefined'}</div>
                         )}
                       </td>
 

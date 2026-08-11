@@ -1,7 +1,7 @@
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import type { DoctorWithDetails, DoctorCertificate, DoctorEmploymentHistory, DoctorPromotion, DoctorFinancialGrade } from '../types';
-import { formatDate, formatCertificateDate, getCertificateSummary } from './doctorUtils';
+import { formatDate, formatCertificateDate, getCertificateSummary, formatDisplayValue } from './doctorUtils';
 
 /**
  * Clean filename string from invalid characters
@@ -15,6 +15,7 @@ function sanitizeFileName(name: string): string {
  */
 export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: string = 'ar'): string {
   const isAr = language === 'ar';
+  const undefinedStr = isAr ? 'غير محدد' : 'undefined';
   const divider = '='.repeat(70);
   const subDivider = '-'.repeat(70);
   const now = new Date().toLocaleString(isAr ? 'ar-EG' : 'en-US', {
@@ -34,9 +35,9 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
   // Personal Information
   lines.push(isAr ? '【 البيانات الشخصية والأساسية 】' : '【 PERSONAL & BASIC INFORMATION 】');
   lines.push(`${isAr ? '• اسم الطبيب' : '• Doctor Name'}: ${doctor.name}`);
-  lines.push(`${isAr ? '• الرقم القومي' : '• National ID'}: ${doctor.national_id || (isAr ? 'غير مسجل' : 'N/A')}`);
-  lines.push(`${isAr ? '• رقم الهاتف' : '• Phone'}: ${doctor.phone || (isAr ? 'غير مسجل' : 'N/A')}`);
-  lines.push(`${isAr ? '• العنوان' : '• Address'}: ${doctor.address || (isAr ? 'غير مسجل' : 'N/A')}`);
+  lines.push(`${isAr ? '• الرقم القومي' : '• National ID'}: ${formatDisplayValue(doctor.national_id, language)}`);
+  lines.push(`${isAr ? '• رقم الهاتف' : '• Phone'}: ${formatDisplayValue(doctor.phone, language)}`);
+  lines.push(`${isAr ? '• العنوان' : '• Address'}: ${formatDisplayValue(doctor.address, language)}`);
   lines.push(`${isAr ? '• تاريخ الميلاد' : '• Birth Date'}: ${formatDate(doctor.birth_date, language)}`);
   lines.push(`${isAr ? '• تاريخ التخرج' : '• Graduation Date'}: ${formatDate(doctor.graduation_date, language)}`);
   lines.push(`${isAr ? '• تاريخ استلام العمل' : '• Hire Date'}: ${formatDate(doctor.hire_date, language)}`);
@@ -46,29 +47,29 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
   lines.push(subDivider);
   lines.push(isAr ? '【 الحالة الوظيفية والتكليف الإداري الحالي 】' : '【 CURRENT EMPLOYMENT & ADMINISTRATIVE STATUS 】');
   const currentStatus = doctor.current_status;
-  const statusType = currentStatus?.status_type || (isAr ? 'قوة أساسية' : 'Core Staff');
+  const statusType = formatDisplayValue(currentStatus?.status_type, language, isAr ? 'قوة أساسية' : 'Core Staff');
   lines.push(`${isAr ? '• الحالة الوظيفية الحالية' : '• Current Employment Status'}: ${statusType}`);
   
-  if (currentStatus?.deputation_direction) {
+  if (currentStatus?.deputation_direction && currentStatus.deputation_direction !== 'null' && currentStatus.deputation_direction !== 'undefined') {
     lines.push(`${isAr ? '• جهة / اتجاه الانتداب' : '• Deputation Direction'}: ${currentStatus.deputation_direction}`);
-    if (currentStatus.deputation_facility) {
+    if (currentStatus.deputation_facility && currentStatus.deputation_facility !== 'null' && currentStatus.deputation_facility !== 'undefined') {
       lines.push(`${isAr ? '• الجهة المنتدب منها / إليها' : '• Deputation Facility'}: ${currentStatus.deputation_facility}`);
     }
   }
 
   if (currentStatus?.has_administrative_duty) {
     lines.push(`${isAr ? '• التكليف الإداري' : '• Administrative Duty'}: ${isAr ? 'نعم (مكلف بعمل إداري)' : 'Yes'}`);
-    lines.push(`${isAr ? '• المسمى / المنصب الإداري' : '• Administrative Role'}: ${currentStatus.administrative_role || (isAr ? 'غير محدد' : 'N/A')}`);
-    lines.push(`${isAr ? '• نطاق العمل الإداري' : '• Administrative Scope'}: ${currentStatus.administrative_scope || (isAr ? 'داخل القسم' : 'Inside Department')}`);
-    if (currentStatus.administrative_facility) {
+    lines.push(`${isAr ? '• المسمى / المنصب الإداري' : '• Administrative Role'}: ${formatDisplayValue(currentStatus.administrative_role, language)}`);
+    lines.push(`${isAr ? '• نطاق العمل الإداري' : '• Administrative Scope'}: ${formatDisplayValue(currentStatus.administrative_scope, language, isAr ? 'داخل القسم' : 'Inside Department')}`);
+    if (currentStatus.administrative_facility && currentStatus.administrative_facility !== 'null' && currentStatus.administrative_facility !== 'undefined') {
       lines.push(`${isAr ? '• جهة العمل الإداري' : '• Administrative Facility'}: ${currentStatus.administrative_facility}`);
     }
   } else {
     lines.push(`${isAr ? '• التكليف الإداري' : '• Administrative Duty'}: ${isAr ? 'لا (عمل إكلينيكي فقط)' : 'Clinical Only'}`);
   }
 
-  if (doctor.current_financial_grade) {
-    lines.push(`${isAr ? '• الدرجة المالية الحالية' : '• Current Financial Grade'}: ${doctor.current_financial_grade.financial_grade} (${isAr ? 'منذ' : 'Since'} ${doctor.current_financial_grade.start_date})`);
+  if (doctor.current_financial_grade?.financial_grade && doctor.current_financial_grade.financial_grade !== 'null') {
+    lines.push(`${isAr ? '• الدرجة المالية الحالية' : '• Current Financial Grade'}: ${doctor.current_financial_grade.financial_grade} (${isAr ? 'منذ' : 'Since'} ${doctor.current_financial_grade.start_date || undefinedStr})`);
   }
   lines.push('');
 
@@ -77,16 +78,25 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
   lines.push(isAr ? `【 الشهادات والدرجات العلمية (${doctor.certificates?.length || 0}) 】` : `【 ACADEMIC CERTIFICATES & DEGREES (${doctor.certificates?.length || 0}) 】`);
   if (doctor.certificates && doctor.certificates.length > 0) {
     doctor.certificates.forEach((cert, idx) => {
-      lines.push(`  ${idx + 1}. ${cert.certificate_type} - ${cert.certificate_title}`);
-      lines.push(`     ${isAr ? 'الجامعة / الجهة المانحة' : 'University'}: ${cert.university_name}${cert.university_country ? ` (${cert.university_country})` : ''}`);
+      lines.push(`  ${idx + 1}. ${formatDisplayValue(cert.certificate_type, language, '')} - ${formatDisplayValue(cert.certificate_title, language, '')}`);
+      const cleanUniv = cert.university_name && cert.university_name !== 'null' && cert.university_name !== 'undefined' ? cert.university_name : undefinedStr;
+      const cleanCountry = (cleanUniv !== undefinedStr && cert.university_country && cert.university_country !== 'null' && cert.university_country !== 'undefined' && cert.university_country !== 'مصر') ? ` (${cert.university_country})` : '';
+      lines.push(`     ${isAr ? 'الجامعة / الجهة المانحة' : 'University'}: ${cleanUniv}${cleanCountry}`);
       lines.push(`     ${isAr ? 'الحالة' : 'Status'}: ${cert.status === 'obtained' ? (isAr ? 'حاصل عليها' : 'Obtained') : (isAr ? 'قيد الدراسة حالياً' : 'In Progress')}`);
       if (cert.status === 'obtained' && cert.obtained_date) {
-        lines.push(`     ${isAr ? 'تاريخ الحصول عليها' : 'Obtained Date'}: ${formatCertificateDate(cert.obtained_date, cert.date_mode || 'month', language)}`);
+        const d = formatCertificateDate(cert.obtained_date, cert.date_mode || 'month', language);
+        if (d) lines.push(`     ${isAr ? 'تاريخ الحصول عليها' : 'Obtained Date'}: ${d}`);
       } else if (cert.status === 'in_progress') {
-        if (cert.study_start_date) lines.push(`     ${isAr ? 'تاريخ بدء القيد' : 'Start Date'}: ${formatCertificateDate(cert.study_start_date, 'month', language)}`);
-        if (cert.expected_date) lines.push(`     ${isAr ? 'تاريخ التخرج المتوقع' : 'Expected Completion'}: ${formatCertificateDate(cert.expected_date, 'month', language)}`);
+        if (cert.study_start_date) {
+          const sd = formatCertificateDate(cert.study_start_date, 'month', language);
+          if (sd) lines.push(`     ${isAr ? 'تاريخ بدء القيد' : 'Start Date'}: ${sd}`);
+        }
+        if (cert.expected_date) {
+          const ed = formatCertificateDate(cert.expected_date, 'month', language);
+          if (ed) lines.push(`     ${isAr ? 'تاريخ التخرج المتوقع' : 'Expected Completion'}: ${ed}`);
+        }
       }
-      if (cert.notes) {
+      if (cert.notes && cert.notes !== 'null' && cert.notes !== 'undefined') {
         lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${cert.notes}`);
       }
       lines.push('');
@@ -101,15 +111,15 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
     lines.push(subDivider);
     lines.push(isAr ? `【 سجل التدرج والحالات الوظيفية (${doctor.employment_history.length}) 】` : `【 EMPLOYMENT TIMELINE HISTORY (${doctor.employment_history.length}) 】`);
     doctor.employment_history.forEach((hist, idx) => {
-      const periodStr = `${hist.start_date || '-'} -> ${hist.end_date || (isAr ? 'مستمر حتى الآن' : 'Present')}`;
-      lines.push(`  ${idx + 1}. [${hist.status_type}] (${periodStr})`);
+      const periodStr = `${hist.start_date || undefinedStr} -> ${hist.end_date || (isAr ? 'مستمر حتى الآن' : 'Present')}`;
+      lines.push(`  ${idx + 1}. [${formatDisplayValue(hist.status_type, language, isAr ? 'قوة أساسية' : 'Core Staff')}] (${periodStr})`);
       if (hist.deputation_direction || hist.deputation_facility) {
-        lines.push(`     ${isAr ? 'الانتداب' : 'Deputation'}: ${hist.deputation_direction || ''} ${hist.deputation_facility ? `(${hist.deputation_facility})` : ''}`);
+        lines.push(`     ${isAr ? 'الانتداب' : 'Deputation'}: ${hist.deputation_direction && hist.deputation_direction !== 'null' ? hist.deputation_direction : ''} ${hist.deputation_facility && hist.deputation_facility !== 'null' ? `(${hist.deputation_facility})` : ''}`);
       }
       if (hist.has_administrative_duty) {
-        lines.push(`     ${isAr ? 'المنصب الإداري' : 'Admin Role'}: ${hist.administrative_role || ''} - ${hist.administrative_scope || ''} ${hist.administrative_facility ? `(${hist.administrative_facility})` : ''}`);
+        lines.push(`     ${isAr ? 'المنصب الإداري' : 'Admin Role'}: ${formatDisplayValue(hist.administrative_role, language)} - ${formatDisplayValue(hist.administrative_scope, language, isAr ? 'داخل القسم' : 'Inside Department')} ${hist.administrative_facility && hist.administrative_facility !== 'null' ? `(${hist.administrative_facility})` : ''}`);
       }
-      if (hist.notes) {
+      if (hist.notes && hist.notes !== 'null' && hist.notes !== 'undefined') {
         lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${hist.notes}`);
       }
     });
@@ -121,8 +131,8 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
     lines.push(subDivider);
     lines.push(isAr ? `【 الترقيات الفنية (${doctor.promotions.length}) 】` : `【 TECHNICAL PROMOTIONS (${doctor.promotions.length}) 】`);
     doctor.promotions.forEach((promo, idx) => {
-      lines.push(`  ${idx + 1}. ${promo.promotion_type} - ${isAr ? 'التاريخ' : 'Date'}: ${formatDate(promo.promotion_date, language)}`);
-      if (promo.notes) lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${promo.notes}`);
+      lines.push(`  ${idx + 1}. ${formatDisplayValue(promo.promotion_type, language)} - ${isAr ? 'التاريخ' : 'Date'}: ${formatDate(promo.promotion_date, language)}`);
+      if (promo.notes && promo.notes !== 'null' && promo.notes !== 'undefined') lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${promo.notes}`);
     });
     lines.push('');
   }
@@ -132,15 +142,15 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
     lines.push(subDivider);
     lines.push(isAr ? `【 التدرج في الدرجات المالية (${doctor.financial_grades.length}) 】` : `【 FINANCIAL GRADES HISTORY (${doctor.financial_grades.length}) 】`);
     doctor.financial_grades.forEach((grade, idx) => {
-      const periodStr = `${grade.start_date || '-'} -> ${grade.end_date || (isAr ? 'الحالية' : 'Current')}`;
-      lines.push(`  ${idx + 1}. ${grade.financial_grade} (${periodStr})`);
-      if (grade.notes) lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${grade.notes}`);
+      const periodStr = `${grade.start_date || undefinedStr} -> ${grade.end_date || (isAr ? 'الحالية' : 'Current')}`;
+      lines.push(`  ${idx + 1}. ${formatDisplayValue(grade.financial_grade, language)} (${periodStr})`);
+      if (grade.notes && grade.notes !== 'null' && grade.notes !== 'undefined') lines.push(`     ${isAr ? 'ملاحظات' : 'Notes'}: ${grade.notes}`);
     });
     lines.push('');
   }
 
   // General Notes
-  if (doctor.notes) {
+  if (doctor.notes && doctor.notes !== 'null' && doctor.notes !== 'undefined') {
     lines.push(subDivider);
     lines.push(isAr ? '【 ملاحظات عامة 】' : '【 GENERAL NOTES 】');
     lines.push(doctor.notes);
@@ -483,8 +493,7 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
   ctx.fillText(displayName, nameX, 98);
 
   // Status Badges in Header
-  const currentStatus = doctor.current_status?.status_type || (isAr ? 'قوة أساسية' : 'Core Staff');
-  let badgeStartX = nameX;
+  const currentStatus = formatDisplayValue(doctor.current_status?.status_type, language, isAr ? 'قوة أساسية' : 'Core Staff');
   const badgeY = 120;
   const badgeH = 26;
 
@@ -492,30 +501,42 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
   ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
   const statusText = currentStatus;
   const statusWidth = ctx.measureText(statusText).width + 20;
-  const statusBadgeX = isAr ? badgeStartX - statusWidth : badgeStartX;
+  const statusBadgeX = isAr ? nameX - statusWidth : nameX;
   drawRoundedRect(ctx, statusBadgeX, badgeY, statusWidth, badgeH, 13, 'rgba(16, 185, 129, 0.25)', '#10b981', 1);
   ctx.fillStyle = '#6ee7b7';
   ctx.fillText(statusText, isAr ? statusBadgeX + statusWidth - 10 : statusBadgeX + 10, badgeY + 17);
 
+  let lastBadgeX = statusBadgeX;
+  let lastBadgeWidth = statusWidth;
+
   // 2. Admin Duty Badge if present
   if (doctor.current_status?.has_administrative_duty) {
-    const adminText = doctor.current_status.administrative_role || (isAr ? 'تكليف إداري' : 'Admin Duty');
+    const rawAdminRole = doctor.current_status.administrative_role;
+    const adminText = formatDisplayValue(rawAdminRole, language, isAr ? 'تكليف إداري' : 'Admin Duty');
     const adminWidth = ctx.measureText(adminText).width + 20;
-    const adminBadgeX = isAr ? statusBadgeX - adminWidth - 10 : statusBadgeX + statusWidth + 10;
-    drawRoundedRect(ctx, adminBadgeX, badgeY, adminWidth, badgeH, 13, 'rgba(168, 85, 247, 0.25)', '#a855f7', 1);
-    ctx.fillStyle = '#e9d5ff';
-    ctx.fillText(adminText, isAr ? adminBadgeX + adminWidth - 10 : adminBadgeX + 10, badgeY + 17);
+    const adminBadgeX = isAr ? lastBadgeX - adminWidth - 10 : lastBadgeX + lastBadgeWidth + 10;
+    
+    if (adminBadgeX > padding + 10 && adminBadgeX + adminWidth < cardWidth - padding - 10) {
+      drawRoundedRect(ctx, adminBadgeX, badgeY, adminWidth, badgeH, 13, 'rgba(168, 85, 247, 0.25)', '#a855f7', 1);
+      ctx.fillStyle = '#e9d5ff';
+      ctx.fillText(adminText, isAr ? adminBadgeX + adminWidth - 10 : adminBadgeX + 10, badgeY + 17);
+      lastBadgeX = adminBadgeX;
+      lastBadgeWidth = adminWidth;
+    }
   }
 
   // 3. Current Financial Grade if present
-  if (doctor.current_financial_grade) {
-    const gradeText = doctor.current_financial_grade.financial_grade;
-    const gradeWidth = ctx.measureText(gradeText).width + 20;
-    const gradeBadgeX = isAr ? statusBadgeX - (doctor.current_status?.has_administrative_duty ? 180 : 0) - gradeWidth - 10 : statusBadgeX + statusWidth + (doctor.current_status?.has_administrative_duty ? 180 : 0) + 10;
-    if (gradeBadgeX > padding + 10 && gradeBadgeX + gradeWidth < cardWidth - padding - 10) {
-      drawRoundedRect(ctx, gradeBadgeX, badgeY, gradeWidth, badgeH, 13, 'rgba(245, 158, 11, 0.25)', '#f59e0b', 1);
-      ctx.fillStyle = '#fde68a';
-      ctx.fillText(gradeText, isAr ? gradeBadgeX + gradeWidth - 10 : gradeBadgeX + 10, badgeY + 17);
+  if (doctor.current_financial_grade?.financial_grade) {
+    const rawGrade = doctor.current_financial_grade.financial_grade;
+    const gradeText = formatDisplayValue(rawGrade, language);
+    if (gradeText !== (isAr ? 'غير محدد' : 'undefined')) {
+      const gradeWidth = ctx.measureText(gradeText).width + 20;
+      const gradeBadgeX = isAr ? lastBadgeX - gradeWidth - 10 : lastBadgeX + lastBadgeWidth + 10;
+      if (gradeBadgeX > padding + 10 && gradeBadgeX + gradeWidth < cardWidth - padding - 10) {
+        drawRoundedRect(ctx, gradeBadgeX, badgeY, gradeWidth, badgeH, 13, 'rgba(245, 158, 11, 0.25)', '#f59e0b', 1);
+        ctx.fillStyle = '#fde68a';
+        ctx.fillText(gradeText, isAr ? gradeBadgeX + gradeWidth - 10 : gradeBadgeX + 10, badgeY + 17);
+      }
     }
   }
 
@@ -545,9 +566,9 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
 
   // Field Rows
   const fieldsCol1 = [
-    { label: isAr ? 'الرقم القومي' : 'National ID', val: doctor.national_id || '---' },
-    { label: isAr ? 'رقم الهاتف' : 'Phone', val: doctor.phone || '---' },
-    { label: isAr ? 'العنوان' : 'Address', val: doctor.address || '---' },
+    { label: isAr ? 'الرقم القومي' : 'National ID', val: formatDisplayValue(doctor.national_id, language) },
+    { label: isAr ? 'رقم الهاتف' : 'Phone', val: formatDisplayValue(doctor.phone, language) },
+    { label: isAr ? 'العنوان' : 'Address', val: formatDisplayValue(doctor.address, language) },
     { label: isAr ? 'تاريخ التعيين' : 'Hire Date', val: formatDate(doctor.hire_date, language) },
   ];
 
@@ -578,10 +599,14 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
   ctx.fillStyle = '#334155';
   ctx.fillText(isAr ? '💼 الحالة الوظيفية والتكليف الإداري' : '💼 Employment & Admin Duty', isAr ? box2X + halfColWidth - 28 : box2X + 28, currentY + 33);
 
+  const adminDutyDisplay = doctor.current_status?.has_administrative_duty
+    ? formatDisplayValue(doctor.current_status.administrative_role, language, isAr ? 'نعم' : 'Yes')
+    : (isAr ? 'عمل إكلينيكي فقط' : 'Clinical Only');
+
   const fieldsCol2 = [
     { label: isAr ? 'الحالة الحالية' : 'Current Status', val: currentStatus },
-    { label: isAr ? 'التكليف الإداري' : 'Admin Duty', val: doctor.current_status?.has_administrative_duty ? (doctor.current_status.administrative_role || (isAr ? 'نعم' : 'Yes')) : (isAr ? 'عمل إكلينيكي فقط' : 'Clinical Only') },
-    { label: isAr ? 'الدرجة المالية' : 'Financial Grade', val: doctor.current_financial_grade?.financial_grade || '---' },
+    { label: isAr ? 'التكليف الإداري' : 'Admin Duty', val: adminDutyDisplay },
+    { label: isAr ? 'الدرجة المالية' : 'Financial Grade', val: formatDisplayValue(doctor.current_financial_grade?.financial_grade, language) },
     { label: isAr ? 'تاريخ التخرج' : 'Graduation Date', val: formatDate(doctor.graduation_date, language) },
   ];
 
@@ -641,13 +666,17 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
       // Certificate Title & Type
       ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = '#1e293b';
-      const certTitleText = `${idx + 1}. ${c.certificate_type} ${c.certificate_title}`;
+      const cleanCertType = formatDisplayValue(c.certificate_type, language, '');
+      const cleanCertTitle = formatDisplayValue(c.certificate_title, language, '');
+      const certTitleText = `${idx + 1}. ${cleanCertType} ${cleanCertTitle}`.trim();
       ctx.fillText(certTitleText, isAr ? padding + innerWidth - 30 : padding + 30, certRowY + 20);
 
       // University Name & Country
       ctx.font = '500 11px system-ui, -apple-system, sans-serif';
       ctx.fillStyle = '#64748b';
-      const univStr = `${c.university_name}${c.university_country ? ` (${c.university_country})` : ''}`;
+      const cleanUniv = c.university_name && c.university_name !== 'null' && c.university_name !== 'undefined' ? c.university_name.trim() : '';
+      const cleanCountry = (cleanUniv && c.university_country && c.university_country !== 'null' && c.university_country !== 'undefined' && c.university_country !== 'مصر') ? ` (${c.university_country})` : '';
+      const univStr = cleanUniv ? `${cleanUniv}${cleanCountry}` : (isAr ? 'غير محدد' : 'undefined');
       ctx.fillText(univStr, isAr ? padding + innerWidth - 30 : padding + 30, certRowY + 38);
 
       // Status Pill on the side
@@ -661,17 +690,37 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
 
       drawRoundedRect(ctx, pillX, certRowY + 12, pillW, 22, 11, pillBg, pillBorder, 1);
       ctx.fillStyle = pillText;
+      ctx.textAlign = isAr ? 'right' : 'left';
       ctx.fillText(statusLabel, isAr ? pillX + pillW - 8 : pillX + 8, certRowY + 27);
 
-      // Date Text next to pill
-      const dateText = isObtained 
-        ? formatCertificateDate(c.obtained_date, c.date_mode || 'month', language)
-        : (c.expected_date ? `${isAr ? 'متوقع: ' : 'Exp: '}${formatCertificateDate(c.expected_date, 'month', language)}` : '');
-      if (dateText) {
+      // Date Text next to pill (NEVER superimposing on status pill)
+      let dateText = '';
+      if (isObtained) {
+        dateText = formatCertificateDate(c.obtained_date, c.date_mode || 'month', language);
+      } else {
+        if (c.expected_date) {
+          dateText = `${isAr ? 'متوقع: ' : 'Exp: '}${formatCertificateDate(c.expected_date, 'month', language)}`;
+        } else if (c.study_start_date) {
+          dateText = `${isAr ? 'بدء: ' : 'Start: '}${formatCertificateDate(c.study_start_date, 'month', language)}`;
+        }
+      }
+
+      if (dateText && dateText !== 'null' && dateText !== 'undefined') {
         ctx.font = '600 10px system-ui, -apple-system, sans-serif';
         ctx.fillStyle = '#64748b';
-        const dateX = isAr ? pillX + pillW + 12 : pillX - ctx.measureText(dateText).width - 12;
-        ctx.fillText(dateText, dateX, certRowY + 27);
+        const dateW = ctx.measureText(dateText).width;
+        
+        if (isAr) {
+          // In RTL, the pill is on the left at [pillX, pillX + pillW].
+          // The date appears to the right of the pill starting at (pillX + pillW + 12).
+          // With textAlign = 'right', anchor is at (pillX + pillW + 12 + dateW).
+          ctx.fillText(dateText, pillX + pillW + 12 + dateW, certRowY + 27);
+        } else {
+          // In LTR, the pill is on the right at [pillX, pillX + pillW].
+          // The date appears to the left of the pill ending before (pillX - 12).
+          // With textAlign = 'left', anchor is at (pillX - 12 - dateW).
+          ctx.fillText(dateText, pillX - 12 - dateW, certRowY + 27);
+        }
       }
 
       certRowY += 54;
@@ -697,10 +746,13 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
 
     let infoText = '';
     if (doctor.promotions && doctor.promotions[0]) {
-      infoText += `${isAr ? 'آخر ترقية' : 'Latest Promotion'}: ${doctor.promotions[0].promotion_type} (${formatDate(doctor.promotions[0].promotion_date, language)})   |   `;
+      const pType = formatDisplayValue(doctor.promotions[0].promotion_type, language);
+      infoText += `${isAr ? 'آخر ترقية' : 'Latest Promotion'}: ${pType} (${formatDate(doctor.promotions[0].promotion_date, language)})   |   `;
     }
-    if (doctor.current_financial_grade) {
-      infoText += `${isAr ? 'الدرجة المالية' : 'Financial Grade'}: ${doctor.current_financial_grade.financial_grade} (${isAr ? 'منذ' : 'Since'} ${doctor.current_financial_grade.start_date})`;
+    if (doctor.current_financial_grade?.financial_grade && doctor.current_financial_grade.financial_grade !== 'null') {
+      const gGrade = formatDisplayValue(doctor.current_financial_grade.financial_grade, language);
+      const gStart = doctor.current_financial_grade.start_date || (isAr ? 'غير محدد' : 'undefined');
+      infoText += `${isAr ? 'الدرجة المالية' : 'Financial Grade'}: ${gGrade} (${isAr ? 'منذ' : 'Since'} ${gStart})`;
     }
 
     ctx.font = '500 11px system-ui, -apple-system, sans-serif';

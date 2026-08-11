@@ -35,6 +35,8 @@ export const translations = {
     no: "No",
     completed: "Completed",
     in_progress: "In Progress",
+    undefined: "Undefined",
+    unspecified: "Undefined",
 
     // Login & Signup
     signInToAccount: "Sign in to your account",
@@ -429,6 +431,8 @@ export const translations = {
     no: "لا",
     completed: "مكتمل",
     in_progress: "قيد العلاج",
+    undefined: "غير محدد",
+    unspecified: "غير محدد",
 
     // Login & Signup
     signInToAccount: "تسجيل الدخول إلى حسابك",

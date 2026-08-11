@@ -813,19 +813,19 @@ export function ReportsPage() {
                                 </span>
                               </td>
                               <td className="px-4 py-3 text-xs text-gray-600 dark:text-gray-300">
-                                {doc.current_status?.administrative_facility || '---'}
+                                {doc.current_status?.administrative_facility || (language === 'ar' ? 'غير محدد' : 'undefined')}
                               </td>
                               <td className="px-4 py-3 text-xs font-semibold text-emerald-600">
-                                {doc.current_status?.status_type || 'قوة أساسية'}
+                                {doc.current_status?.status_type || (language === 'ar' ? 'قوة أساسية' : 'Core Staff')}
                               </td>
                               <td className="px-4 py-3 text-xs font-mono text-gray-500">
-                                {doc.phone ? (
+                                {doc.phone && doc.phone !== 'null' && doc.phone !== 'undefined' ? (
                                   <div className="flex items-center gap-1.5">
                                     <span>{doc.phone}</span>
                                     <WhatsAppButton phone={doc.phone} size="xs" />
                                   </div>
                                 ) : (
-                                  '---'
+                                  (language === 'ar' ? 'غير محدد' : 'undefined')
                                 )}
                               </td>
                             </tr>
@@ -874,9 +874,9 @@ export function ReportsPage() {
                             <td className="px-4 py-3 font-bold text-gray-900 dark:text-white">{doc.name}</td>
                             <td className="px-4 py-3 font-semibold text-indigo-600 dark:text-indigo-400">{cert.certificate_type}</td>
                             <td className="px-4 py-3">{cert.certificate_title}</td>
-                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{cert.university_name}</td>
-                            <td className="px-4 py-3 text-xs">{cert.study_start_date || '---'}</td>
-                            <td className="px-4 py-3 text-xs font-semibold text-blue-600">{cert.expected_date || '---'}</td>
+                            <td className="px-4 py-3 text-gray-600 dark:text-gray-300">{cert.university_name || (language === 'ar' ? 'غير محدد' : 'undefined')}</td>
+                            <td className="px-4 py-3 text-xs">{cert.study_start_date ? formatDate(cert.study_start_date) : (language === 'ar' ? 'غير محدد' : 'undefined')}</td>
+                            <td className="px-4 py-3 text-xs font-semibold text-blue-600">{cert.expected_date ? formatDate(cert.expected_date) : (language === 'ar' ? 'غير محدد' : 'undefined')}</td>
                             <td className="px-4 py-3 text-xs italic text-gray-500 max-w-xs">{getCertificateSummary(cert, language)}</td>
                           </tr>
                         ))}

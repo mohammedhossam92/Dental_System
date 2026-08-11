@@ -14,7 +14,7 @@ import { useAuth } from '../../context/AuthContext';
 import { WhatsAppButton } from '../common/WhatsAppButton';
 import {
   formatDate, formatMonthYear, formatCertificateDate, getCertificateSummary,
-  getCurrentEmploymentStatus, uploadDoctorFile
+  getCurrentEmploymentStatus, uploadDoctorFile, formatDisplayValue
 } from '../../utils/doctorUtils';
 import { DoctorFormModal } from './DoctorFormModal';
 import { CertificateFormModal } from './CertificateFormModal';
@@ -346,7 +346,7 @@ export function DoctorDetailsModal({
                       <div>
                         <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{t('currentStatus')}</span>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
-                          {doctorDetails?.current_status?.status_type || 'قوة أساسية'}
+                          {formatDisplayValue(doctorDetails?.current_status?.status_type, language, language === 'ar' ? 'قوة أساسية' : 'Core Staff')}
                         </h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
                           {doctorDetails?.current_status ? (
@@ -366,11 +366,11 @@ export function DoctorDetailsModal({
                         <div>
                           <span className="text-xs text-purple-600 dark:text-purple-400 font-semibold">{t('administrativeDuty')}</span>
                           <h3 className="text-base font-bold text-gray-900 dark:text-white mt-0.5 truncate max-w-[170px]" title={doctorDetails.current_status.administrative_role || ''}>
-                            {doctorDetails.current_status.administrative_role || t('administrativeDuty')}
+                            {formatDisplayValue(doctorDetails.current_status.administrative_role, language, t('administrativeDuty'))}
                           </h3>
                           <p className="text-xs text-purple-700 dark:text-purple-300 mt-1 flex items-center gap-1">
-                            <span>{doctorDetails.current_status.administrative_scope || t('insideDepartment')}</span>
-                            {doctorDetails.current_status.administrative_facility && (
+                            <span>{formatDisplayValue(doctorDetails.current_status.administrative_scope, language, t('insideDepartment'))}</span>
+                            {doctorDetails.current_status.administrative_facility && doctorDetails.current_status.administrative_facility !== 'null' && (
                               <span className="text-[11px] opacity-80 truncate max-w-[100px]">({doctorDetails.current_status.administrative_facility})</span>
                             )}
                           </p>
@@ -385,10 +385,10 @@ export function DoctorDetailsModal({
                       <div>
                         <span className="text-xs text-amber-600 dark:text-amber-400 font-semibold">{t('financialGrade')}</span>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
-                          {doctorDetails?.current_financial_grade?.financial_grade || 'غير محدد'}
+                          {formatDisplayValue(doctorDetails?.current_financial_grade?.financial_grade, language)}
                         </h3>
                         <p className="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                          {doctorDetails?.current_financial_grade?.start_date ? `منذ ${doctorDetails.current_financial_grade.start_date}` : '---'}
+                          {doctorDetails?.current_financial_grade?.start_date ? `منذ ${doctorDetails.current_financial_grade.start_date}` : (language === 'ar' ? 'غير محدد' : 'undefined')}
                         </p>
                       </div>
                       <div className="p-3 bg-amber-600/10 dark:bg-amber-400/10 rounded-xl text-amber-600 dark:text-amber-400">
@@ -421,18 +421,18 @@ export function DoctorDetailsModal({
 
                     <div>
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('nationalId')}</span>
-                      <p className="text-base font-mono font-bold text-gray-900 dark:text-white">{doctorDetails?.national_id || '---'}</p>
+                      <p className="text-base font-mono font-bold text-gray-900 dark:text-white">{formatDisplayValue(doctorDetails?.national_id, language)}</p>
                     </div>
 
                     <div>
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('phone')}</span>
-                      {doctorDetails?.phone ? (
+                      {doctorDetails?.phone && doctorDetails.phone !== 'null' && doctorDetails.phone !== 'undefined' ? (
                         <div className="flex items-center gap-2">
                           <p className="text-base font-mono font-bold text-gray-900 dark:text-white">{doctorDetails.phone}</p>
                           <WhatsAppButton phone={doctorDetails.phone} variant="button" size="sm" />
                         </div>
                       ) : (
-                        <p className="text-base font-mono font-bold text-gray-400">---</p>
+                        <p className="text-base font-medium text-gray-400">{language === 'ar' ? 'غير محدد' : 'undefined'}</p>
                       )}
                     </div>
 
@@ -453,10 +453,10 @@ export function DoctorDetailsModal({
 
                     <div className="md:col-span-2 lg:col-span-3">
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('address')}</span>
-                      <p className="text-base font-medium text-gray-900 dark:text-white">{doctorDetails?.address || '---'}</p>
+                      <p className="text-base font-medium text-gray-900 dark:text-white">{formatDisplayValue(doctorDetails?.address, language)}</p>
                     </div>
 
-                    {doctorDetails?.notes && (
+                    {doctorDetails?.notes && doctorDetails.notes !== 'null' && doctorDetails.notes !== 'undefined' && (
                       <div className="md:col-span-2 lg:col-span-3">
                         <span className="text-xs font-semibold text-gray-400 block mb-1">{t('notes')}</span>
                         <p className="text-sm text-gray-700 dark:text-gray-300 bg-white dark:bg-gray-800 p-3 rounded-xl border border-gray-200 dark:border-gray-600">
