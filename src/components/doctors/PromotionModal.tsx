@@ -161,15 +161,15 @@ export function PromotionModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-lg max-h-[96vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-800">
-          <div className="flex items-center space-x-3 rtl:space-x-reverse">
-            <div className="p-2 bg-purple-600 rounded-lg text-white">
-              <TrendingUp className="w-5 h-5" />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-purple-50 to-pink-50 dark:from-gray-800 dark:to-gray-800 shrink-0">
+          <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
+            <div className="p-1.5 sm:p-2 bg-purple-600 rounded-lg sm:rounded-xl text-white">
+              <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
               {promotion ? t('edit') : t('addPromotion')}
             </h2>
           </div>
@@ -177,21 +177,21 @@ export function PromotionModal({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-3.5 sm:space-y-4 overflow-y-auto flex-1">
           {/* Promotion Type */}
           <div>
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
               {t('promotionType')} <span className="text-red-500">*</span>
             </label>
             <select
               value={promotionType}
               onChange={(e) => setPromotionType(e.target.value)}
-              className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
+              className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all"
             >
               {PROMOTION_TYPES.map((type) => (
                 <option key={type} value={type}>
@@ -228,13 +228,13 @@ export function PromotionModal({
 
           {/* Document Attachment */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {language === 'ar' ? 'المستند المرفق (قرار الترقية)' : 'Attachment Document'}
             </label>
-            <div className="flex items-center space-x-3 rtl:space-x-reverse">
-              <label className="flex-1 cursor-pointer flex items-center justify-center px-4 py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-purple-50/50 transition-colors">
-                <Upload className="w-4 h-4 mr-2 rtl:mr-0 rtl:ml-2 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <div className="flex items-center space-x-2 sm:space-x-3 rtl:space-x-reverse">
+              <label className="flex-1 cursor-pointer flex items-center justify-center px-3.5 sm:px-4 py-2 sm:py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-purple-500 dark:hover:border-purple-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-purple-50/50 transition-colors">
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-gray-500 shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                   {uploadingFile ? t('uploading') : (documentName || t('uploadFile'))}
                 </span>
                 <input
@@ -250,10 +250,10 @@ export function PromotionModal({
                   href={documentUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-2.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-xl text-xs font-semibold flex items-center transition-colors"
+                  className="px-3 py-2 sm:py-2.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-xl text-xs font-semibold flex items-center transition-colors shrink-0"
                 >
-                  <FileText className="w-4 h-4 mr-1 rtl:mr-0 rtl:ml-1" />
-                  {t('viewFile')}
+                  <FileText className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1" />
+                  <span>{t('viewFile')}</span>
                 </a>
               )}
             </div>
@@ -261,7 +261,7 @@ export function PromotionModal({
 
           {/* Notes */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {t('notes')}
             </label>
             <textarea
@@ -269,23 +269,23 @@ export function PromotionModal({
               value={notes}
               onChange={(e) => setNotes(e.target.value)}
               placeholder={language === 'ar' ? 'ملاحظات حول الترقية...' : 'Notes...'}
-              className="w-full px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-purple-500"
+              className="w-full px-3.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-purple-500"
             />
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end space-x-3 rtl:space-x-reverse pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-end space-x-2 sm:space-x-3 rtl:space-x-reverse pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs sm:text-sm font-medium transition-colors"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || uploadingFile}
-              className="px-6 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white font-semibold flex items-center space-x-2 rtl:space-x-reverse shadow-lg shadow-purple-600/30 transition-all disabled:opacity-50"
+              className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-purple-600 hover:bg-purple-700 text-white text-xs sm:text-sm font-semibold flex items-center space-x-1.5 sm:space-x-2 rtl:space-x-reverse shadow-lg shadow-purple-600/30 transition-all disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>{promotion ? t('saveChanges') : t('save')}</span>

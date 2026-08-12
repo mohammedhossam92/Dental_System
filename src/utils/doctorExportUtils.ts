@@ -389,31 +389,80 @@ function drawRoundedRect(
 }
 
 /**
- * Generate a high-DPI Canvas Doctor Dossier / Profile Card
- * Produces an ultra-crisp, state-of-the-art medical doctor card image
+ * Truncate text with ellipsis if it exceeds maxWidth
+ */
+function truncateText(ctx: CanvasRenderingContext2D, text: string, maxWidth: number): string {
+  if (!text || maxWidth <= 0) return '';
+  if (ctx.measureText(text).width <= maxWidth) return text;
+  let truncated = text;
+  while (truncated.length > 1 && ctx.measureText(truncated + '…').width > maxWidth) {
+    truncated = truncated.slice(0, -1);
+  }
+  return truncated + '…';
+}
+
+/**
+ * Generate a mobile-friendly, high-DPI Canvas Doctor Dossier / Profile Card
+ * Produces an ultra-crisp, vertically stacked, large-typography card for mobile phones
  */
 export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: string = 'ar'): HTMLCanvasElement {
   const isAr = language === 'ar';
   const scale = 2; // High-DPI 2x Retina rendering
 
-  const cardWidth = 1000;
-  const padding = 40;
-  const innerWidth = cardWidth - padding * 2;
+  const cardWidth = 720;
+  const padding = 24;
+  const innerWidth = cardWidth - padding * 2; // 672px
 
-  // Compute dynamic height based on number of certificates and items
-  const certCount = doctor.certificates?.length || 0;
-  const promoCount = doctor.promotions?.length || 0;
-  const gradeCount = doctor.financial_grades?.length || 0;
-  const hasHistory = (doctor.employment_history?.length || 0) > 1;
+  const currentStatus = doctor.current_status;
+  const certs = doctor.certificates || [];
+  const hasPromos = (doctor.promotions && doctor.promotions.length > 0) || (doctor.financial_grades && doctor.financial_grades.length > 0);
+  const hasNotes = !!(doctor.notes && doctor.notes.trim() && doctor.notes.trim() !== 'null' && doctor.notes.trim() !== 'undefined');
 
-  let baseHeight = 720;
-  if (certCount > 0) baseHeight += Math.min(certCount * 62 + 50, 420);
-  if (hasHistory) baseHeight += 120;
-  if (promoCount > 0 || gradeCount > 0) baseHeight += 130;
-  if (doctor.notes) baseHeight += 90;
+  const hasDeputation = !!(currentStatus?.deputation_direction && currentStatus.deputation_direction !== 'null' && currentStatus.deputation_direction !== 'undefined') ||
+                        !!(currentStatus?.deputation_facility && currentStatus.deputation_facility !== 'null' && currentStatus.deputation_facility !== 'undefined');
+  const hasAdminDuty = !!(currentStatus?.has_administrative_duty);
 
-  const cardHeight = Math.max(baseHeight, 820);
+  const rowStep = 30; // Spacious, clear row height for mobile readability
 
+  // --- PASS 1: Calculate Exact Dynamic Height (Zero Dead Space) ---
+  let calculatedY = 16; // Top margin
+  const headerHeight = 148;
+  calculatedY += headerHeight;
+
+  // 1. Personal & Contact Info Card (Full Width)
+  calculatedY += 12; // Spacing
+  const personalBoxHeight = 36 + (4 * rowStep) + 12; // ~168px
+  calculatedY += personalBoxHeight;
+
+  // 2. Employment & Administrative Status Card (Full Width)
+  calculatedY += 12; // Spacing
+  const employmentRowsCount = 4 + (hasDeputation ? 1 : 0) + (hasAdminDuty ? 1 : 0);
+  const employmentBoxHeight = 36 + (employmentRowsCount * rowStep) + 12;
+  calculatedY += employmentBoxHeight;
+
+  // 3. Academic Certificates & Degrees Card (Full Width)
+  calculatedY += 12; // Spacing
+  const certBoxHeight = certs.length === 0 ? 68 : (38 + certs.length * 54 + 10);
+  calculatedY += certBoxHeight;
+
+  // 4. Promotions & Financial Progression (Conditional)
+  if (hasPromos) {
+    calculatedY += 12;
+    calculatedY += 56;
+  }
+
+  // 5. Doctor Notes (Conditional)
+  if (hasNotes) {
+    calculatedY += 12;
+    calculatedY += 52;
+  }
+
+  calculatedY += 16; // Spacing to footer
+  calculatedY += 34; // Footer height + bottom padding
+
+  const cardHeight = calculatedY;
+
+  // --- PASS 2: Canvas Rendering ---
   const canvas = document.createElement('canvas');
   canvas.width = cardWidth * scale;
   canvas.height = cardHeight * scale;
@@ -433,267 +482,327 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
   topGrad.addColorStop(0.5, '#4f46e5');
   topGrad.addColorStop(1, '#2563eb');
   ctx.fillStyle = topGrad;
-  ctx.fillRect(0, 0, cardWidth, 8);
+  ctx.fillRect(0, 0, cardWidth, 6);
 
-  // Header Banner Card
-  const headerHeight = 175;
-  const headerGrad = ctx.createLinearGradient(0, 8, cardWidth, headerHeight + 8);
+  // ================= 1. Header Banner Card =================
+  const headerY = 16;
+  const headerGrad = ctx.createLinearGradient(0, headerY, cardWidth, headerY + headerHeight);
   headerGrad.addColorStop(0, '#1e1b4b');
-  headerGrad.addColorStop(0.6, '#312e81');
+  headerGrad.addColorStop(0.5, '#312e81');
   headerGrad.addColorStop(1, '#1e40af');
 
-  drawRoundedRect(ctx, padding, 24, innerWidth, headerHeight, 20, '#1e1b4b');
+  drawRoundedRect(ctx, padding, headerY, innerWidth, headerHeight, 16, '#1e1b4b');
   ctx.fillStyle = headerGrad;
   ctx.fill();
 
   // Subtle Header Decorative Glow
   ctx.save();
   ctx.beginPath();
-  ctx.arc(cardWidth - 80, 50, 110, 0, Math.PI * 2);
-  ctx.fillStyle = 'rgba(99, 102, 241, 0.15)';
+  ctx.arc(isAr ? padding + 50 : cardWidth - padding - 50, headerY + 40, 85, 0, Math.PI * 2);
+  ctx.fillStyle = 'rgba(99, 102, 241, 0.14)';
   ctx.fill();
   ctx.restore();
 
   // Clinic System Title (Top of Header)
   ctx.save();
   ctx.direction = isAr ? 'rtl' : 'ltr';
-  ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+  ctx.font = '600 12px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#a5b4fc';
-  const clinicTitle = isAr ? 'نظام إدارة عيادات طب الأسنان  |  سجل وبيانات الطبيب' : 'Dental Clinic Management System  |  Doctor Dossier Profile';
-  ctx.fillText(clinicTitle, isAr ? cardWidth - padding - 24 : padding + 24, 52);
+  ctx.textAlign = isAr ? 'right' : 'left';
+  const clinicTitle = isAr ? 'نظام إدارة عيادات طب الأسنان  |  بطاقة وسجل بيانات الطبيب' : 'Dental Clinic Management System  |  Doctor Dossier Profile';
+  ctx.fillText(clinicTitle, isAr ? cardWidth - padding - 18 : padding + 18, headerY + 26);
 
-  // Doctor Monogram Avatar Circle
-  const avatarSize = 74;
-  const avatarX = isAr ? cardWidth - padding - 30 - avatarSize : padding + 30;
-  const avatarY = 70;
+  // Doctor Monogram Avatar
+  const avatarSize = 60;
+  const avatarX = isAr ? cardWidth - padding - 18 - avatarSize : padding + 18;
+  const avatarY = headerY + 40;
 
   const avatarGrad = ctx.createLinearGradient(avatarX, avatarY, avatarX + avatarSize, avatarY + avatarSize);
   avatarGrad.addColorStop(0, '#6366f1');
   avatarGrad.addColorStop(1, '#3b82f6');
-  drawRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 18, '#6366f1');
+  drawRoundedRect(ctx, avatarX, avatarY, avatarSize, avatarSize, 16, '#6366f1');
   ctx.fillStyle = avatarGrad;
   ctx.fill();
 
-  // Avatar Monogram Letter
-  ctx.font = 'bold 34px system-ui, -apple-system, sans-serif';
+  // Avatar Monogram Initial
+  ctx.font = 'bold 30px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#ffffff';
   ctx.textAlign = 'center';
   ctx.textBaseline = 'middle';
   const initialChar = doctor.name ? doctor.name.trim().charAt(0) : 'د';
-  ctx.fillText(initialChar, avatarX + avatarSize / 2, avatarY + avatarSize / 2);
+  ctx.fillText(initialChar, avatarX + avatarSize / 2, avatarY + avatarSize / 2 + 1);
 
   // Doctor Full Name
   ctx.textAlign = isAr ? 'right' : 'left';
   ctx.textBaseline = 'alphabetic';
-  ctx.font = 'bold 24px system-ui, -apple-system, sans-serif';
+  ctx.font = 'bold 23px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#ffffff';
-  const nameX = isAr ? avatarX - 20 : avatarX + avatarSize + 20;
+  const nameX = isAr ? avatarX - 16 : avatarX + avatarSize + 16;
   const docPrefix = isAr ? 'د. ' : 'Dr. ';
-  const displayName = doctor.name.startsWith('د') || doctor.name.startsWith('Dr') ? doctor.name : `${docPrefix}${doctor.name}`;
-  ctx.fillText(displayName, nameX, 98);
+  const rawDisplayName = doctor.name.startsWith('د') || doctor.name.startsWith('Dr') ? doctor.name : `${docPrefix}${doctor.name}`;
+  const maxNameWidth = innerWidth - avatarSize - 44;
+  const displayName = truncateText(ctx, rawDisplayName, maxNameWidth);
+  ctx.fillText(displayName, nameX, avatarY + 26);
 
-  // Status Badges in Header
-  const currentStatus = formatDisplayValue(doctor.current_status?.status_type, language, isAr ? 'قوة أساسية' : 'Core Staff');
-  const badgeY = 120;
+  // Badges in Header (Status, Financial Grade, Admin Duty)
+  const statusTypeStr = formatDisplayValue(doctor.current_status?.status_type, language, isAr ? 'قوة أساسية' : 'Core Staff');
+  const badgeY = avatarY + 42;
   const badgeH = 26;
+
+  let currentBadgeX = nameX;
 
   // 1. Status Badge
   ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-  const statusText = currentStatus;
-  const statusWidth = ctx.measureText(statusText).width + 20;
-  const statusBadgeX = isAr ? nameX - statusWidth : nameX;
+  const statusWidth = ctx.measureText(statusTypeStr).width + 18;
+  const statusBadgeX = isAr ? currentBadgeX - statusWidth : currentBadgeX;
   drawRoundedRect(ctx, statusBadgeX, badgeY, statusWidth, badgeH, 13, 'rgba(16, 185, 129, 0.25)', '#10b981', 1);
   ctx.fillStyle = '#6ee7b7';
-  ctx.fillText(statusText, isAr ? statusBadgeX + statusWidth - 10 : statusBadgeX + 10, badgeY + 17);
+  ctx.fillText(statusTypeStr, isAr ? statusBadgeX + statusWidth - 9 : statusBadgeX + 9, badgeY + 17);
 
-  let lastBadgeX = statusBadgeX;
-  let lastBadgeWidth = statusWidth;
+  currentBadgeX = isAr ? statusBadgeX - 8 : statusBadgeX + statusWidth + 8;
 
-  // 2. Admin Duty Badge if present
-  if (doctor.current_status?.has_administrative_duty) {
-    const rawAdminRole = doctor.current_status.administrative_role;
-    const adminText = formatDisplayValue(rawAdminRole, language, isAr ? 'تكليف إداري' : 'Admin Duty');
-    const adminWidth = ctx.measureText(adminText).width + 20;
-    const adminBadgeX = isAr ? lastBadgeX - adminWidth - 10 : lastBadgeX + lastBadgeWidth + 10;
-    
-    if (adminBadgeX > padding + 10 && adminBadgeX + adminWidth < cardWidth - padding - 10) {
-      drawRoundedRect(ctx, adminBadgeX, badgeY, adminWidth, badgeH, 13, 'rgba(168, 85, 247, 0.25)', '#a855f7', 1);
-      ctx.fillStyle = '#e9d5ff';
-      ctx.fillText(adminText, isAr ? adminBadgeX + adminWidth - 10 : adminBadgeX + 10, badgeY + 17);
-      lastBadgeX = adminBadgeX;
-      lastBadgeWidth = adminWidth;
-    }
-  }
-
-  // 3. Current Financial Grade if present
-  if (doctor.current_financial_grade?.financial_grade) {
+  // 2. Financial Grade Badge (if present)
+  if (doctor.current_financial_grade?.financial_grade && doctor.current_financial_grade.financial_grade !== 'null') {
     const rawGrade = doctor.current_financial_grade.financial_grade;
     const gradeText = formatDisplayValue(rawGrade, language);
     if (gradeText !== (isAr ? 'غير محدد' : 'undefined')) {
-      const gradeWidth = ctx.measureText(gradeText).width + 20;
-      const gradeBadgeX = isAr ? lastBadgeX - gradeWidth - 10 : lastBadgeX + lastBadgeWidth + 10;
-      if (gradeBadgeX > padding + 10 && gradeBadgeX + gradeWidth < cardWidth - padding - 10) {
+      const gradeWidth = ctx.measureText(gradeText).width + 18;
+      const gradeBadgeX = isAr ? currentBadgeX - gradeWidth : currentBadgeX;
+      const canFit = isAr ? gradeBadgeX > (padding + 16) : (gradeBadgeX + gradeWidth < cardWidth - padding - 16);
+      if (canFit) {
         drawRoundedRect(ctx, gradeBadgeX, badgeY, gradeWidth, badgeH, 13, 'rgba(245, 158, 11, 0.25)', '#f59e0b', 1);
         ctx.fillStyle = '#fde68a';
-        ctx.fillText(gradeText, isAr ? gradeBadgeX + gradeWidth - 10 : gradeBadgeX + 10, badgeY + 17);
+        ctx.fillText(gradeText, isAr ? gradeBadgeX + gradeWidth - 9 : gradeBadgeX + 9, badgeY + 17);
+        currentBadgeX = isAr ? gradeBadgeX - 8 : gradeBadgeX + gradeWidth + 8;
       }
     }
   }
 
+  // 3. Admin Duty Badge (if present)
+  if (doctor.current_status?.has_administrative_duty) {
+    const rawAdminRole = doctor.current_status.administrative_role;
+    const adminText = formatDisplayValue(rawAdminRole, language, isAr ? 'تكليف إداري' : 'Admin Duty');
+    const adminWidth = ctx.measureText(adminText).width + 18;
+    const adminBadgeX = isAr ? currentBadgeX - adminWidth : currentBadgeX;
+    const canFit = isAr ? adminBadgeX > (padding + 16) : (adminBadgeX + adminWidth < cardWidth - padding - 16);
+    if (canFit) {
+      drawRoundedRect(ctx, adminBadgeX, badgeY, adminWidth, badgeH, 13, 'rgba(168, 85, 247, 0.25)', '#a855f7', 1);
+      ctx.fillStyle = '#e9d5ff';
+      ctx.fillText(adminText, isAr ? adminBadgeX + adminWidth - 9 : adminBadgeX + 9, badgeY + 17);
+    }
+  }
+
   ctx.restore();
 
-  // Content Layout
-  let currentY = 220;
-  const colGap = 18;
-  const halfColWidth = (innerWidth - colGap) / 2;
+  let currentY = headerY + headerHeight + 12;
 
-  // Left & Right Info Boxes: Personal Info & Employment Info
-  const boxHeight = 168;
-
-  // Box 1: Personal & Contact Info
-  const box1X = isAr ? padding + halfColWidth + colGap : padding;
-  drawRoundedRect(ctx, box1X, currentY, halfColWidth, boxHeight, 16, '#ffffff', '#e2e8f0', 1);
+  // ================= 2. Personal & Contact Info Card (Full Width) =================
+  drawRoundedRect(ctx, padding, currentY, innerWidth, personalBoxHeight, 14, '#ffffff', '#e2e8f0', 1);
 
   ctx.save();
   ctx.direction = isAr ? 'rtl' : 'ltr';
-  ctx.textAlign = isAr ? 'right' : 'left';
-  
-  // Section 1 Header
-  drawRoundedRect(ctx, box1X + 16, currentY + 14, halfColWidth - 32, 28, 8, '#f1f5f9');
-  ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#334155';
-  ctx.fillText(isAr ? '📋 البيانات الشخصية والاتصال' : '📋 Personal & Contact Info', isAr ? box1X + halfColWidth - 28 : box1X + 28, currentY + 33);
 
-  // Field Rows
-  const fieldsCol1 = [
+  // Card Header Banner
+  drawRoundedRect(ctx, padding + 12, currentY + 8, innerWidth - 24, 28, 6, '#f8fafc');
+  ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#1e293b';
+  ctx.textAlign = isAr ? 'right' : 'left';
+  ctx.fillText(
+    isAr ? '📋 البيانات الشخصية والاتصال' : '📋 Personal & Contact Information',
+    isAr ? padding + innerWidth - 22 : padding + 22,
+    currentY + 26
+  );
+
+  const personalFields = [
     { label: isAr ? 'الرقم القومي' : 'National ID', val: formatDisplayValue(doctor.national_id, language) },
-    { label: isAr ? 'رقم الهاتف' : 'Phone', val: formatDisplayValue(doctor.phone, language) },
+    { label: isAr ? 'رقم الهاتف' : 'Phone Number', val: formatDisplayValue(doctor.phone, language) },
+    { label: isAr ? 'تاريخ الميلاد' : 'Birth Date', val: formatDate(doctor.birth_date, language) },
     { label: isAr ? 'العنوان' : 'Address', val: formatDisplayValue(doctor.address, language) },
-    { label: isAr ? 'تاريخ التعيين' : 'Hire Date', val: formatDate(doctor.hire_date, language) },
   ];
 
-  let fieldY = currentY + 62;
-  fieldsCol1.forEach(f => {
-    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#64748b';
-    ctx.fillText(`${f.label}:`, isAr ? box1X + halfColWidth - 24 : box1X + 24, fieldY);
+  let pRowY = currentY + 62;
+  personalFields.forEach((f, idx) => {
+    // Subtle separator line
+    if (idx > 0) {
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding + 16, pRowY - 18);
+      ctx.lineTo(padding + innerWidth - 16, pRowY - 18);
+      ctx.stroke();
+    }
 
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    // Label
+    ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#64748b';
+    ctx.textAlign = isAr ? 'right' : 'left';
+    ctx.fillText(`${f.label}:`, isAr ? cardWidth - padding - 20 : padding + 20, pRowY);
+
+    // Value
+    ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#0f172a';
-    ctx.fillText(f.val, isAr ? box1X + halfColWidth - 110 : box1X + 105, fieldY);
-    fieldY += 24;
+    ctx.textAlign = isAr ? 'left' : 'right';
+    const truncatedVal = truncateText(ctx, f.val, innerWidth - 220);
+    ctx.fillText(truncatedVal, isAr ? padding + 20 : cardWidth - padding - 20, pRowY);
+
+    pRowY += rowStep;
   });
   ctx.restore();
 
-  // Box 2: Employment & Administrative Info
-  const box2X = isAr ? padding : padding + halfColWidth + colGap;
-  drawRoundedRect(ctx, box2X, currentY, halfColWidth, boxHeight, 16, '#ffffff', '#e2e8f0', 1);
+  currentY += personalBoxHeight + 12;
+
+  // ================= 3. Employment & Administrative Status Card (Full Width) =================
+  drawRoundedRect(ctx, padding, currentY, innerWidth, employmentBoxHeight, 14, '#ffffff', '#e2e8f0', 1);
 
   ctx.save();
   ctx.direction = isAr ? 'rtl' : 'ltr';
+
+  // Card Header Banner
+  drawRoundedRect(ctx, padding + 12, currentY + 8, innerWidth - 24, 28, 6, '#f8fafc');
+  ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
+  ctx.fillStyle = '#1e293b';
   ctx.textAlign = isAr ? 'right' : 'left';
+  ctx.fillText(
+    isAr ? '💼 الحالة الوظيفية والتكليف الإداري' : '💼 Employment & Administrative Status',
+    isAr ? padding + innerWidth - 22 : padding + 22,
+    currentY + 26
+  );
 
-  // Section 2 Header
-  drawRoundedRect(ctx, box2X + 16, currentY + 14, halfColWidth - 32, 28, 8, '#f1f5f9');
-  ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#334155';
-  ctx.fillText(isAr ? '💼 الحالة الوظيفية والتكليف الإداري' : '💼 Employment & Admin Duty', isAr ? box2X + halfColWidth - 28 : box2X + 28, currentY + 33);
-
-  const adminDutyDisplay = doctor.current_status?.has_administrative_duty
-    ? formatDisplayValue(doctor.current_status.administrative_role, language, isAr ? 'نعم' : 'Yes')
-    : (isAr ? 'عمل إكلينيكي فقط' : 'Clinical Only');
-
-  const fieldsCol2 = [
-    { label: isAr ? 'الحالة الحالية' : 'Current Status', val: currentStatus },
-    { label: isAr ? 'التكليف الإداري' : 'Admin Duty', val: adminDutyDisplay },
-    { label: isAr ? 'الدرجة المالية' : 'Financial Grade', val: formatDisplayValue(doctor.current_financial_grade?.financial_grade, language) },
+  const employmentFields: { label: string; val: string; isHighlight?: boolean; highlightColor?: string }[] = [
+    { label: isAr ? 'الحالة الوظيفية الحالية' : 'Current Status', val: statusTypeStr },
+    { label: isAr ? 'تاريخ التعيين واستلام العمل' : 'Hire Date', val: formatDate(doctor.hire_date, language) },
     { label: isAr ? 'تاريخ التخرج' : 'Graduation Date', val: formatDate(doctor.graduation_date, language) },
+    {
+      label: isAr ? 'الدرجة المالية الحالية' : 'Financial Grade',
+      val: formatDisplayValue(doctor.current_financial_grade?.financial_grade, language)
+    },
   ];
 
-  let field2Y = currentY + 62;
-  fieldsCol2.forEach(f => {
-    ctx.font = '600 11px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#64748b';
-    ctx.fillText(`${f.label}:`, isAr ? box2X + halfColWidth - 24 : box2X + 24, field2Y);
+  if (hasDeputation) {
+    const dirStr = currentStatus?.deputation_direction || (isAr ? 'منتدب' : 'Deputed');
+    const facStr = currentStatus?.deputation_facility ? ` - ${currentStatus.deputation_facility}` : '';
+    employmentFields.push({
+      label: isAr ? '🔄 الانتداب والجهة' : '🔄 Deputation Facility',
+      val: `${dirStr}${facStr}`,
+      isHighlight: true,
+      highlightColor: '#1d4ed8'
+    });
+  }
 
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#0f172a';
-    ctx.fillText(f.val, isAr ? box2X + halfColWidth - 110 : box2X + 105, field2Y);
-    field2Y += 24;
+  if (hasAdminDuty) {
+    const adminRoleStr = formatDisplayValue(currentStatus?.administrative_role, language, isAr ? 'مكلف بعمل إداري' : 'Admin Duty');
+    const adminScopeStr = currentStatus?.administrative_scope ? ` (${currentStatus.administrative_scope})` : '';
+    const adminFacilityStr = currentStatus?.administrative_facility ? ` - ${currentStatus.administrative_facility}` : '';
+    employmentFields.push({
+      label: isAr ? '💼 التكليف والمنصب الإداري' : '💼 Administrative Role',
+      val: `${adminRoleStr}${adminScopeStr}${adminFacilityStr}`,
+      isHighlight: true,
+      highlightColor: '#6d28d9'
+    });
+  }
+
+  let eRowY = currentY + 62;
+  employmentFields.forEach((f, idx) => {
+    // Subtle separator line
+    if (idx > 0) {
+      ctx.strokeStyle = '#f8fafc';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      ctx.moveTo(padding + 16, eRowY - 18);
+      ctx.lineTo(padding + innerWidth - 16, eRowY - 18);
+      ctx.stroke();
+    }
+
+    // Label
+    ctx.font = '600 13px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = f.isHighlight ? (f.highlightColor || '#4338ca') : '#64748b';
+    ctx.textAlign = isAr ? 'right' : 'left';
+    ctx.fillText(`${f.label}:`, isAr ? cardWidth - padding - 20 : padding + 20, eRowY);
+
+    // Value
+    ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = f.isHighlight ? (f.highlightColor || '#4338ca') : '#0f172a';
+    ctx.textAlign = isAr ? 'left' : 'right';
+    const truncatedVal = truncateText(ctx, f.val, innerWidth - 230);
+    ctx.fillText(truncatedVal, isAr ? padding + 20 : cardWidth - padding - 20, eRowY);
+
+    eRowY += rowStep;
   });
   ctx.restore();
 
-  currentY += boxHeight + 20;
+  currentY += employmentBoxHeight + 12;
 
-  // Section 3: Academic Degrees & Certificates (Full Width Box)
-  const certs = doctor.certificates || [];
-  const certBoxHeight = Math.max(80, certs.length * 56 + 56);
-  drawRoundedRect(ctx, padding, currentY, innerWidth, certBoxHeight, 16, '#ffffff', '#e2e8f0', 1);
+  // ================= 4. Academic Certificates & Degrees Card (Full Width) =================
+  drawRoundedRect(ctx, padding, currentY, innerWidth, certBoxHeight, 14, '#ffffff', '#e2e8f0', 1);
 
   ctx.save();
   ctx.direction = isAr ? 'rtl' : 'ltr';
-  ctx.textAlign = isAr ? 'right' : 'left';
 
-  // Section Header
-  drawRoundedRect(ctx, padding + 16, currentY + 14, innerWidth - 32, 28, 8, '#eef2ff');
-  ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
+  // Section Header Banner
+  drawRoundedRect(ctx, padding + 12, currentY + 8, innerWidth - 24, 28, 6, '#eef2ff');
+  ctx.font = 'bold 13px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#3730a3';
+  ctx.textAlign = isAr ? 'right' : 'left';
   ctx.fillText(
     `${isAr ? '🎓 الشهادات والدرجات العلمية' : '🎓 Academic Certificates & Degrees'} (${certs.length})`,
-    isAr ? padding + innerWidth - 28 : padding + 28,
-    currentY + 33
+    isAr ? padding + innerWidth - 22 : padding + 22,
+    currentY + 26
   );
 
   if (certs.length === 0) {
-    ctx.font = '11px system-ui, -apple-system, sans-serif';
+    ctx.font = '12px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#94a3b8';
-    ctx.fillText(isAr ? 'لا توجد شهادات علمية مسجلة حتى الآن' : 'No academic degrees registered yet', isAr ? padding + innerWidth - 30 : padding + 30, currentY + 68);
+    ctx.textAlign = isAr ? 'right' : 'left';
+    ctx.fillText(
+      isAr ? 'لا توجد شهادات علمية مسجلة حتى الآن' : 'No academic degrees registered yet',
+      isAr ? padding + innerWidth - 22 : padding + 22,
+      currentY + 52
+    );
   } else {
-    let certRowY = currentY + 54;
+    let certRowY = currentY + 44;
     certs.forEach((c, idx) => {
       // Row separator
       if (idx > 0) {
         ctx.strokeStyle = '#f1f5f9';
         ctx.lineWidth = 1;
         ctx.beginPath();
-        ctx.moveTo(padding + 20, certRowY);
-        ctx.lineTo(padding + innerWidth - 20, certRowY);
+        ctx.moveTo(padding + 16, certRowY - 8);
+        ctx.lineTo(padding + innerWidth - 16, certRowY - 8);
         ctx.stroke();
       }
 
       const isObtained = c.status === 'obtained';
-      
-      // Certificate Title & Type
-      ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = '#1e293b';
-      const cleanCertType = formatDisplayValue(c.certificate_type, language, '');
-      const cleanCertTitle = formatDisplayValue(c.certificate_title, language, '');
-      const certTitleText = `${idx + 1}. ${cleanCertType} ${cleanCertTitle}`.trim();
-      ctx.fillText(certTitleText, isAr ? padding + innerWidth - 30 : padding + 30, certRowY + 20);
 
-      // University Name & Country
-      ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-      ctx.fillStyle = '#64748b';
-      const cleanUniv = c.university_name && c.university_name !== 'null' && c.university_name !== 'undefined' ? c.university_name.trim() : '';
-      const cleanCountry = (cleanUniv && c.university_country && c.university_country !== 'null' && c.university_country !== 'undefined' && c.university_country !== 'مصر') ? ` (${c.university_country})` : '';
-      const univStr = cleanUniv ? `${cleanUniv}${cleanCountry}` : (isAr ? 'غير محدد' : 'undefined');
-      ctx.fillText(univStr, isAr ? padding + innerWidth - 30 : padding + 30, certRowY + 38);
-
-      // Status Pill on the side
+      // Status Pill
       const statusLabel = isObtained ? (isAr ? 'حاصل عليها' : 'Obtained') : (isAr ? 'قيد الدراسة' : 'In Progress');
-      ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
+      ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
       const pillW = ctx.measureText(statusLabel).width + 16;
-      const pillX = isAr ? padding + 30 : padding + innerWidth - 30 - pillW;
+      const pillX = isAr ? padding + 18 : padding + innerWidth - 18 - pillW;
       const pillBg = isObtained ? '#ecfdf5' : '#eff6ff';
       const pillBorder = isObtained ? '#10b981' : '#3b82f6';
       const pillText = isObtained ? '#047857' : '#1d4ed8';
 
-      drawRoundedRect(ctx, pillX, certRowY + 12, pillW, 22, 11, pillBg, pillBorder, 1);
+      drawRoundedRect(ctx, pillX, certRowY, pillW, 22, 11, pillBg, pillBorder, 1);
       ctx.fillStyle = pillText;
       ctx.textAlign = isAr ? 'right' : 'left';
-      ctx.fillText(statusLabel, isAr ? pillX + pillW - 8 : pillX + 8, certRowY + 27);
+      ctx.fillText(statusLabel, isAr ? pillX + pillW - 8 : pillX + 8, certRowY + 15);
 
-      // Date Text next to pill (NEVER superimposing on status pill)
+      // Certificate Title & Type (Line 1)
+      ctx.font = 'bold 13.5px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#0f172a';
+      ctx.textAlign = isAr ? 'right' : 'left';
+      const cleanCertType = formatDisplayValue(c.certificate_type, language, '');
+      const cleanCertTitle = formatDisplayValue(c.certificate_title, language, '');
+      const rawCertTitle = `${idx + 1}. ${cleanCertType} ${cleanCertTitle}`.trim();
+      const maxTitleWidth = innerWidth - pillW - 54;
+      const certTitleText = truncateText(ctx, rawCertTitle, maxTitleWidth);
+      ctx.fillText(
+        certTitleText,
+        isAr ? padding + innerWidth - 20 : padding + 20,
+        certRowY + 16
+      );
+
+      // Date Text (Line 2 opposite side)
       let dateText = '';
       if (isObtained) {
         dateText = formatCertificateDate(c.obtained_date, c.date_mode || 'month', language);
@@ -705,49 +814,65 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
         }
       }
 
+      // University Name & Country (Line 2)
+      ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+      ctx.fillStyle = '#64748b';
+      ctx.textAlign = isAr ? 'right' : 'left';
+      const cleanUniv = c.university_name && c.university_name !== 'null' && c.university_name !== 'undefined' ? c.university_name.trim() : '';
+      const cleanCountry = (cleanUniv && c.university_country && c.university_country !== 'null' && c.university_country !== 'undefined' && c.university_country !== 'مصر') ? ` (${c.university_country})` : '';
+      const rawUnivStr = cleanUniv ? `🏛️ ${cleanUniv}${cleanCountry}` : (isAr ? 'غير محدد' : 'undefined');
+
+      ctx.font = '600 11.5px system-ui, -apple-system, sans-serif';
+      const dateW = dateText ? ctx.measureText(`📅 ${dateText}`).width : 0;
+      const maxUnivWidth = innerWidth - dateW - 60;
+
+      ctx.font = '500 12px system-ui, -apple-system, sans-serif';
+      const univStr = truncateText(ctx, rawUnivStr, maxUnivWidth);
+      ctx.fillText(
+        univStr,
+        isAr ? padding + innerWidth - 20 : padding + 20,
+        certRowY + 37
+      );
+
       if (dateText && dateText !== 'null' && dateText !== 'undefined') {
-        ctx.font = '600 10px system-ui, -apple-system, sans-serif';
-        ctx.fillStyle = '#64748b';
-        const dateW = ctx.measureText(dateText).width;
-        
-        if (isAr) {
-          // In RTL, the pill is on the left at [pillX, pillX + pillW].
-          // The date appears to the right of the pill starting at (pillX + pillW + 12).
-          // With textAlign = 'right', anchor is at (pillX + pillW + 12 + dateW).
-          ctx.fillText(dateText, pillX + pillW + 12 + dateW, certRowY + 27);
-        } else {
-          // In LTR, the pill is on the right at [pillX, pillX + pillW].
-          // The date appears to the left of the pill ending before (pillX - 12).
-          // With textAlign = 'left', anchor is at (pillX - 12 - dateW).
-          ctx.fillText(dateText, pillX - 12 - dateW, certRowY + 27);
-        }
+        ctx.font = '600 11.5px system-ui, -apple-system, sans-serif';
+        ctx.fillStyle = '#475569';
+        ctx.textAlign = isAr ? 'left' : 'right';
+        ctx.fillText(
+          `📅 ${dateText}`,
+          isAr ? padding + 20 : padding + innerWidth - 20,
+          certRowY + 37
+        );
       }
 
       certRowY += 54;
     });
   }
   ctx.restore();
+  currentY += certBoxHeight;
 
-  currentY += certBoxHeight + 20;
-
-  // Section 4: Promotions & Financial Grades (if available)
-  if (promoCount > 0 || gradeCount > 0) {
-    const promoBoxHeight = 90;
-    drawRoundedRect(ctx, padding, currentY, innerWidth, promoBoxHeight, 16, '#ffffff', '#e2e8f0', 1);
+  // ================= 5. Promotions & Financial Grades (Conditional) =================
+  if (hasPromos) {
+    currentY += 12;
+    const promoBoxHeight = 56;
+    drawRoundedRect(ctx, padding, currentY, innerWidth, promoBoxHeight, 12, '#fffbeb', '#fde68a', 1);
 
     ctx.save();
     ctx.direction = isAr ? 'rtl' : 'ltr';
     ctx.textAlign = isAr ? 'right' : 'left';
 
-    drawRoundedRect(ctx, padding + 16, currentY + 12, innerWidth - 32, 26, 8, '#fef3c7');
-    ctx.font = 'bold 11px system-ui, -apple-system, sans-serif';
+    ctx.font = 'bold 12px system-ui, -apple-system, sans-serif';
     ctx.fillStyle = '#92400e';
-    ctx.fillText(isAr ? '⭐ الترقيات والتدرج المالي' : '⭐ Promotions & Financial Progression', isAr ? padding + innerWidth - 28 : padding + 28, currentY + 29);
+    ctx.fillText(
+      isAr ? '⭐ الترقيات والتدرج المالي' : '⭐ Promotions & Financial Progression',
+      isAr ? padding + innerWidth - 20 : padding + 20,
+      currentY + 20
+    );
 
     let infoText = '';
     if (doctor.promotions && doctor.promotions[0]) {
       const pType = formatDisplayValue(doctor.promotions[0].promotion_type, language);
-      infoText += `${isAr ? 'آخر ترقية' : 'Latest Promotion'}: ${pType} (${formatDate(doctor.promotions[0].promotion_date, language)})   |   `;
+      infoText += `${isAr ? 'آخر ترقية' : 'Latest Promotion'}: ${pType} (${formatDate(doctor.promotions[0].promotion_date, language)})   •   `;
     }
     if (doctor.current_financial_grade?.financial_grade && doctor.current_financial_grade.financial_grade !== 'null') {
       const gGrade = formatDisplayValue(doctor.current_financial_grade.financial_grade, language);
@@ -755,31 +880,67 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
       infoText += `${isAr ? 'الدرجة المالية' : 'Financial Grade'}: ${gGrade} (${isAr ? 'منذ' : 'Since'} ${gStart})`;
     }
 
-    ctx.font = '500 11px system-ui, -apple-system, sans-serif';
-    ctx.fillStyle = '#334155';
-    ctx.fillText(infoText || (isAr ? 'لا توجد سجلات ترقية' : 'No records'), isAr ? padding + innerWidth - 28 : padding + 28, currentY + 62);
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#78350f';
+    ctx.fillText(
+      truncateText(ctx, infoText || (isAr ? 'لا توجد سجلات ترقية' : 'No records'), innerWidth - 40),
+      isAr ? padding + innerWidth - 20 : padding + 20,
+      currentY + 41
+    );
     ctx.restore();
-
-    currentY += promoBoxHeight + 20;
+    currentY += promoBoxHeight;
   }
 
-  // Footer / Verification Stamp
+  // ================= 6. Doctor Notes (Conditional) =================
+  if (hasNotes) {
+    currentY += 12;
+    const noteBoxHeight = 52;
+    drawRoundedRect(ctx, padding, currentY, innerWidth, noteBoxHeight, 12, '#f8fafc', '#e2e8f0', 1);
+
+    ctx.save();
+    ctx.direction = isAr ? 'rtl' : 'ltr';
+    ctx.textAlign = isAr ? 'right' : 'left';
+
+    ctx.font = '600 12px system-ui, -apple-system, sans-serif';
+    ctx.fillStyle = '#475569';
+    const noteStr = `${isAr ? '📝 ملاحظات: ' : '📝 Notes: '}${doctor.notes?.trim()}`;
+    ctx.fillText(
+      truncateText(ctx, noteStr, innerWidth - 40),
+      isAr ? padding + innerWidth - 20 : padding + 20,
+      currentY + 31
+    );
+    ctx.restore();
+    currentY += noteBoxHeight;
+  }
+
+  // ================= 7. Footer / Verification Stamp =================
+  currentY += 16;
+
+  // Thin separator line above footer
+  ctx.strokeStyle = '#e2e8f0';
+  ctx.lineWidth = 1;
+  ctx.beginPath();
+  ctx.moveTo(padding, currentY);
+  ctx.lineTo(cardWidth - padding, currentY);
+  ctx.stroke();
+
   ctx.save();
   ctx.direction = isAr ? 'rtl' : 'ltr';
-  ctx.textAlign = isAr ? 'right' : 'left';
   ctx.font = '500 11px system-ui, -apple-system, sans-serif';
   ctx.fillStyle = '#94a3b8';
+  ctx.textAlign = isAr ? 'right' : 'left';
 
-  const footerText = isAr 
-    ? `سجل رسمي معتمد  •  تاريخ الاستخراج: ${new Date().toLocaleDateString('ar-EG')}  •  عيادات طب الأسنان`
-    : `Official Medical Dossier  •  Generated: ${new Date().toLocaleDateString('en-US')}  •  Dental Clinics System`;
-  ctx.fillText(footerText, isAr ? cardWidth - padding - 10 : padding + 10, cardHeight - 20);
+  const footerDate = new Date().toLocaleDateString(isAr ? 'ar-EG' : 'en-US');
+  const footerText = isAr
+    ? `سجل رسمي معتمد  •  تاريخ الاستخراج: ${footerDate}  •  عيادات طب الأسنان`
+    : `Official Medical Dossier  •  Date: ${footerDate}  •  Dental Clinics System`;
+  ctx.fillText(footerText, isAr ? cardWidth - padding : padding, currentY + 20);
 
-  // Left / Right badge text
+  // System Badge
   ctx.textAlign = isAr ? 'left' : 'right';
   ctx.font = 'bold 10px system-ui, -apple-system, sans-serif';
-  ctx.fillStyle = '#6366f1';
-  ctx.fillText('VERIFIED SYSTEM RECORD ✓', isAr ? padding + 10 : cardWidth - padding - 10, cardHeight - 20);
+  ctx.fillStyle = '#4f46e5';
+  ctx.fillText('VERIFIED SYSTEM RECORD ✓', isAr ? padding : cardWidth - padding, currentY + 20);
 
   ctx.restore();
 

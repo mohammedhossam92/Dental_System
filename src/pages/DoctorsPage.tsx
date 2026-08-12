@@ -424,59 +424,59 @@ export function DoctorsPage() {
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-200">
+    <div className="space-y-4 sm:space-y-6 animate-in fade-in duration-200">
       
       {/* Page Title & Main Header */}
-      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4">
         <div>
-          <h1 className="text-2xl sm:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
-            <Users className="w-8 h-8 text-indigo-600 dark:text-indigo-400" />
+          <h1 className="text-xl sm:text-2xl md:text-3xl font-bold text-gray-900 dark:text-white flex items-center gap-2">
+            <Users className="w-6 h-6 sm:w-8 sm:h-8 text-indigo-600 dark:text-indigo-400 shrink-0" />
             <span>{t('doctors')}</span>
           </h1>
-          <p className="text-sm text-gray-500 dark:text-gray-400 mt-1">
+          <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 mt-0.5 sm:mt-1">
             {language === 'ar' 
               ? 'إدارة بيانات الأطباء والسجل الوظيفي والشهادات العلمية والترقيات والدرجات المالية' 
               : 'Doctor profiles, employment timeline, certificates & career progression'}
           </p>
         </div>
 
-        <div className="flex items-center space-x-2 rtl:space-x-reverse">
+        <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
           <button
             onClick={() => {
               setRefreshing(true);
               fetchData();
             }}
-            className="p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl shadow-sm transition-all"
+            className="p-2 sm:p-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl shadow-sm transition-all"
             title={t('search')}
           >
-            <RefreshCw className={`w-5 h-5 ${refreshing ? 'animate-spin text-indigo-600' : ''}`} />
+            <RefreshCw className={`w-4 h-4 sm:w-5 sm:h-5 ${refreshing ? 'animate-spin text-indigo-600' : ''}`} />
           </button>
 
           <button
             onClick={handleExportExcel}
-            className="px-4 py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-sm font-semibold flex items-center gap-2 shadow-sm transition-all"
+            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all"
           >
-            <Download className="w-4 h-4 text-emerald-600" />
+            <Download className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600" />
             <span>{language === 'ar' ? 'تصدير Excel' : 'Export'}</span>
           </button>
 
           <button
             onClick={() => setIsAddDoctorOpen(true)}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-bold flex items-center gap-2 shadow-lg shadow-indigo-600/30 transition-all transform hover:-translate-y-0.5"
+            className="flex-1 sm:flex-initial px-3.5 sm:px-5 py-2 sm:py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-1.5 sm:gap-2 shadow-lg shadow-indigo-600/30 transition-all transform hover:-translate-y-0.5"
           >
-            <UserPlus className="w-5 h-5" />
+            <UserPlus className="w-4 h-4 sm:w-5 sm:h-5" />
             <span>{t('addDoctor')}</span>
           </button>
         </div>
       </div>
 
       {/* Top Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-3 sm:gap-3.5">
+      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
         {/* Total Doctors */}
         <button
           type="button"
           onClick={clearAllFilters}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             activeFiltersCount === 0 && !filters.search
               ? 'border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -484,17 +484,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'عرض كافة الأطباء' : 'View all doctors'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('totalDoctors')}</span>
-            <Users className="w-4 h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('totalDoctors')}</span>
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-gray-900 dark:text-white mt-2">{stats.total}</p>
+          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1.5">{stats.total}</p>
         </button>
 
         {/* Core Staff */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'قوة أساسية' ? 'all' : 'قوة أساسية' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'قوة أساسية'
               ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -502,17 +502,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: قوة أساسية' : 'Filter: Core Staff'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('coreStaff')}</span>
-            <ShieldCheck className="w-4 h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('coreStaff')}</span>
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-2">{stats.coreStaff}</p>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.coreStaff}</p>
         </button>
 
         {/* Deputation */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'انتداب' ? 'all' : 'انتداب' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'انتداب' || filters.employmentStatus === 'انتداب_إلى_المستشفى' || filters.employmentStatus === 'انتداب_خارج_المستشفى' || filters.employmentStatus === 'ندب'
               ? 'border-sky-400 dark:border-sky-600 ring-2 ring-sky-500/20 bg-sky-50/30 dark:bg-sky-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -520,17 +520,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: منتدب' : 'Filter: Deputed'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('deputation')}</span>
-            <ArrowLeftRight className="w-4 h-4 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('deputation')}</span>
+            <ArrowLeftRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-sky-600 dark:text-sky-400 mt-2">{stats.deputed}</p>
+          <p className="text-xl sm:text-2xl font-bold text-sky-600 dark:text-sky-400 mt-1.5">{stats.deputed}</p>
         </button>
 
         {/* Loan */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إعارة' ? 'all' : 'إعارة' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'إعارة'
               ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/30 dark:bg-purple-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -538,17 +538,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: إعارة' : 'Filter: Loaned'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('loaned')}</span>
-            <Globe className="w-4 h-4 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('loaned')}</span>
+            <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-purple-600 dark:text-purple-400 mt-2">{stats.loaned}</p>
+          <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1.5">{stats.loaned}</p>
         </button>
 
         {/* Leave */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : 'إجازة' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'إجازة'
               ? 'border-amber-400 dark:border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -556,17 +556,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: في إجازة' : 'Filter: On Leave'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('onLeave')}</span>
-            <Clock className="w-4 h-4 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('onLeave')}</span>
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-amber-600 dark:text-amber-400 mt-2">{stats.onLeave}</p>
+          <p className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1.5">{stats.onLeave}</p>
         </button>
 
         {/* Administrative Roles */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, administrativeDuty: prev.administrativeDuty === 'has_admin' ? 'all' : 'has_admin' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.administrativeDuty !== 'all' && filters.administrativeDuty !== 'no_admin'
               ? 'border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -574,17 +574,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: تكليف إداري' : 'Filter: Administrative Duty'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('administrativeStaff')}</span>
-            <Briefcase className="w-4 h-4 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('administrativeStaff')}</span>
+            <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-rose-600 dark:text-rose-400 mt-2">{stats.adminStaff}</p>
+          <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1.5">{stats.adminStaff}</p>
         </button>
 
         {/* Higher Degrees */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'obtained' ? 'all' : 'obtained' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.certificateStatus === 'obtained'
               ? 'border-fuchsia-400 dark:border-fuchsia-600 ring-2 ring-fuchsia-500/20 bg-fuchsia-50/30 dark:bg-fuchsia-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -592,17 +592,17 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: حاصلين على دراسات عليا' : 'Filter: Higher Degrees'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('higherDegrees')}</span>
-            <Award className="w-4 h-4 text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('higherDegrees')}</span>
+            <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 mt-2">{stats.higherDegrees}</p>
+          <p className="text-xl sm:text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 mt-1.5">{stats.higherDegrees}</p>
         </button>
 
         {/* Currently Studying */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'in_progress' ? 'all' : 'in_progress' }))}
-          className={`p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.certificateStatus === 'in_progress'
               ? 'border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30 dark:bg-blue-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -610,32 +610,32 @@ export function DoctorsPage() {
           title={language === 'ar' ? 'تصفية: قيد الدراسة' : 'Filter: Currently Studying'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-xs font-semibold">{t('inStudy')}</span>
-            <Sparkles className="w-4 h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('inStudy')}</span>
+            <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-2xl font-bold text-blue-600 dark:text-blue-400 mt-2">{stats.inStudy}</p>
+          <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1.5">{stats.inStudy}</p>
         </button>
       </div>
 
       {/* Search & Filter Control Bar */}
-      <div className="bg-white dark:bg-gray-800 p-4 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
-        <div className="flex flex-col md:flex-row items-center gap-3">
+      <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
+        <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 sm:gap-3">
           {/* Universal Search Input */}
           <div className="relative flex-1 w-full">
-            <Search className="absolute right-3.5 rtl:right-3.5 rtl:left-auto left-auto top-3 w-5 h-5 text-gray-400 pointer-events-none" />
+            <Search className="absolute right-3.5 rtl:right-3.5 rtl:left-auto left-auto top-2.5 sm:top-3 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none" />
             <input
               type="text"
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder={language === 'ar' 
-                ? 'البحث باسم الطبيب، الرقم القومي، الهاتف، الجامعة، مسمى الشهادة...' 
-                : 'Search by doctor name, national ID, mobile, university, degree major...'}
-              className="w-full pl-4 pr-11 rtl:pr-11 rtl:pl-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-gray-700 transition-all"
+                ? 'البحث باسم الطبيب، الرقم القومي، الهاتف، الجامعة...' 
+                : 'Search by doctor name, national ID, mobile, university...'}
+              className="w-full pl-3.5 pr-10 rtl:pr-10 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-gray-700 transition-all"
             />
             {filters.search && (
               <button
                 onClick={() => setFilters({ ...filters, search: '' })}
-                className="absolute left-3 rtl:left-3 rtl:right-auto top-3 text-gray-400 hover:text-gray-600"
+                className="absolute left-3 rtl:left-3 rtl:right-auto top-2.5 sm:top-3 text-gray-400 hover:text-gray-600"
               >
                 <X className="w-4 h-4" />
               </button>
@@ -643,38 +643,38 @@ export function DoctorsPage() {
           </div>
 
           {/* Filter Toggle & Sort & View Switcher */}
-          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto justify-between md:justify-end">
+          <div className="flex flex-wrap items-center gap-2 w-full lg:w-auto justify-between lg:justify-end">
             {/* Sort Selector */}
-            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-700/60 p-1 rounded-xl border border-gray-200 dark:border-gray-600">
-              <span className="text-xs text-gray-500 dark:text-gray-400 px-1 font-semibold">
+            <div className="flex items-center gap-1 bg-gray-50 dark:bg-gray-700/60 p-1 rounded-xl border border-gray-200 dark:border-gray-600 flex-1 sm:flex-initial">
+              <span className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 px-1 font-semibold whitespace-nowrap">
                 {language === 'ar' ? 'ترتيب:' : 'Sort:'}
               </span>
               <select
                 value={filters.sortBy || 'recently_added'}
                 onChange={(e) => setFilters({ ...filters, sortBy: e.target.value as any })}
-                className="px-2 py-1.5 rounded-lg border-0 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 shadow-sm"
+                className="w-full sm:w-auto px-2 py-1.5 rounded-lg border-0 bg-white dark:bg-gray-700 text-gray-800 dark:text-gray-200 text-xs font-semibold focus:ring-1 focus:ring-indigo-500 shadow-sm"
               >
-                <option value="recently_added">🕒 {language === 'ar' ? 'الأحدث إضافة (المضافون مؤخراً)' : 'Recently Added'}</option>
+                <option value="recently_added">🕒 {language === 'ar' ? 'الأحدث إضافة' : 'Recently Added'}</option>
                 <option value="oldest">⏳ {language === 'ar' ? 'الأقدم إضافة' : 'Oldest First'}</option>
-                <option value="name_asc">🔤 {language === 'ar' ? 'الاسم أبجدياً (أ - ي)' : 'Name (A to Z)'}</option>
+                <option value="name_asc">🔤 {language === 'ar' ? 'الاسم (أ - ي)' : 'Name (A to Z)'}</option>
                 <option value="name_desc">🔤 {language === 'ar' ? 'الاسم (ي - أ)' : 'Name (Z to A)'}</option>
-                <option value="hire_date_desc">📅 {language === 'ar' ? 'أحدث تاريخ استلام عمل' : 'Newest Hire Date'}</option>
-                <option value="grad_date_desc">🎓 {language === 'ar' ? 'أحدث تاريخ تخرج' : 'Newest Graduation'}</option>
+                <option value="hire_date_desc">📅 {language === 'ar' ? 'أحدث استلام عمل' : 'Newest Hire Date'}</option>
+                <option value="grad_date_desc">🎓 {language === 'ar' ? 'أحدث تخرج' : 'Newest Graduation'}</option>
               </select>
             </div>
 
             <button
               onClick={() => setShowAdvancedFilters(!showAdvancedFilters)}
-              className={`px-3.5 py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-2 border transition-all ${
+              className={`px-3 py-1.5 sm:px-3.5 sm:py-2 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 sm:gap-2 border transition-all ${
                 showAdvancedFilters || activeFiltersCount > 0
                   ? 'bg-indigo-50 dark:bg-indigo-950/60 border-indigo-300 dark:border-indigo-700 text-indigo-700 dark:text-indigo-300'
                   : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50'
               }`}
             >
-              <Filter className="w-4 h-4" />
+              <Filter className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
               <span>{t('filter')}</span>
               {activeFiltersCount > 0 && (
-                <span className="w-5 h-5 rounded-full bg-indigo-600 text-white text-xs flex items-center justify-center font-bold">
+                <span className="w-4 h-4 sm:w-5 sm:h-5 rounded-full bg-indigo-600 text-white text-[10px] sm:text-xs flex items-center justify-center font-bold">
                   {activeFiltersCount}
                 </span>
               )}
@@ -1076,7 +1076,7 @@ export function DoctorsPage() {
         </div>
       ) : (
         /* CARDS GRID VIEW */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
           {filteredDoctors.map((doc) => {
             const currentStatus = doc.current_status?.status_type || 'قوة أساسية';
             return (

@@ -86,7 +86,7 @@ export function DoctorExportDropdown({
       {isOpen && (
         <div
           onClick={(e) => e.stopPropagation()}
-          className="absolute z-50 mt-1.5 w-60 rounded-2xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-100 dark:border-gray-700 py-2 ltr:right-0 rtl:left-0 animate-in fade-in zoom-in-95 duration-150"
+          className="absolute z-50 mt-1.5 w-60 max-w-[calc(100vw-24px)] rounded-2xl bg-white dark:bg-gray-800 shadow-2xl border border-gray-100 dark:border-gray-700 py-2 ltr:right-0 rtl:left-0 animate-in fade-in zoom-in-95 duration-150"
         >
           <div className="px-3 py-1.5 border-b border-gray-100 dark:border-gray-700/60 mb-1">
             <span className="text-[11px] font-bold text-gray-400 uppercase tracking-wider block">

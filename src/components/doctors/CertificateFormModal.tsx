@@ -298,15 +298,15 @@ export function CertificateFormModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-2xl overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[96vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
-        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-gray-800 dark:to-gray-800">
-          <div className="flex items-center space-x-3 rtl:space-x-reverse">
-            <div className="p-2 bg-emerald-600 rounded-lg text-white">
-              <Award className="w-5 h-5" />
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-emerald-50 to-teal-50 dark:from-gray-800 dark:to-gray-800 shrink-0">
+          <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
+            <div className="p-1.5 sm:p-2 bg-emerald-600 rounded-lg sm:rounded-xl text-white">
+              <Award className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h2 className="text-xl font-bold text-gray-900 dark:text-white">
+            <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
               {certificate ? t('editCertificate') : t('addCertificate')}
             </h2>
           </div>
@@ -314,23 +314,23 @@ export function CertificateFormModal({
             onClick={onClose}
             className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
           >
-            <X className="w-5 h-5" />
+            <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="p-6 space-y-4 max-h-[80vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="p-3.5 sm:p-6 space-y-3.5 sm:space-y-4 overflow-y-auto flex-1">
           
           {/* Certificate Type */}
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
             <div>
-              <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+              <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                 {t('certificateType')} <span className="text-red-500">*</span>
               </label>
               <select
                 value={certificateType}
                 onChange={(e) => setCertificateType(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
               >
                 {allTypes.map((type) => (
                   <option key={type} value={type}>
@@ -342,7 +342,7 @@ export function CertificateFormModal({
 
             {certificateType === 'أخرى' && (
               <div>
-                <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                   {language === 'ar' ? 'حدد نوع الشهادة' : 'Specify Type'} <span className="text-red-500">*</span>
                 </label>
                 <input
@@ -351,13 +351,13 @@ export function CertificateFormModal({
                   value={customType}
                   onChange={(e) => setCustomType(e.target.value)}
                   placeholder={language === 'ar' ? 'مثال: زمالة الكلية الملكية' : 'e.g. Royal Fellowship'}
-                  className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                  className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                 />
               </div>
             )}
 
             {/* Certificate Title / Major with Autocomplete */}
-            <div className={certificateType === 'أخرى' ? 'md:col-span-2' : ''}>
+            <div className={certificateType === 'أخرى' ? 'sm:col-span-2' : ''}>
               <AutocompleteInput
                 label={t('certificateTitle')}
                 required
@@ -371,15 +371,15 @@ export function CertificateFormModal({
           </div>
 
           {/* University & Country (Completely Optional with Autocomplete) */}
-          <div className="p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 space-y-3">
-            <div className="flex items-center space-x-2 rtl:space-x-reverse text-sm font-semibold text-gray-800 dark:text-gray-200">
-              <Building className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
+          <div className="p-3 sm:p-4 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 space-y-2.5 sm:space-y-3">
+            <div className="flex items-center space-x-1.5 sm:space-x-2 rtl:space-x-reverse text-xs sm:text-sm font-semibold text-gray-800 dark:text-gray-200">
+              <Building className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400" />
               <span>{language === 'ar' ? 'الجامعة / الجهة المانحة (اختياري)' : 'University / Granting Body (Optional)'}</span>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 sm:gap-3">
               {/* University with Autocomplete */}
-              <div className={universityName.trim() ? '' : 'md:col-span-2'}>
+              <div className={universityName.trim() ? '' : 'sm:col-span-2'}>
                 <AutocompleteInput
                   label={language === 'ar' ? 'اسم الجامعة أو الجهة المانحة' : 'University / Granting Body'}
                   value={universityName}
@@ -400,13 +400,13 @@ export function CertificateFormModal({
               {/* Country Selection (shown when university is entered) */}
               {universityName.trim() && (
                 <div className="animate-in fade-in duration-150">
-                  <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                  <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300 mb-1">
                     {t('universityCountry')}
                   </label>
                   <select
                     value={universityCountry}
                     onChange={(e) => setUniversityCountry(e.target.value)}
-                    className="w-full px-4 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-sm focus:ring-2 focus:ring-emerald-500"
+                    className="w-full px-3.5 sm:px-4 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-emerald-500"
                   >
                     {DEFAULT_COUNTRIES.map((c) => (
                       <option key={c} value={c}>
@@ -420,32 +420,32 @@ export function CertificateFormModal({
           </div>
 
           {/* Certificate Status Radio */}
-          <div className="space-y-2">
-            <label className="block text-sm font-semibold text-gray-700 dark:text-gray-300">
+          <div className="space-y-1.5 sm:space-y-2">
+            <label className="block text-xs sm:text-sm font-semibold text-gray-700 dark:text-gray-300">
               {t('certificateStatus')} <span className="text-red-500">*</span>
             </label>
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-2 gap-2 sm:gap-4">
               <label
                 onClick={() => setStatus('obtained')}
-                className={`flex items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl border-2 cursor-pointer transition-all text-xs sm:text-sm ${
                   status === 'obtained'
                     ? 'border-emerald-600 bg-emerald-50/50 dark:bg-emerald-950/30 text-emerald-900 dark:text-emerald-300 font-bold'
                     : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
                 }`}
               >
-                <CheckCircle2 className={`w-5 h-5 mr-2 rtl:mr-0 rtl:ml-2 ${status === 'obtained' ? 'text-emerald-600' : 'text-gray-400'}`} />
+                <CheckCircle2 className={`w-4 h-4 sm:w-5 sm:h-5 mr-1.5 rtl:mr-0 rtl:ml-1.5 ${status === 'obtained' ? 'text-emerald-600' : 'text-gray-400'}`} />
                 <span>{t('obtained')}</span>
               </label>
 
               <label
                 onClick={() => setStatus('in_progress')}
-                className={`flex items-center justify-center p-3 rounded-xl border-2 cursor-pointer transition-all ${
+                className={`flex items-center justify-center p-2.5 sm:p-3 rounded-xl border-2 cursor-pointer transition-all text-xs sm:text-sm ${
                   status === 'in_progress'
                     ? 'border-blue-600 bg-blue-50/50 dark:bg-blue-950/30 text-blue-900 dark:text-blue-300 font-bold'
                     : 'border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700/50 text-gray-700 dark:text-gray-300'
                 }`}
               >
-                <Clock className={`w-5 h-5 mr-2 rtl:mr-0 rtl:ml-2 ${status === 'in_progress' ? 'text-blue-600' : 'text-gray-400'}`} />
+                <Clock className={`w-4 h-4 sm:w-5 sm:h-5 mr-1.5 rtl:mr-0 rtl:ml-1.5 ${status === 'in_progress' ? 'text-blue-600' : 'text-gray-400'}`} />
                 <span>{t('inProgress')}</span>
               </label>
             </div>
@@ -463,7 +463,7 @@ export function CertificateFormModal({
               accentColor="emerald"
             />
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-4">
               <FlexibleDateInput
                 label={t('studyStartDate')}
                 value={studyStartDate}
@@ -486,13 +486,13 @@ export function CertificateFormModal({
 
           {/* Certificate File Upload */}
           <div>
-            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+            <label className="block text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
               {t('certificateFile')}
             </label>
-            <div className="flex items-center space-x-3 rtl:space-x-reverse">
-              <label className="flex-1 cursor-pointer flex items-center justify-center px-4 py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-emerald-500 dark:hover:border-emerald-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-emerald-50/50 transition-colors">
-                <Upload className="w-4 h-4 mr-2 rtl:mr-0 rtl:ml-2 text-gray-500" />
-                <span className="text-sm font-medium text-gray-700 dark:text-gray-200">
+            <div className="flex items-center space-x-2 sm:space-x-3 rtl:space-x-reverse">
+              <label className="flex-1 cursor-pointer flex items-center justify-center px-3.5 sm:px-4 py-2 sm:py-2.5 border-2 border-dashed border-gray-300 dark:border-gray-600 rounded-xl hover:border-emerald-500 dark:hover:border-emerald-400 bg-gray-50 dark:bg-gray-700/50 hover:bg-emerald-50/50 transition-colors">
+                <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4 mr-1.5 rtl:mr-0 rtl:ml-1.5 text-gray-500 shrink-0" />
+                <span className="text-xs sm:text-sm font-medium text-gray-700 dark:text-gray-200 truncate">
                   {uploadingFile ? t('uploading') : (fileName || t('uploadFile'))}
                 </span>
                 <input
@@ -508,39 +508,39 @@ export function CertificateFormModal({
                   href={fileUrl}
                   target="_blank"
                   rel="noreferrer"
-                  className="px-3 py-2.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-xl text-xs font-semibold flex items-center transition-colors"
+                  className="px-3 py-2 sm:py-2.5 bg-gray-200 dark:bg-gray-600 hover:bg-gray-300 dark:hover:bg-gray-500 text-gray-800 dark:text-white rounded-xl text-xs font-semibold flex items-center transition-colors shrink-0"
                 >
-                  <FileText className="w-4 h-4 mr-1 rtl:mr-0 rtl:ml-1" />
-                  {t('viewFile')}
+                  <FileText className="w-3.5 h-3.5 mr-1 rtl:mr-0 rtl:ml-1" />
+                  <span>{t('viewFile')}</span>
                 </a>
               )}
             </div>
           </div>
 
           {/* Live Generated Summary Box with High Contrast */}
-          <div className="p-4 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-2xl border border-emerald-200 dark:border-emerald-800/80 shadow-sm space-y-1.5">
-            <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-xs font-bold text-emerald-800 dark:text-emerald-300">
-              <Sparkles className="w-4 h-4 text-emerald-600 dark:text-emerald-400" />
-              <span>{t('generatedSummary')} (Generated Display Text):</span>
+          <div className="p-3 sm:p-4 bg-emerald-50/80 dark:bg-emerald-950/40 rounded-xl sm:rounded-2xl border border-emerald-200 dark:border-emerald-800/80 shadow-sm space-y-1 sm:space-y-1.5">
+            <div className="flex items-center space-x-1.5 rtl:space-x-reverse text-[11px] sm:text-xs font-bold text-emerald-800 dark:text-emerald-300">
+              <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 shrink-0" />
+              <span>{t('generatedSummary')}:</span>
             </div>
-            <p className="text-sm font-bold text-gray-900 dark:text-white leading-relaxed">
+            <p className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white leading-relaxed">
               {liveSummary || '...'}
             </p>
           </div>
 
           {/* Footer Actions */}
-          <div className="flex items-center justify-end space-x-3 rtl:space-x-reverse pt-4 border-t border-gray-200 dark:border-gray-700">
+          <div className="flex items-center justify-end space-x-2 sm:space-x-3 rtl:space-x-reverse pt-3 sm:pt-4 border-t border-gray-200 dark:border-gray-700">
             <button
               type="button"
               onClick={onClose}
-              className="px-5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 font-medium transition-colors"
+              className="px-4 sm:px-5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 text-xs sm:text-sm font-medium transition-colors"
             >
               {t('cancel')}
             </button>
             <button
               type="submit"
               disabled={loading || uploadingFile}
-              className="px-6 py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold flex items-center space-x-2 rtl:space-x-reverse shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
+              className="px-5 sm:px-6 py-2 sm:py-2.5 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs sm:text-sm font-semibold flex items-center space-x-1.5 sm:space-x-2 rtl:space-x-reverse shadow-lg shadow-emerald-600/30 transition-all disabled:opacity-50"
             >
               {loading && <Loader2 className="w-4 h-4 animate-spin" />}
               <span>{certificate ? t('saveChanges') : t('save')}</span>

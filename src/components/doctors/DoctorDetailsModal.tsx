@@ -232,31 +232,31 @@ export function DoctorDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[96vh] sm:max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Top Header Card */}
-        <div className="px-6 py-5 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex items-center justify-between">
-          <div className="flex items-center space-x-3.5 rtl:space-x-reverse">
-            <div className="w-12 h-12 rounded-2xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-bold text-xl shadow-sm">
-              {doctorDetails?.name?.charAt(0) || <User className="w-6 h-6" />}
+        <div className="px-3.5 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
+            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-bold text-base sm:text-xl shadow-sm shrink-0">
+              {doctorDetails?.name?.charAt(0) || <User className="w-5 h-5 sm:w-6 sm:h-6" />}
             </div>
-            <div>
-              <div className="flex items-center space-x-2 rtl:space-x-reverse flex-wrap gap-1">
-                <h1 className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white">
+            <div className="min-w-0">
+              <div className="flex items-center space-x-1.5 rtl:space-x-reverse flex-wrap gap-1">
+                <h1 className="text-base sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
                   {doctorDetails?.name || t('loading')}
                 </h1>
                 {doctorDetails?.current_status && (
-                  <span className={`text-xs px-2.5 py-0.5 rounded-full font-bold border ${getStatusBadgeColor(doctorDetails.current_status.status_type)}`}>
+                  <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold border ${getStatusBadgeColor(doctorDetails.current_status.status_type)}`}>
                     {doctorDetails.current_status.status_type}
                     {doctorDetails.current_status.deputation_direction ? ` (${doctorDetails.current_status.deputation_direction})` : ''}
                   </span>
                 )}
                 {doctorDetails?.current_status?.has_administrative_duty && (
-                  <span className="text-xs px-2.5 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
-                    <Briefcase className="w-3 h-3" />
+                  <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
+                    <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
                     <span>{doctorDetails.current_status.administrative_role || t('administrativeDuty')}</span>
-                    <span className="text-[11px] opacity-80">
+                    <span className="text-[9px] sm:text-[11px] opacity-80">
                       ({doctorDetails.current_status.administrative_scope === 'خارج القسم' 
                         ? `${t('outsideDepartment')}${doctorDetails.current_status.administrative_facility ? `: ${doctorDetails.current_status.administrative_facility}` : ''}`
                         : t('insideDepartment')})
@@ -264,10 +264,10 @@ export function DoctorDetailsModal({
                   </span>
                 )}
               </div>
-              <p className="text-xs sm:text-sm text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-3 mt-1">
+              <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1">
                 {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
                 {doctorDetails?.phone && (
-                  <span className="inline-flex items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1">
                     <span>{t('phone')}:</span>
                     <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong>
                     <WhatsAppButton phone={doctorDetails.phone} size="xs" />
@@ -277,7 +277,7 @@ export function DoctorDetailsModal({
             </div>
           </div>
 
-          <div className="flex items-center space-x-2 rtl:space-x-reverse">
+          <div className="flex items-center space-x-1.5 rtl:space-x-reverse self-end sm:self-center shrink-0">
             {doctorDetails && (
               <DoctorExportDropdown
                 doctor={doctorDetails}
@@ -287,22 +287,22 @@ export function DoctorDetailsModal({
             )}
             <button
               onClick={() => setIsEditDoctorOpen(true)}
-              className="px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1.5 shadow-sm transition-colors"
+              className="px-2.5 sm:px-3.5 py-1.5 bg-gray-50 hover:bg-gray-100 dark:bg-gray-700 dark:hover:bg-gray-600 border border-gray-200 dark:border-gray-600 text-gray-700 dark:text-gray-200 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1 sm:gap-1.5 shadow-sm transition-colors"
             >
-              <Edit className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+              <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
               <span>{t('edit')}</span>
             </button>
             <button
               onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 sm:p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
             >
-              <X className="w-5 h-5" />
+              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
 
         {/* Tab Navigation */}
-        <div className="flex border-b border-gray-200 dark:border-gray-700 px-6 bg-slate-50/70 dark:bg-gray-900/50 overflow-x-auto">
+        <div className="flex border-b border-gray-200 dark:border-gray-700 px-3 sm:px-6 bg-slate-50/70 dark:bg-gray-900/50 overflow-x-auto gap-1">
           {[
             { id: 'basic', label: t('basicInfo'), icon: User },
             { id: 'history', label: `${t('statusHistory')} (${doctorDetails?.employment_history?.length || 0})`, icon: Clock },
@@ -316,13 +316,13 @@ export function DoctorDetailsModal({
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as TabType)}
-                className={`flex items-center space-x-2 rtl:space-x-reverse py-3 px-4 font-semibold text-xs sm:text-sm border-b-2 transition-all whitespace-nowrap ${
+                className={`flex items-center space-x-1.5 rtl:space-x-reverse py-2.5 sm:py-3 px-2.5 sm:px-4 font-semibold text-xs sm:text-sm border-b-2 transition-all whitespace-nowrap shrink-0 ${
                   isActive
                     ? 'border-indigo-600 text-indigo-600 dark:text-indigo-400 dark:border-indigo-400 bg-white dark:bg-gray-800 shadow-sm'
                     : 'border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
                 }`}
               >
-                <Icon className="w-4 h-4" />
+                <Icon className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                 <span>{tab.label}</span>
               </button>
             );
@@ -330,7 +330,7 @@ export function DoctorDetailsModal({
         </div>
 
         {/* Tab Content Body */}
-        <div className="p-6 overflow-y-auto flex-1 space-y-6">
+        <div className="p-3 sm:p-5 md:p-6 overflow-y-auto flex-1 space-y-4 sm:space-y-6">
           {loading ? (
             <div className="flex items-center justify-center py-16 text-gray-500">
               {t('loading')}
@@ -339,10 +339,10 @@ export function DoctorDetailsModal({
             <>
               {/* TAB 1: BASIC INFO */}
               {activeTab === 'basic' && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Status Banner */}
-                  <div className={`grid grid-cols-1 ${doctorDetails?.current_status?.has_administrative_duty ? 'md:grid-cols-2 lg:grid-cols-4' : 'md:grid-cols-3'} gap-4`}>
-                    <div className="p-4 rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-between">
+                  <div className={`grid grid-cols-1 sm:grid-cols-2 ${doctorDetails?.current_status?.has_administrative_duty ? 'lg:grid-cols-4' : 'lg:grid-cols-3'} gap-2.5 sm:gap-4`}>
+                    <div className="p-3.5 sm:p-4 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-50 to-blue-50 dark:from-indigo-950/30 dark:to-blue-950/30 border border-indigo-100 dark:border-indigo-800/40 flex items-center justify-between">
                       <div>
                         <span className="text-xs text-indigo-600 dark:text-indigo-400 font-semibold">{t('currentStatus')}</span>
                         <h3 className="text-lg font-bold text-gray-900 dark:text-white mt-0.5">
@@ -716,20 +716,20 @@ export function DoctorDetailsModal({
 
               {/* TAB 4: PROMOTIONS & FINANCIAL GRADES */}
               {activeTab === 'promotions' && (
-                <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-6">
                   {/* Technical Promotions Section */}
-                  <div className="space-y-4">
+                  <div className="space-y-3.5 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                        <TrendingUp className="w-5 h-5 text-purple-600 dark:text-purple-400" />
-                        <h3 className="text-base font-bold text-gray-900 dark:text-white">{t('promotions')}</h3>
+                        <TrendingUp className="w-4 h-4 sm:w-5 sm:h-5 text-purple-600 dark:text-purple-400 shrink-0" />
+                        <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">{t('promotions')}</h3>
                       </div>
                       <button
                         onClick={() => {
                           setSelectedPromotion(null);
                           setIsPromotionModalOpen(true);
                         }}
-                        className="px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm"
+                        className="px-2.5 sm:px-3 py-1.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>{t('addPromotion')}</span>
@@ -737,32 +737,32 @@ export function DoctorDetailsModal({
                     </div>
 
                     {doctorDetails?.promotions?.length === 0 ? (
-                      <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
+                      <div className="text-center py-6 sm:py-8 bg-gray-50 dark:bg-gray-700/30 rounded-xl sm:rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
                         <p className="text-xs text-gray-500">{language === 'ar' ? 'لا توجد ترقيات فنية مسجلة' : 'No promotions'}</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2.5 sm:space-y-3">
                         {doctorDetails?.promotions?.map(p => (
-                          <div key={p.id} className="p-3.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex items-center justify-between">
-                            <div>
-                              <div className="font-bold text-gray-900 dark:text-white text-sm">
+                          <div key={p.id} className="p-3 sm:p-3.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex items-center justify-between gap-2">
+                            <div className="min-w-0">
+                              <div className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm truncate">
                                 {p.promotion_type}
                               </div>
-                              <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                              <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                 {t('promotionDate')}: {formatDate(p.promotion_date, language)}
                               </div>
-                              {p.notes && <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{p.notes}</p>}
+                              {p.notes && <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 mt-1">{p.notes}</p>}
                             </div>
-                            <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                            <div className="flex items-center space-x-1 sm:space-x-2 rtl:space-x-reverse shrink-0">
                               {p.document_url && (
                                 <a
                                   href={p.document_url}
                                   target="_blank"
                                   rel="noreferrer"
-                                  className="p-1.5 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-950 rounded-lg text-xs"
+                                  className="p-1 sm:p-1.5 text-purple-600 hover:bg-purple-100 dark:hover:bg-purple-950 rounded-lg text-xs"
                                   title={t('viewFile')}
                                 >
-                                  <ExternalLink className="w-4 h-4" />
+                                  <ExternalLink className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                                 </a>
                               )}
                               <button
@@ -788,18 +788,18 @@ export function DoctorDetailsModal({
                   </div>
 
                   {/* Financial Grades Section */}
-                  <div className="space-y-4">
+                  <div className="space-y-3.5 sm:space-y-4">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                        <Layers className="w-5 h-5 text-amber-600 dark:text-amber-400" />
-                        <h3 className="text-base font-bold text-gray-900 dark:text-white">{t('financialGrades')}</h3>
+                        <Layers className="w-4 h-4 sm:w-5 sm:h-5 text-amber-600 dark:text-amber-400 shrink-0" />
+                        <h3 className="text-sm sm:text-base font-bold text-gray-900 dark:text-white">{t('financialGrades')}</h3>
                       </div>
                       <button
                         onClick={() => {
                           setSelectedFinancial(null);
                           setIsFinancialModalOpen(true);
                         }}
-                        className="px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm"
+                        className="px-2.5 sm:px-3 py-1.5 bg-amber-600 hover:bg-amber-700 text-white rounded-xl text-xs font-semibold flex items-center gap-1 shadow-sm"
                       >
                         <Plus className="w-3.5 h-3.5" />
                         <span>{t('addFinancialGrade')}</span>
@@ -807,32 +807,32 @@ export function DoctorDetailsModal({
                     </div>
 
                     {doctorDetails?.financial_grades?.length === 0 ? (
-                      <div className="text-center py-8 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
+                      <div className="text-center py-6 sm:py-8 bg-gray-50 dark:bg-gray-700/30 rounded-xl sm:rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
                         <p className="text-xs text-gray-500">{language === 'ar' ? 'لا توجد درجات مالية مسجلة' : 'No financial grades'}</p>
                       </div>
                     ) : (
-                      <div className="space-y-3">
+                      <div className="space-y-2.5 sm:space-y-3">
                         {doctorDetails?.financial_grades?.map(g => {
                           const isCurrent = !g.end_date;
                           return (
-                            <div key={g.id} className="p-3.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex items-center justify-between">
-                              <div>
-                                <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                                  <span className="font-bold text-gray-900 dark:text-white text-sm">
+                            <div key={g.id} className="p-3 sm:p-3.5 bg-gray-50 dark:bg-gray-700/50 rounded-xl border border-gray-200 dark:border-gray-600 flex items-center justify-between gap-2">
+                              <div className="min-w-0">
+                                <div className="flex items-center space-x-1.5 rtl:space-x-reverse flex-wrap">
+                                  <span className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm">
                                     {g.financial_grade}
                                   </span>
                                   {isCurrent && (
-                                    <span className="text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold px-2 py-0.5 rounded-full">
+                                    <span className="text-[9px] sm:text-[10px] bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 font-bold px-1.5 py-0.5 rounded-full">
                                       {t('currentStatus')}
                                     </span>
                                   )}
                                 </div>
-                                <div className="text-xs text-gray-500 dark:text-gray-400 mt-0.5">
+                                <div className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5">
                                   {formatDate(g.start_date, language)} &rarr; {g.end_date ? formatDate(g.end_date, language) : t('ongoing')}
                                 </div>
-                                {g.notes && <p className="text-xs text-gray-600 dark:text-gray-300 mt-1">{g.notes}</p>}
+                                {g.notes && <p className="text-[11px] sm:text-xs text-gray-600 dark:text-gray-300 mt-1">{g.notes}</p>}
                               </div>
-                              <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                              <div className="flex items-center space-x-1 sm:space-x-2 rtl:space-x-reverse shrink-0">
                                 <button
                                   onClick={() => {
                                     setSelectedFinancial(g);
@@ -860,22 +860,22 @@ export function DoctorDetailsModal({
 
               {/* TAB 5: GENERAL DOCUMENTS */}
               {activeTab === 'documents' && (
-                <div className="space-y-6">
+                <div className="space-y-4 sm:space-y-6">
                   {/* Upload Box */}
-                  <div className="p-5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-gray-800 dark:to-gray-800 rounded-2xl border border-blue-200 dark:border-gray-700">
-                    <h4 className="text-sm font-bold text-gray-900 dark:text-white mb-3">
+                  <div className="p-3.5 sm:p-5 bg-gradient-to-r from-blue-50/70 to-indigo-50/70 dark:from-gray-800 dark:to-gray-800 rounded-xl sm:rounded-2xl border border-blue-200 dark:border-gray-700">
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white mb-2 sm:mb-3">
                       {language === 'ar' ? 'إضافة وثيقة أو مستند جديد' : 'Upload New Document'}
                     </h4>
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-3 items-center">
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5 sm:gap-3 items-center">
                       <input
                         type="text"
                         value={newDocTitle}
                         onChange={(e) => setNewDocTitle(e.target.value)}
                         placeholder={language === 'ar' ? 'مسمى الوثيقة (مثل: بطاقة الرقم القومي، كارنيه النقابة)' : 'Document title (e.g. Syndicate ID)'}
-                        className="md:col-span-2 px-4 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-sm text-gray-900 dark:text-white"
+                        className="sm:col-span-2 px-3.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-xs sm:text-sm text-gray-900 dark:text-white"
                       />
-                      <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-semibold flex items-center justify-center gap-2 shadow-sm transition-colors">
-                        <Upload className="w-4 h-4" />
+                      <label className="cursor-pointer px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs sm:text-sm font-semibold flex items-center justify-center gap-1.5 sm:gap-2 shadow-sm transition-colors">
+                        <Upload className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                         <span>{uploadingDoc ? t('uploading') : (language === 'ar' ? 'اختر الملف للرفع' : 'Choose File')}</span>
                         <input
                           type="file"
@@ -890,29 +890,29 @@ export function DoctorDetailsModal({
 
                   {/* Documents List */}
                   {doctorDetails?.documents?.length === 0 ? (
-                    <div className="text-center py-12 bg-gray-50 dark:bg-gray-700/30 rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
-                      <FileText className="w-10 h-10 text-gray-400 mx-auto mb-2" />
-                      <p className="text-sm text-gray-500">{language === 'ar' ? 'لا توجد وثائق أو مستندات مرفوعة' : 'No documents uploaded'}</p>
+                    <div className="text-center py-8 sm:py-12 bg-gray-50 dark:bg-gray-700/30 rounded-xl sm:rounded-2xl border border-dashed border-gray-300 dark:border-gray-600">
+                      <FileText className="w-8 h-8 sm:w-10 sm:h-10 text-gray-400 mx-auto mb-2" />
+                      <p className="text-xs sm:text-sm text-gray-500">{language === 'ar' ? 'لا توجد وثائق أو مستندات مرفوعة' : 'No documents uploaded'}</p>
                     </div>
                   ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3 sm:gap-4">
                       {doctorDetails?.documents?.map((doc) => (
-                        <div key={doc.id} className="p-4 bg-white dark:bg-gray-800 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between space-y-3">
+                        <div key={doc.id} className="p-3.5 sm:p-4 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm flex flex-col justify-between space-y-3">
                           <div className="flex items-start justify-between">
-                            <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
-                              <div className="p-2.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl">
-                                <FileText className="w-5 h-5" />
+                            <div className="flex items-center space-x-2.5 rtl:space-x-reverse min-w-0">
+                              <div className="p-2 sm:p-2.5 bg-indigo-50 dark:bg-indigo-950/50 text-indigo-600 dark:text-indigo-400 rounded-xl shrink-0">
+                                <FileText className="w-4 h-4 sm:w-5 sm:h-5" />
                               </div>
-                              <div>
-                                <h5 className="font-bold text-gray-900 dark:text-white text-sm">{doc.title}</h5>
-                                <span className="text-[11px] text-gray-400">{formatDate(doc.created_at || null, language)}</span>
+                              <div className="min-w-0">
+                                <h5 className="font-bold text-gray-900 dark:text-white text-xs sm:text-sm truncate">{doc.title}</h5>
+                                <span className="text-[10px] sm:text-[11px] text-gray-400">{formatDate(doc.created_at || null, language)}</span>
                               </div>
                             </div>
                             <button
                               onClick={() => handleDeleteItem('doctor_documents', doc.id, doc.title)}
-                              className="text-gray-400 hover:text-red-600 p-1"
+                              className="text-gray-400 hover:text-red-600 p-1 shrink-0"
                             >
-                              <Trash2 className="w-4 h-4" />
+                              <Trash2 className="w-3.5 h-3.5 sm:w-4 sm:h-4" />
                             </button>
                           </div>
 
@@ -920,7 +920,7 @@ export function DoctorDetailsModal({
                             href={doc.file_url}
                             target="_blank"
                             rel="noreferrer"
-                            className="w-full py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                            className="w-full py-1.5 sm:py-2 bg-gray-100 dark:bg-gray-700 hover:bg-gray-200 dark:hover:bg-gray-600 text-gray-800 dark:text-gray-200 rounded-xl text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
                           >
                             <ExternalLink className="w-3.5 h-3.5" />
                             <span>{t('viewFile')}</span>
