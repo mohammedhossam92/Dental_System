@@ -213,6 +213,40 @@ export function DoctorDetailsModal({
     }
   };
 
+  const handleToggleConfirmation = async () => {
+    if (!doctorDetails) return;
+    const newStatus = !doctorDetails.is_confirmed;
+    try {
+      const { error } = await supabase
+        .from('doctors')
+        .update({ is_confirmed: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', doctorDetails.id);
+
+      if (error) throw error;
+
+      setDoctorDetails((prev) => (prev ? { ...prev, is_confirmed: newStatus } : null));
+      onDoctorUpdated();
+
+      const toast = Swal.mixin({
+        toast: true,
+        position: language === 'ar' ? 'top-start' : 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+      });
+      toast.fire({
+        icon: newStatus ? 'success' : 'info',
+        title: newStatus ? t('doctorConfirmedSuccess') : t('doctorUnconfirmedSuccess')
+      });
+    } catch (err: any) {
+      Swal.fire({
+        icon: 'error',
+        title: t('error'),
+        text: err.message,
+        confirmButtonColor: '#4f46e5'
+      });
+    }
+  };
+
   const getStatusBadgeColor = (status?: string) => {
     switch (status) {
       case 'قوة أساسية':
@@ -263,6 +297,12 @@ export function DoctorDetailsModal({
                     </span>
                   </span>
                 )}
+                {doctorDetails?.is_confirmed && (
+                  <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                    <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                    <span>{t('dataConfirmed')}</span>
+                  </span>
+                )}
               </div>
               <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1">
                 {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
@@ -277,7 +317,21 @@ export function DoctorDetailsModal({
             </div>
           </div>
 
-          <div className="flex items-center space-x-1.5 rtl:space-x-reverse self-end sm:self-center shrink-0">
+          <div className="flex items-center space-x-1.5 rtl:space-x-reverse self-end sm:self-center shrink-0 flex-wrap gap-1.5">
+            {/* Confirmation Toggle Button */}
+            <button
+              onClick={handleToggleConfirmation}
+              className={`px-2.5 sm:px-3 py-1.5 rounded-xl text-xs sm:text-sm font-semibold flex items-center gap-1 sm:gap-1.5 border transition-all ${
+                doctorDetails?.is_confirmed
+                  ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 dark:hover:bg-emerald-900/50 shadow-sm'
+                  : 'bg-white dark:bg-gray-700 border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-200 hover:bg-gray-50 dark:hover:bg-gray-650'
+              }`}
+              title={doctorDetails?.is_confirmed ? t('unconfirmData') : t('confirmData')}
+            >
+              <CheckCircle2 className={`w-3.5 h-3.5 sm:w-4 sm:h-4 ${doctorDetails?.is_confirmed ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
+              <span className="whitespace-nowrap">{doctorDetails?.is_confirmed ? t('dataConfirmed') : t('confirmData')}</span>
+            </button>
+
             {doctorDetails && (
               <DoctorExportDropdown
                 doctor={doctorDetails}

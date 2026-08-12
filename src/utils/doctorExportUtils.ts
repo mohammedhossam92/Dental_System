@@ -41,6 +41,7 @@ export function generateDoctorTextDossier(doctor: DoctorWithDetails, language: s
   lines.push(`${isAr ? '• تاريخ الميلاد' : '• Birth Date'}: ${formatDate(doctor.birth_date, language)}`);
   lines.push(`${isAr ? '• تاريخ التخرج' : '• Graduation Date'}: ${formatDate(doctor.graduation_date, language)}`);
   lines.push(`${isAr ? '• تاريخ استلام العمل' : '• Hire Date'}: ${formatDate(doctor.hire_date, language)}`);
+  lines.push(`${isAr ? '• حالة تدقيق وتأكيد البيانات' : '• Data Confirmation'}: ${doctor.is_confirmed ? (isAr ? 'بيانات مؤكدة ومدققة ✓' : 'Confirmed & Verified ✓') : (isAr ? 'غير مؤكدة (قيد المراجعة)' : 'Pending Review')}`);
   lines.push('');
 
   // Employment Status & Admin Duty

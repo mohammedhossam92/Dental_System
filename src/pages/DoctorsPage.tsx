@@ -49,6 +49,7 @@ export function DoctorsPage() {
   const [filters, setFilters] = useState<DoctorFilterState>({
     search: '',
     sortBy: 'recently_added',
+    confirmationStatus: 'all',
     employmentStatus: 'all',
     administrativeDuty: 'all',
     certificateType: 'all',
@@ -142,6 +143,12 @@ export function DoctorsPage() {
   // Filtered Doctors Logic
   const filteredDoctors = useMemo(() => {
     return doctors.filter((doc) => {
+      // 0. Filter by Confirmation Status
+      if (filters.confirmationStatus && filters.confirmationStatus !== 'all') {
+        if (filters.confirmationStatus === 'confirmed' && !doc.is_confirmed) return false;
+        if (filters.confirmationStatus === 'unconfirmed' && doc.is_confirmed) return false;
+      }
+
       // 1. Universal Search (Name, National ID, Phone, University, Certificate Title)
       if (filters.search.trim()) {
         const query = filters.search.toLowerCase().trim();
@@ -282,6 +289,8 @@ export function DoctorsPage() {
   // Statistics calculation
   const stats = useMemo(() => {
     const total = doctors.length;
+    const confirmed = doctors.filter((d) => d.is_confirmed).length;
+    const unconfirmed = doctors.filter((d) => !d.is_confirmed).length;
     const coreStaff = doctors.filter(
       (d) => (d.current_status?.status_type || 'قوة أساسية') === 'قوة أساسية'
     ).length;
@@ -309,7 +318,7 @@ export function DoctorsPage() {
       (d) => d.current_status?.has_administrative_duty
     ).length;
 
-    return { total, coreStaff, deputed, loaned, onLeave, higherDegrees, inStudy, adminStaff };
+    return { total, confirmed, unconfirmed, coreStaff, deputed, loaned, onLeave, higherDegrees, inStudy, adminStaff };
   }, [doctors]);
 
   // Export to Excel
@@ -321,6 +330,7 @@ export function DoctorsPage() {
 
         return {
           'اسم الطبيب': doc.name,
+          'حالة تدقيق وتأكيد البيانات': doc.is_confirmed ? 'مؤكدة ومدققة' : 'غير مؤكدة (قيد المراجعة)',
           'الرقم القومي': doc.national_id || '',
           'رقم الهاتف': doc.phone || '',
           'الحالة الوظيفية الحالية': currentStatus,
@@ -346,6 +356,47 @@ export function DoctorsPage() {
     } catch (err: any) {
       console.error('Export error:', err);
       Swal.fire({ icon: 'error', title: t('error'), text: 'فشل تصدير ملف Excel' });
+    }
+  };
+
+  const handleToggleConfirmation = async (e: React.MouseEvent, doctorId: string, currentStatus?: boolean | null) => {
+    e.stopPropagation();
+    const newStatus = !currentStatus;
+
+    // Optimistic update
+    setDoctors((prev) =>
+      prev.map((d) => (d.id === doctorId ? { ...d, is_confirmed: newStatus } : d))
+    );
+
+    try {
+      const { error } = await supabase
+        .from('doctors')
+        .update({ is_confirmed: newStatus, updated_at: new Date().toISOString() })
+        .eq('id', doctorId);
+
+      if (error) throw error;
+
+      const toast = Swal.mixin({
+        toast: true,
+        position: language === 'ar' ? 'top-start' : 'top-end',
+        showConfirmButton: false,
+        timer: 1500,
+      });
+      toast.fire({
+        icon: newStatus ? 'success' : 'info',
+        title: newStatus ? t('doctorConfirmedSuccess') : t('doctorUnconfirmedSuccess')
+      });
+    } catch (err: any) {
+      // Rollback on error
+      setDoctors((prev) =>
+        prev.map((d) => (d.id === doctorId ? { ...d, is_confirmed: currentStatus } : d))
+      );
+      Swal.fire({
+        icon: 'error',
+        title: t('error'),
+        text: err.message || t('errorSaving'),
+        confirmButtonColor: '#4f46e5'
+      });
     }
   };
 
@@ -403,23 +454,30 @@ export function DoctorsPage() {
   };
 
   const activeFiltersCount = [
+    filters.confirmationStatus && filters.confirmationStatus !== 'all',
     filters.employmentStatus !== 'all',
     filters.administrativeDuty !== 'all',
     filters.certificateType !== 'all',
     filters.certificateStatus !== 'all',
     filters.university !== 'all',
     filters.obtainedYear !== 'all',
+    filters.promotionType && filters.promotionType !== 'all',
+    filters.financialGrade && filters.financialGrade !== 'all',
   ].filter(Boolean).length;
 
   const clearAllFilters = () => {
     setFilters({
       search: '',
+      sortBy: 'recently_added',
+      confirmationStatus: 'all',
       employmentStatus: 'all',
       administrativeDuty: 'all',
       certificateType: 'all',
       certificateStatus: 'all',
       university: 'all',
       obtainedYear: 'all',
+      promotionType: 'all',
+      financialGrade: 'all',
     });
   };
 
@@ -471,7 +529,7 @@ export function DoctorsPage() {
       </div>
 
       {/* Top Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 xl:grid-cols-8 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-9 gap-2 sm:gap-3">
         {/* Total Doctors */}
         <button
           type="button"
@@ -488,6 +546,24 @@ export function DoctorsPage() {
             <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
           <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1.5">{stats.total}</p>
+        </button>
+
+        {/* Confirmed Doctors */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, confirmationStatus: prev.confirmationStatus === 'confirmed' ? 'all' : 'confirmed' }))}
+          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.confirmationStatus === 'confirmed'
+              ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: البيانات المؤكدة' : 'Filter: Confirmed Data'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('confirmedDoctorsCount')}</span>
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+          </div>
+          <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.confirmed}</p>
         </button>
 
         {/* Core Staff */}
@@ -707,6 +783,22 @@ export function DoctorsPage() {
         {/* Expandable Advanced Structured Filters */}
         {showAdvancedFilters && (
           <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-in fade-in duration-150">
+            {/* Filter by Confirmation Status */}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
+                {t('filterByConfirmation')}
+              </label>
+              <select
+                value={filters.confirmationStatus || 'all'}
+                onChange={(e) => setFilters({ ...filters, confirmationStatus: e.target.value as any })}
+                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
+              >
+                <option value="all">{t('allConfirmationStatuses')}</option>
+                <option value="confirmed">✅ {t('onlyConfirmed')}</option>
+                <option value="unconfirmed">⏳ {t('onlyUnconfirmed')}</option>
+              </select>
+            </div>
+
             {/* Filter by Employment Status */}
             <div>
               <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
@@ -911,6 +1003,9 @@ export function DoctorsPage() {
             <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-right rtl:text-right ltr:text-left">
               <thead className="bg-slate-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
                 <tr>
+                  <th className="px-3 py-4 text-center w-12" title={t('confirmedStatus')}>
+                    <CheckCircle2 className="w-4 h-4 mx-auto text-emerald-600 dark:text-emerald-400" />
+                  </th>
                   <th className="px-6 py-4">{t('doctorName')}</th>
                   <th className="px-6 py-4">{t('nationalId')} / {t('phone')}</th>
                   <th className="px-6 py-4">{t('currentStatus')}</th>
@@ -931,15 +1026,42 @@ export function DoctorsPage() {
                         setIsDetailsOpen(true);
                       }}
                     >
+                      {/* Confirmation Checkbox Column */}
+                      <td
+                        className="px-3 py-4 whitespace-nowrap text-center"
+                        onClick={(e) => e.stopPropagation()}
+                      >
+                        <button
+                          type="button"
+                          onClick={(e) => handleToggleConfirmation(e, doc.id, doc.is_confirmed)}
+                          className={`p-1.5 rounded-xl border transition-all inline-flex items-center justify-center ${
+                            doc.is_confirmed
+                              ? 'bg-emerald-50 text-emerald-600 border-emerald-300 dark:bg-emerald-950/60 dark:text-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 hover:scale-110 shadow-sm ring-2 ring-emerald-500/20'
+                              : 'bg-white dark:bg-gray-700 text-gray-300 dark:text-gray-500 border-gray-300 dark:border-gray-600 hover:border-emerald-400 hover:text-emerald-500 hover:scale-105'
+                          }`}
+                          title={doc.is_confirmed ? t('unconfirmData') : t('confirmData')}
+                        >
+                          <CheckCircle2 className={`w-4 h-4 sm:w-5 sm:h-5 ${doc.is_confirmed ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-300 dark:text-gray-500'}`} />
+                        </button>
+                      </td>
+
                       {/* Name & Initial Avatar */}
                       <td className="px-6 py-4 whitespace-nowrap">
                         <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-base shadow-sm">
+                          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-base shadow-sm shrink-0">
                             {doc.name.charAt(0)}
                           </div>
                           <div>
-                            <div className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
-                              {doc.name}
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              <div className="font-bold text-gray-900 dark:text-white group-hover:text-indigo-600 dark:group-hover:text-indigo-400 transition-colors">
+                                {doc.name}
+                              </div>
+                              {doc.is_confirmed && (
+                                <span className="inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 shrink-0">
+                                  <CheckCircle2 className="w-2.5 h-2.5" />
+                                  <span>{t('dataConfirmed')}</span>
+                                </span>
+                              )}
                             </div>
                             {doc.address && (
                               <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
@@ -1089,13 +1211,15 @@ export function DoctorsPage() {
                 className="bg-white dark:bg-gray-800 p-5 rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-md transition-all cursor-pointer flex flex-col justify-between space-y-4"
               >
                 <div>
-                  <div className="flex items-start justify-between">
-                    <div className="flex items-center space-x-3 rtl:space-x-reverse">
-                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm">
+                  <div className="flex items-start justify-between gap-2">
+                    <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
+                      <div className="w-12 h-12 rounded-2xl bg-gradient-to-br from-indigo-500 to-blue-600 flex items-center justify-center text-white font-bold text-lg shadow-sm shrink-0">
                         {doc.name.charAt(0)}
                       </div>
-                      <div>
-                        <h3 className="font-bold text-gray-900 dark:text-white text-base">{doc.name}</h3>
+                      <div className="min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <h3 className="font-bold text-gray-900 dark:text-white text-base truncate">{doc.name}</h3>
+                        </div>
                         <div className="flex flex-wrap gap-1 mt-1">
                           <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-[11px] font-bold border ${getStatusBadgeColor(currentStatus)}`}>
                             {currentStatus}
@@ -1114,6 +1238,23 @@ export function DoctorsPage() {
                           )}
                         </div>
                       </div>
+                    </div>
+
+                    {/* Confirmation Checkbox Button */}
+                    <div onClick={(e) => e.stopPropagation()} className="shrink-0">
+                      <button
+                        type="button"
+                        onClick={(e) => handleToggleConfirmation(e, doc.id, doc.is_confirmed)}
+                        className={`px-2 py-1 rounded-xl text-[11px] font-bold border flex items-center gap-1 transition-all ${
+                          doc.is_confirmed
+                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700 hover:bg-emerald-100 shadow-sm ring-1 ring-emerald-400/30'
+                            : 'bg-gray-50 text-gray-400 dark:bg-gray-750 dark:text-gray-400 border-gray-200 dark:border-gray-600 hover:border-emerald-400 hover:text-emerald-600'
+                        }`}
+                        title={doc.is_confirmed ? t('unconfirmData') : t('confirmData')}
+                      >
+                        <CheckCircle2 className={`w-3.5 h-3.5 ${doc.is_confirmed ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
+                        <span className="hidden xs:inline">{doc.is_confirmed ? t('dataConfirmed') : t('confirmData')}</span>
+                      </button>
                     </div>
                   </div>
 

@@ -34,6 +34,7 @@ CREATE TABLE IF NOT EXISTS public.doctors (
     address text,
     phone text,
     notes text,
+    is_confirmed boolean DEFAULT false,
     created_at timestamptz DEFAULT now(),
     updated_at timestamptz DEFAULT now(),
     CONSTRAINT doctors_national_id_org_unique UNIQUE NULLS NOT DISTINCT (national_id, organization_id)

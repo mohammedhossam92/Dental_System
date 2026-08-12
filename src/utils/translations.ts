@@ -393,6 +393,18 @@ export const translations = {
     exportSingleDoctor: "Export Doctor Data",
     copiedSuccess: "Copied to clipboard successfully",
     allDoctorData: "Complete Doctor Data",
+    dataConfirmed: "Data Confirmed",
+    dataUnconfirmed: "Pending Review",
+    confirmData: "Confirm Doctor Data",
+    unconfirmData: "Unconfirm Doctor Data",
+    confirmedStatus: "Data Confirmation",
+    filterByConfirmation: "Filter by Confirmation",
+    allConfirmationStatuses: "All (Confirmed & Unconfirmed)",
+    onlyConfirmed: "Confirmed Data Only",
+    onlyUnconfirmed: "Unconfirmed / Pending Review",
+    doctorConfirmedSuccess: "Doctor data marked as confirmed",
+    doctorUnconfirmedSuccess: "Doctor data marked as unconfirmed",
+    confirmedDoctorsCount: "Confirmed Data",
   },
 
   ar: {
@@ -790,6 +802,18 @@ export const translations = {
     exportSingleDoctor: "تصدير بيانات الطبيب",
     copiedSuccess: "تم النسخ إلى الحافظة بنجاح",
     allDoctorData: "كافة بيانات الطبيب",
+    dataConfirmed: "بيانات مؤكدة",
+    dataUnconfirmed: "قيد المراجعة",
+    confirmData: "تأكيد صحة البيانات",
+    unconfirmData: "إلغاء تأكيد البيانات",
+    confirmedStatus: "حالة تدقيق وتأكيد البيانات",
+    filterByConfirmation: "تصفية بحالة التأكيد والتدقيق",
+    allConfirmationStatuses: "كافة الحالات (مؤكد وغير مؤكد)",
+    onlyConfirmed: "البيانات المؤكدة فقط",
+    onlyUnconfirmed: "غير المؤكدة (قيد المراجعة)",
+    doctorConfirmedSuccess: "تم تأكيد صحة بيانات الطبيب بنجاح",
+    doctorUnconfirmedSuccess: "تم إلغاء تأكيد بيانات الطبيب",
+    confirmedDoctorsCount: "بيانات مؤكدة",
   }
 
 };

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, MapPin, Calendar, CreditCard, FileText, Loader2 } from 'lucide-react';
+import { X, User, Phone, MapPin, Calendar, CreditCard, FileText, Loader2, CheckCircle2 } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Doctor } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -30,6 +30,7 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
     address: '',
     phone: '',
     notes: '',
+    is_confirmed: false,
   });
 
   useEffect(() => {
@@ -51,6 +52,7 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
         address: doctor.address || '',
         phone: doctor.phone || '',
         notes: doctor.notes || '',
+        is_confirmed: !!doctor.is_confirmed,
       });
     } else {
       setFormData({
@@ -62,6 +64,7 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
         address: '',
         phone: '',
         notes: '',
+        is_confirmed: false,
       });
     }
   }, [doctor, isOpen]);
@@ -92,6 +95,7 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
         address: formData.address.trim() || null,
         phone: formData.phone.trim() || null,
         notes: formData.notes.trim() || null,
+        is_confirmed: formData.is_confirmed,
         organization_id: organizationId || null,
         updated_at: new Date().toISOString(),
       };
@@ -321,6 +325,33 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
                 className="w-full pl-3.5 pr-9 rtl:pr-9 rtl:pl-3.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
               />
             </div>
+          </div>
+
+          {/* Confirmation Checkbox */}
+          <div className="pt-1">
+            <label className={`flex items-start gap-3 p-3 sm:p-3.5 rounded-xl border transition-all cursor-pointer select-none ${
+              formData.is_confirmed
+                ? 'bg-emerald-50/70 dark:bg-emerald-950/30 border-emerald-300 dark:border-emerald-700 ring-1 ring-emerald-400/30'
+                : 'bg-gray-50/70 dark:bg-gray-700/50 border-gray-200 dark:border-gray-600 hover:border-gray-300'
+            }`}>
+              <input
+                type="checkbox"
+                checked={formData.is_confirmed}
+                onChange={(e) => setFormData({ ...formData, is_confirmed: e.target.checked })}
+                className="mt-0.5 w-4 h-4 rounded text-emerald-600 focus:ring-emerald-500 border-gray-300 dark:border-gray-600 accent-emerald-600 cursor-pointer shrink-0"
+              />
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 font-bold text-xs sm:text-sm text-gray-900 dark:text-white">
+                  <CheckCircle2 className={`w-4 h-4 shrink-0 ${formData.is_confirmed ? 'text-emerald-600 dark:text-emerald-400' : 'text-gray-400'}`} />
+                  <span>{language === 'ar' ? 'تم تدقيق وتأكيد صحة بيانات ومستندات الطبيب' : 'Doctor data and documents are verified & confirmed'}</span>
+                </div>
+                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 leading-relaxed">
+                  {language === 'ar'
+                    ? 'ضع علامة في هذا المربع إذا تمت مراجعة كافة بيانات وسجلات الطبيب واعتماد صحتها.'
+                    : 'Check this box if all records, credentials, and details have been reviewed and verified.'}
+                </p>
+              </div>
+            </label>
           </div>
 
           {/* Footer Actions */}

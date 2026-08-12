@@ -177,6 +177,7 @@ export interface Doctor {
   address: string | null;
   phone: string | null;
   notes: string | null;
+  is_confirmed?: boolean | null;
   organization_id?: string | null;
   created_at?: string;
   updated_at?: string;
@@ -268,6 +269,7 @@ export interface DoctorWithDetails extends Doctor {
 export interface DoctorFilterState {
   search: string;
   sortBy?: 'recently_added' | 'oldest' | 'name_asc' | 'name_desc' | 'hire_date_desc' | 'grad_date_desc';
+  confirmationStatus?: 'all' | 'confirmed' | 'unconfirmed';
   employmentStatus: string;
   administrativeDuty: string;
   certificateType: string;
