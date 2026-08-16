@@ -2,7 +2,7 @@ import React, { useState, useMemo } from 'react';
 import {
   X, Award, GraduationCap, Users, BookOpen, Layers, Briefcase,
   ChevronDown, ChevronUp, Download, Search, CheckCircle2, Clock,
-  Filter, Sparkles, PieChart, BarChart3, Building, UserCheck
+  Filter, Sparkles, PieChart, BarChart3, Building, UserCheck, CalendarOff
 } from 'lucide-react';
 import type { DoctorWithDetails, DoctorCertificate, DoctorPromotion } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -17,6 +17,8 @@ interface DoctorDetailedStatsModalProps {
   onSelectDoctor?: (doctorId: string) => void;
 }
 
+type DutyFilterType = 'all' | 'active_duty' | 'on_leave';
+
 export function DoctorDetailedStatsModal({
   isOpen,
   onClose,
@@ -26,10 +28,11 @@ export function DoctorDetailedStatsModal({
   const { t, language } = useLanguage();
   const isAr = language === 'ar';
 
+  const [dutyFilter, setDutyFilter] = useState<DutyFilterType>('all');
   const [searchFilter, setSearchFilter] = useState('');
   const [selectedDegreeType, setSelectedDegreeType] = useState<string>('all');
   const [expandedDegrees, setExpandedDegrees] = useState<Record<string, boolean>>({});
-  const [activeTab, setActiveTab] = useState<'degrees' | 'promotions' | 'matrix'>('degrees');
+  const [activeTab, setActiveTab] = useState<'degrees' | 'promotions'>('degrees');
 
   // Toggle accordion state for degree groups
   const toggleDegreeExpand = (degName: string) => {
@@ -39,11 +42,45 @@ export function DoctorDetailedStatsModal({
     }));
   };
 
+  // 0. Compute Duty Status breakdown counts
+  const dutyCounts = useMemo(() => {
+    let active = 0;
+    let leave = 0;
+    doctors.forEach(doc => {
+      const st = doc.current_status?.status_type || 'قوة أساسية';
+      if (st === 'إجازة') {
+        leave++;
+      } else if (st !== 'إنهاء خدمة') {
+        active++;
+      }
+    });
+    return {
+      all: doctors.length,
+      active,
+      leave
+    };
+  }, [doctors]);
+
+  // Filtered doctors list based on duty status (الكل / على قوة العمل / في إجازة)
+  const scopedDoctors = useMemo(() => {
+    if (dutyFilter === 'all') return doctors;
+    return doctors.filter(doc => {
+      const st = doc.current_status?.status_type || 'قوة أساسية';
+      if (dutyFilter === 'active_duty') {
+        return st !== 'إجازة' && st !== 'إنهاء خدمة';
+      }
+      if (dutyFilter === 'on_leave') {
+        return st === 'إجازة';
+      }
+      return true;
+    });
+  }, [doctors, dutyFilter]);
+
   // 1. Calculate Technical Promotions / Scientific Ranks (عدد الأخصائيين، الاستشاريين، إلخ)
   const promotionStats = useMemo(() => {
     const statsMap: Record<string, { count: number; doctors: DoctorWithDetails[] }> = {};
 
-    doctors.forEach(doc => {
+    scopedDoctors.forEach(doc => {
       // Latest promotion if any, or default general status
       const latestPromo = doc.promotions && doc.promotions.length > 0
         ? [...doc.promotions].sort((a, b) => (b.promotion_date || '').localeCompare(a.promotion_date || ''))[0]
@@ -63,15 +100,14 @@ export function DoctorDetailedStatsModal({
         title,
         count: data.count,
         doctors: data.doctors,
-        percentage: doctors.length > 0 ? (data.count / doctors.length) * 100 : 0
+        percentage: scopedDoctors.length > 0 ? (data.count / scopedDoctors.length) * 100 : 0
       }))
       .sort((a, b) => b.count - a.count);
-  }, [doctors, isAr]);
+  }, [scopedDoctors, isAr]);
 
   // 2. Calculate Comprehensive Academic Degrees & Subspecialties Breakdown
   // (كم واحد ماجستير، وكم واحد في كل تخصص من تخصص الماجستير، وهكذا لكل درجة علمية)
   const degreeStats = useMemo(() => {
-    // Map: Degree Type (e.g. ماجستير) -> { totalDoctors, specialtiesMap: { specialtyTitle -> { total, obtained, inProgress, doctorsList } } }
     const degreeMap: Record<string, {
       degreeType: string;
       totalCertificates: number;
@@ -88,7 +124,7 @@ export function DoctorDetailedStatsModal({
       }>;
     }> = {};
 
-    doctors.forEach(doc => {
+    scopedDoctors.forEach(doc => {
       if (!doc.certificates || doc.certificates.length === 0) return;
 
       doc.certificates.forEach(cert => {
@@ -143,7 +179,7 @@ export function DoctorDetailedStatsModal({
       uniqueDoctorsCount: deg.uniqueDoctors.size,
       specialtiesList: Object.values(deg.specialties).sort((a, b) => b.total - a.total)
     })).sort((a, b) => b.uniqueDoctorsCount - a.uniqueDoctorsCount);
-  }, [doctors, isAr]);
+  }, [scopedDoctors, isAr]);
 
   // List of active degrees available for filter
   const activeDegreeTypes = useMemo(() => {
@@ -177,8 +213,21 @@ export function DoctorDetailedStatsModal({
     try {
       const wb = XLSX.utils.book_new();
 
+      const dutyLabel = dutyFilter === 'active_duty'
+        ? (isAr ? 'الأطباء على قوة العمل' : 'Active Duty Doctors')
+        : dutyFilter === 'on_leave'
+        ? (isAr ? 'الأطباء في إجازة' : 'Doctors on Leave')
+        : (isAr ? 'جميع الأطباء المسجلين' : 'All Registered Doctors');
+
       // Sheet 1: Degrees & Subspecialties Summary
       const degreesSummaryRows: any[] = [];
+      degreesSummaryRows.push([
+        isAr ? 'نطاق التقرير' : 'Report Scope',
+        dutyLabel,
+        isAr ? 'إجمالي الأطباء المشمولين' : 'Total Scope Doctors',
+        scopedDoctors.length
+      ]);
+      degreesSummaryRows.push([]); // Empty row
       degreesSummaryRows.push([
         isAr ? 'الدرجة العلمية' : 'Degree Type',
         isAr ? 'إجمالي الأطباء' : 'Unique Doctors',
@@ -198,7 +247,7 @@ export function DoctorDetailedStatsModal({
       });
 
       const wsDegreesSummary = XLSX.utils.aoa_to_sheet(degreesSummaryRows);
-      wsDegreesSummary['!cols'] = [{ wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 15 }, { wch: 22 }];
+      wsDegreesSummary['!cols'] = [{ wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 22 }];
       XLSX.utils.book_append_sheet(wb, wsDegreesSummary, isAr ? 'ملخص الدرجات العلمية' : 'Degrees Summary');
 
       // Sheet 2: Detailed Degrees and Subspecialties Breakdown
@@ -208,6 +257,7 @@ export function DoctorDetailedStatsModal({
         isAr ? 'التخصص / المجال' : 'Specialty / Field',
         isAr ? 'إجمالي الأطباء في التخصص' : 'Total Doctors in Field',
         isAr ? 'اسم الطبيب' : 'Doctor Name',
+        isAr ? 'الحالة الوظيفية الحالية' : 'Current Duty Status',
         isAr ? 'الجامعة' : 'University',
         isAr ? 'الدولة' : 'Country',
         isAr ? 'حالة الشهادة' : 'Status',
@@ -223,6 +273,7 @@ export function DoctorDetailedStatsModal({
               spec.specialtyTitle,
               spec.total,
               entry.doctor.name,
+              entry.doctor.current_status?.status_type || (isAr ? 'قوة أساسية' : 'Core Staff'),
               entry.cert.university_name || (isAr ? 'غير محدد' : 'N/A'),
               entry.cert.university_country || 'مصر',
               entry.cert.status === 'obtained' ? (isAr ? 'حاصل عليها' : 'Obtained') : (isAr ? 'قيد الدراسة' : 'In Progress'),
@@ -235,7 +286,7 @@ export function DoctorDetailedStatsModal({
 
       const wsDetailed = XLSX.utils.aoa_to_sheet(detailedSpecialtiesRows);
       wsDetailed['!cols'] = [
-        { wch: 20 }, { wch: 30 }, { wch: 22 }, { wch: 25 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 16 }
+        { wch: 20 }, { wch: 30 }, { wch: 22 }, { wch: 25 }, { wch: 22 }, { wch: 25 }, { wch: 15 }, { wch: 15 }, { wch: 20 }, { wch: 16 }
       ];
       XLSX.utils.book_append_sheet(wb, wsDetailed, isAr ? 'تفاصيل التخصصات والأطباء' : 'Specialties & Doctors');
 
@@ -262,13 +313,14 @@ export function DoctorDetailedStatsModal({
       XLSX.utils.book_append_sheet(wb, wsPromotions, isAr ? 'المسميات الفنية والترقيات' : 'Technical Ranks');
 
       const dateStr = new Date().toISOString().split('T')[0];
-      XLSX.writeFile(wb, `doctors_detailed_statistics_report_${dateStr}.xlsx`);
+      const filterSuffix = dutyFilter === 'active_duty' ? 'active_duty' : dutyFilter === 'on_leave' ? 'on_leave' : 'all';
+      XLSX.writeFile(wb, `doctors_detailed_statistics_${filterSuffix}_${dateStr}.xlsx`);
 
       Swal.fire({
         icon: 'success',
         title: isAr ? 'تم تصدير التقرير الإحصائي' : 'Report Exported Successfully',
-        text: isAr ? 'تم تحميل ملف إكسيل الشامل للإحصائيات والدرجات والتخصصات' : 'Excel statistics workbook downloaded',
-        timer: 1600,
+        text: isAr ? `تم تحميل ملف إكسيل (${dutyLabel})` : `Excel statistics workbook downloaded (${dutyLabel})`,
+        timer: 1800,
         showConfirmButton: false
       });
     } catch (err: any) {
@@ -298,8 +350,20 @@ export function DoctorDetailedStatsModal({
                 <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
                   {isAr ? 'التقرير الإحصائي التفصيلي للأطباء والدرجات العلمية' : 'Detailed Doctors & Academic Degrees Report'}
                 </h2>
-                <span className="px-2.5 py-0.5 rounded-full text-xs font-bold bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
-                  {doctors.length} {isAr ? 'طبيب مسجل' : 'Registered Doctors'}
+                <span className={`px-2.5 py-0.5 rounded-full text-xs font-bold border transition-colors ${
+                  dutyFilter === 'active_duty'
+                    ? 'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-300 border-emerald-300 dark:border-emerald-800'
+                    : dutyFilter === 'on_leave'
+                    ? 'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-300 border-amber-300 dark:border-amber-800'
+                    : 'bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 border-indigo-200 dark:border-indigo-800'
+                }`}>
+                  {scopedDoctors.length} {
+                    dutyFilter === 'active_duty'
+                      ? (isAr ? 'طبيب على قوة العمل' : 'Active Duty Doctors')
+                      : dutyFilter === 'on_leave'
+                      ? (isAr ? 'طبيب في إجازة' : 'Doctors on Leave')
+                      : (isAr ? 'طبيب مسجل' : 'Registered Doctors')
+                  }
                 </span>
               </div>
               <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 mt-0.5 truncate">
@@ -327,6 +391,98 @@ export function DoctorDetailedStatsModal({
               <X className="w-5 h-5" />
             </button>
           </div>
+        </div>
+
+        {/* Duty Status Scope Selector (الكل / على قوة العمل / في إجازة) */}
+        <div className="px-4 sm:px-6 py-2.5 bg-indigo-50/40 dark:bg-gray-900/60 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between gap-3 flex-wrap">
+          <div className="flex items-center gap-1.5 sm:gap-2">
+            <span className="text-xs font-bold text-gray-700 dark:text-gray-300 flex items-center gap-1.5 ml-1 rtl:ml-1 ltr:mr-1">
+              <Filter className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+              <span>{isAr ? 'نطاق عرض الأطباء:' : 'Workforce Scope:'}</span>
+            </span>
+
+            {/* Segmented Duty Buttons */}
+            <div className="inline-flex p-1 bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm gap-1">
+              {/* Option 1: All Doctors */}
+              <button
+                type="button"
+                onClick={() => setDutyFilter('all')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  dutyFilter === 'all'
+                    ? 'bg-indigo-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
+                }`}
+              >
+                <Users className="w-3.5 h-3.5" />
+                <span>{isAr ? 'الكل' : 'All'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                  dutyFilter === 'all'
+                    ? 'bg-white/25 text-white'
+                    : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300'
+                }`}>
+                  {dutyCounts.all}
+                </span>
+              </button>
+
+              {/* Option 2: Active Duty Doctors */}
+              <button
+                type="button"
+                onClick={() => setDutyFilter('active_duty')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  dutyFilter === 'active_duty'
+                    ? 'bg-emerald-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
+                }`}
+              >
+                <UserCheck className="w-3.5 h-3.5" />
+                <span>{isAr ? 'على قوة العمل' : 'Active Duty'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                  dutyFilter === 'active_duty'
+                    ? 'bg-white/25 text-white'
+                    : 'bg-emerald-50 dark:bg-emerald-950/60 text-emerald-700 dark:text-emerald-300'
+                }`}>
+                  {dutyCounts.active}
+                </span>
+              </button>
+
+              {/* Option 3: Doctors On Leave */}
+              <button
+                type="button"
+                onClick={() => setDutyFilter('on_leave')}
+                className={`flex items-center gap-1.5 px-2.5 sm:px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all ${
+                  dutyFilter === 'on_leave'
+                    ? 'bg-amber-600 text-white shadow-sm'
+                    : 'text-gray-600 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700/60'
+                }`}
+              >
+                <Clock className="w-3.5 h-3.5" />
+                <span>{isAr ? 'في إجازة' : 'On Leave'}</span>
+                <span className={`text-[10px] px-1.5 py-0.2 rounded-full font-extrabold ${
+                  dutyFilter === 'on_leave'
+                    ? 'bg-white/25 text-white'
+                    : 'bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300'
+                }`}>
+                  {dutyCounts.leave}
+                </span>
+              </button>
+            </div>
+          </div>
+
+          <span className="text-[11px] text-gray-500 dark:text-gray-400 font-medium">
+            {dutyFilter === 'active_duty' && (
+              <span className="text-emerald-600 dark:text-emerald-400 font-semibold">
+                ✓ {isAr ? 'يتم عرض وإحصاء الأطباء المتواجدين على قوة العمل فقط' : 'Showing active on-duty staff only'}
+              </span>
+            )}
+            {dutyFilter === 'on_leave' && (
+              <span className="text-amber-600 dark:text-amber-400 font-semibold">
+                🏖️ {isAr ? 'يتم عرض وإحصاء الأطباء الحاصلين على إجازات فقط' : 'Showing doctors on active leave only'}
+              </span>
+            )}
+            {dutyFilter === 'all' && (
+              <span>{isAr ? 'يشمل جميع الأطباء المقيدين بالسجلات' : 'Includes all registered doctors'}</span>
+            )}
+          </span>
         </div>
 
         {/* Tab Navigation & Search Bar */}
@@ -537,38 +693,50 @@ export function DoctorDetailedStatsModal({
 
                                   {/* Doctors in this specialty */}
                                   <div className="space-y-1.5">
-                                    {spec.entries.map((entry, idx) => (
-                                      <div
-                                        key={idx}
-                                        onClick={() => onSelectDoctor && onSelectDoctor(entry.doctor.id)}
-                                        className={`flex items-center justify-between p-2 rounded-lg text-xs transition-colors ${
-                                          onSelectDoctor ? 'hover:bg-indigo-50/80 dark:hover:bg-gray-700/80 cursor-pointer' : 'bg-gray-50 dark:bg-gray-750'
-                                        }`}
-                                      >
-                                        <div className="flex items-center gap-2 min-w-0">
-                                          <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-[10px] font-bold shrink-0">
-                                            {idx + 1}
-                                          </div>
-                                          <div className="min-w-0">
-                                            <span className="font-bold text-gray-800 dark:text-gray-200 block truncate">
-                                              {entry.doctor.name}
-                                            </span>
-                                            <span className="text-[10.5px] text-gray-500 dark:text-gray-400 truncate block">
-                                              {entry.cert.university_name ? `🏛️ ${entry.cert.university_name}` : ''}
-                                              {entry.cert.obtained_date ? ` (${formatDate(entry.cert.obtained_date, language)})` : ''}
-                                            </span>
-                                          </div>
-                                        </div>
+                                    {spec.entries.map((entry, idx) => {
+                                      const docStatus = entry.doctor.current_status?.status_type || 'قوة أساسية';
+                                      const isOnLeave = docStatus === 'إجازة';
 
-                                        <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${
-                                          entry.cert.status === 'obtained'
-                                            ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
-                                            : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
-                                        }`}>
-                                          {entry.cert.status === 'obtained' ? (isAr ? 'حاصل عليها' : 'Obtained') : (isAr ? 'قيد الدراسة' : 'Studying')}
-                                        </span>
-                                      </div>
-                                    ))}
+                                      return (
+                                        <div
+                                          key={idx}
+                                          onClick={() => onSelectDoctor && onSelectDoctor(entry.doctor.id)}
+                                          className={`flex items-center justify-between p-2 rounded-lg text-xs transition-colors ${
+                                            onSelectDoctor ? 'hover:bg-indigo-50/80 dark:hover:bg-gray-700/80 cursor-pointer' : 'bg-gray-50 dark:bg-gray-750'
+                                          }`}
+                                        >
+                                          <div className="flex items-center gap-2 min-w-0">
+                                            <div className="w-6 h-6 rounded-full bg-indigo-100 dark:bg-indigo-950 text-indigo-700 dark:text-indigo-300 flex items-center justify-center text-[10px] font-bold shrink-0">
+                                              {idx + 1}
+                                            </div>
+                                            <div className="min-w-0">
+                                              <div className="flex items-center gap-1.5 truncate">
+                                                <span className="font-bold text-gray-800 dark:text-gray-200 truncate">
+                                                  {entry.doctor.name}
+                                                </span>
+                                                {isOnLeave && (
+                                                  <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
+                                                    {isAr ? 'إجازة' : 'On Leave'}
+                                                  </span>
+                                                )}
+                                              </div>
+                                              <span className="text-[10.5px] text-gray-500 dark:text-gray-400 truncate block">
+                                                {entry.cert.university_name ? `🏛️ ${entry.cert.university_name}` : ''}
+                                                {entry.cert.obtained_date ? ` (${formatDate(entry.cert.obtained_date, language)})` : ''}
+                                              </span>
+                                            </div>
+                                          </div>
+
+                                          <span className={`text-[10px] font-semibold px-2 py-0.5 rounded-md shrink-0 ${
+                                            entry.cert.status === 'obtained'
+                                              ? 'bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300'
+                                              : 'bg-blue-50 text-blue-700 dark:bg-blue-950/60 dark:text-blue-300'
+                                          }`}>
+                                            {entry.cert.status === 'obtained' ? (isAr ? 'حاصل عليها' : 'Obtained') : (isAr ? 'قيد الدراسة' : 'Studying')}
+                                          </span>
+                                        </div>
+                                      );
+                                    })}
                                   </div>
                                 </div>
                               ))}
@@ -618,7 +786,7 @@ export function DoctorDetailedStatsModal({
                             {promo.title}
                           </h4>
                           <span className="text-xs text-gray-500 dark:text-gray-400">
-                            {promo.percentage.toFixed(1)}% {isAr ? 'من إجمالي الأطباء' : 'of doctors'}
+                            {promo.percentage.toFixed(1)}% {isAr ? 'من نطاق الأطباء الحالي' : 'of current doctors'}
                           </span>
                         </div>
                       </div>
@@ -641,22 +809,33 @@ export function DoctorDetailedStatsModal({
 
                     {/* Doctors Names in this rank */}
                     <div className="space-y-1 pt-1 max-h-48 overflow-y-auto">
-                      {promo.doctors.map((doc, idx) => (
-                        <div
-                          key={doc.id}
-                          onClick={() => onSelectDoctor && onSelectDoctor(doc.id)}
-                          className={`flex items-center justify-between p-1.5 rounded-lg text-xs transition-colors ${
-                            onSelectDoctor ? 'hover:bg-indigo-50 dark:hover:bg-gray-700 cursor-pointer' : ''
-                          }`}
-                        >
-                          <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">
-                            {idx + 1}. {doc.name}
-                          </span>
-                          <span className="text-[10.5px] text-gray-500 font-mono">
-                            {doc.phone || ''}
-                          </span>
-                        </div>
-                      ))}
+                      {promo.doctors.map((doc, idx) => {
+                        const isOnLeave = doc.current_status?.status_type === 'إجازة';
+
+                        return (
+                          <div
+                            key={doc.id}
+                            onClick={() => onSelectDoctor && onSelectDoctor(doc.id)}
+                            className={`flex items-center justify-between p-1.5 rounded-lg text-xs transition-colors ${
+                              onSelectDoctor ? 'hover:bg-indigo-50 dark:hover:bg-gray-700 cursor-pointer' : ''
+                            }`}
+                          >
+                            <div className="flex items-center gap-1.5 truncate">
+                              <span className="font-semibold text-gray-800 dark:text-gray-200 truncate">
+                                {idx + 1}. {doc.name}
+                              </span>
+                              {isOnLeave && (
+                                <span className="text-[9.5px] font-bold px-1.5 py-0.2 rounded bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 border border-amber-200 dark:border-amber-800 shrink-0">
+                                  {isAr ? 'إجازة' : 'On Leave'}
+                                </span>
+                              )}
+                            </div>
+                            <span className="text-[10.5px] text-gray-500 font-mono">
+                              {doc.phone || ''}
+                            </span>
+                          </div>
+                        );
+                      })}
                     </div>
                   </div>
                 ))}
