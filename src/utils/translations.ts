@@ -405,6 +405,15 @@ export const translations = {
     doctorConfirmedSuccess: "Doctor data marked as confirmed",
     doctorUnconfirmedSuccess: "Doctor data marked as unconfirmed",
     confirmedDoctorsCount: "Confirmed Data",
+    dutyStatus: "Workforce / Duty Status",
+    allDutyStatuses: "All Doctors (On Duty & On Leave)",
+    activeDutyOnly: "Active on Duty (Not on Leave)",
+    onLeaveOnly: "On Leave Only",
+    activeWorkforce: "Active on Duty",
+    filterBySpecialty: "Specialty / Certificate Title",
+    allSpecialties: "All Specialties",
+    selectOrTypeSpecialty: "Select or search specialty...",
+    registeredSpecialties: "Available Specialties",
   },
 
   ar: {
@@ -814,6 +823,15 @@ export const translations = {
     doctorConfirmedSuccess: "تم تأكيد صحة بيانات الطبيب بنجاح",
     doctorUnconfirmedSuccess: "تم إلغاء تأكيد بيانات الطبيب",
     confirmedDoctorsCount: "بيانات مؤكدة",
+    dutyStatus: "حالة التواجد والعمل",
+    allDutyStatuses: "كافة الأطباء (الكل)",
+    activeDutyOnly: "على رأس العمل (ليس في إجازة)",
+    onLeaveOnly: "في إجازة فقط",
+    activeWorkforce: "على رأس العمل",
+    filterBySpecialty: "التخصص / مسمى الشهادة",
+    allSpecialties: "كافة التخصصات",
+    selectOrTypeSpecialty: "اختر أو ابحث عن التخصص...",
+    registeredSpecialties: "تخصصات مسجلة",
   }
 
 };

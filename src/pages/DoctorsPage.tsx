@@ -3,7 +3,8 @@ import {
   Users, UserPlus, Search, Filter, Download, Award, Clock,
   CheckCircle2, ShieldCheck, ChevronDown, RefreshCw, Layers,
   Phone, CreditCard, Building, Calendar, Edit, Trash2, Eye,
-  Sparkles, X, LayoutGrid, List, MapPin, Briefcase, ArrowLeftRight, Globe
+  Sparkles, X, LayoutGrid, List, MapPin, Briefcase, ArrowLeftRight, Globe,
+  GraduationCap, BookOpen, UserCheck
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type {
@@ -17,6 +18,7 @@ import {
   getCertificateSummary, getCurrentEmploymentStatus,
   formatDate, getYearFromDate, formatDisplayValue
 } from '../utils/doctorUtils';
+import { DEFAULT_CERTIFICATE_TITLES } from '../utils/suggestionUtils';
 import { DoctorFormModal } from '../components/doctors/DoctorFormModal';
 import { DoctorDetailsModal } from '../components/doctors/DoctorDetailsModal';
 import { DoctorExportModal } from '../components/doctors/DoctorExportModal';
@@ -50,9 +52,11 @@ export function DoctorsPage() {
     search: '',
     sortBy: 'recently_added',
     confirmationStatus: 'all',
+    dutyStatus: 'all',
     employmentStatus: 'all',
     administrativeDuty: 'all',
     certificateType: 'all',
+    certificateTitle: '',
     certificateStatus: 'all',
     university: 'all',
     obtainedYear: 'all',
@@ -140,6 +144,36 @@ export function DoctorsPage() {
     return Array.from(years).sort((a, b) => b.localeCompare(a));
   }, [doctors]);
 
+  // Dynamic list of entered certificate titles / specialties grouped by selected certificate type
+  const specialtiesData = useMemo(() => {
+    const selectedType = filters.certificateType || 'all';
+    const enteredTitles = new Set<string>();
+
+    doctors.forEach((d) => {
+      d.certificates?.forEach((c) => {
+        if (!c.certificate_title || !c.certificate_title.trim()) return;
+        const title = c.certificate_title.trim();
+        if (selectedType === 'all') {
+          enteredTitles.add(title);
+        } else if (c.certificate_type === selectedType) {
+          enteredTitles.add(title);
+        }
+      });
+    });
+
+    const enteredList = Array.from(enteredTitles).sort((a, b) => a.localeCompare(b, 'ar'));
+    const remainingDefaults = DEFAULT_CERTIFICATE_TITLES.filter(
+      (dt) => !enteredTitles.has(dt)
+    );
+
+    return {
+      enteredCount: enteredList.length,
+      enteredList,
+      defaultList: remainingDefaults,
+      allCombined: [...enteredList, ...remainingDefaults]
+    };
+  }, [doctors, filters.certificateType]);
+
   // Filtered Doctors Logic
   const filteredDoctors = useMemo(() => {
     return doctors.filter((doc) => {
@@ -149,7 +183,7 @@ export function DoctorsPage() {
         if (filters.confirmationStatus === 'unconfirmed' && doc.is_confirmed) return false;
       }
 
-      // 1. Universal Search (Name, National ID, Phone, University, Certificate Title)
+      // 1. Universal Search (Name, National ID, Phone, University, Certificate Title, Address)
       if (filters.search.trim()) {
         const query = filters.search.toLowerCase().trim();
         const matchesName = doc.name?.toLowerCase().includes(query);
@@ -168,9 +202,20 @@ export function DoctorsPage() {
         }
       }
 
-      // 2. Filter by Current Employment Status
+      // 2. Filter by Workforce / Duty Status (على رأس العمل vs في إجازة)
+      const currentStatusType = doc.current_status?.status_type || 'قوة أساسية';
+      if (filters.dutyStatus && filters.dutyStatus !== 'all') {
+        if (filters.dutyStatus === 'active_duty') {
+          // On active duty = not on leave and not terminated
+          if (currentStatusType === 'إجازة' || currentStatusType === 'إنهاء خدمة') return false;
+        } else if (filters.dutyStatus === 'on_leave') {
+          // On leave only
+          if (currentStatusType !== 'إجازة') return false;
+        }
+      }
+
+      // 3. Filter by Detailed Employment Status
       if (filters.employmentStatus !== 'all') {
-        const currentStatusType = doc.current_status?.status_type || 'قوة أساسية';
         const currentDeputationDir = doc.current_status?.deputation_direction;
         if (filters.employmentStatus === 'انتداب_إلى_المستشفى') {
           if (currentStatusType !== 'انتداب' && currentStatusType !== 'ندب') return false;
@@ -185,7 +230,7 @@ export function DoctorsPage() {
         }
       }
 
-      // 3. Filter by Administrative Duty
+      // 4. Filter by Administrative Duty
       if (filters.administrativeDuty !== 'all') {
         const hasAdmin = doc.current_status?.has_administrative_duty;
         const scope = doc.current_status?.administrative_scope;
@@ -204,40 +249,31 @@ export function DoctorsPage() {
         }
       }
 
-      // 4. Filter by Certificate Type (e.g. دبلوم, ماجستير, دكتوراه...)
-      if (filters.certificateType !== 'all') {
-        const hasType = doc.certificates?.some(
-          (c) => c.certificate_type === filters.certificateType
-        );
-        if (!hasType) return false;
-      }
+      // 5. Filter by Academic Qualifications (Degree Type, Specialty / Title, Status, University, Year)
+      const hasCertType = filters.certificateType && filters.certificateType !== 'all';
+      const hasCertTitle = !!filters.certificateTitle?.trim();
+      const hasCertStatus = filters.certificateStatus && filters.certificateStatus !== 'all';
+      const hasCertUniv = filters.university && filters.university !== 'all';
+      const hasCertYear = filters.obtainedYear && filters.obtainedYear !== 'all';
 
-      // 4. Filter by Certificate Status (obtained / in_progress)
-      if (filters.certificateStatus !== 'all') {
-        const hasStatus = doc.certificates?.some(
-          (c) => c.status === filters.certificateStatus
-        );
-        if (!hasStatus) return false;
-      }
-
-      // 5. Filter by University
-      if (filters.university !== 'all') {
-        const hasUniv = doc.certificates?.some(
-          (c) => c.university_name === filters.university
-        );
-        if (!hasUniv) return false;
-      }
-
-      // 6. Filter by Certificate Acquisition Year
-      if (filters.obtainedYear !== 'all') {
-        const hasYear = doc.certificates?.some((c) => {
-          if (!c.obtained_date) return false;
-          return getYearFromDate(c.obtained_date) === filters.obtainedYear;
+      if (hasCertType || hasCertTitle || hasCertStatus || hasCertUniv || hasCertYear) {
+        const titleQuery = filters.certificateTitle?.toLowerCase().trim() || '';
+        const matchesCertificate = doc.certificates?.some((c) => {
+          if (hasCertType && c.certificate_type !== filters.certificateType) return false;
+          if (hasCertTitle && !c.certificate_title?.toLowerCase().includes(titleQuery)) return false;
+          if (hasCertStatus && c.status !== filters.certificateStatus) return false;
+          if (hasCertUniv && c.university_name !== filters.university) return false;
+          if (hasCertYear) {
+            if (!c.obtained_date) return false;
+            if (getYearFromDate(c.obtained_date) !== filters.obtainedYear) return false;
+          }
+          return true;
         });
-        if (!hasYear) return false;
+
+        if (!matchesCertificate) return false;
       }
 
-      // 7. Filter by Promotion / Professional Rank
+      // 6. Filter by Promotion / Professional Rank
       if (filters.promotionType && filters.promotionType !== 'all') {
         const hasPromotion = doc.promotions?.some((p) =>
           p.promotion_type.toLowerCase().includes(filters.promotionType!.toLowerCase())
@@ -245,7 +281,7 @@ export function DoctorsPage() {
         if (!hasPromotion) return false;
       }
 
-      // 8. Filter by Financial Grade
+      // 7. Filter by Financial Grade
       if (filters.financialGrade && filters.financialGrade !== 'all') {
         const hasGrade = doc.financial_grades?.some((g) =>
           g.financial_grade.toLowerCase().includes(filters.financialGrade!.toLowerCase())
@@ -291,6 +327,14 @@ export function DoctorsPage() {
     const total = doctors.length;
     const confirmed = doctors.filter((d) => d.is_confirmed).length;
     const unconfirmed = doctors.filter((d) => !d.is_confirmed).length;
+    const onLeave = doctors.filter((d) => {
+      const st = d.current_status?.status_type;
+      return st === 'إجازة';
+    }).length;
+    const activeDuty = doctors.filter((d) => {
+      const st = d.current_status?.status_type || 'قوة أساسية';
+      return st !== 'إجازة' && st !== 'إنهاء خدمة';
+    }).length;
     const coreStaff = doctors.filter(
       (d) => (d.current_status?.status_type || 'قوة أساسية') === 'قوة أساسية'
     ).length;
@@ -301,10 +345,6 @@ export function DoctorsPage() {
     const loaned = doctors.filter((d) => {
       const st = d.current_status?.status_type;
       return st === 'إعارة';
-    }).length;
-    const onLeave = doctors.filter((d) => {
-      const st = d.current_status?.status_type;
-      return st === 'إجازة';
     }).length;
     const higherDegrees = doctors.filter((d) =>
       d.certificates?.some(
@@ -318,7 +358,7 @@ export function DoctorsPage() {
       (d) => d.current_status?.has_administrative_duty
     ).length;
 
-    return { total, confirmed, unconfirmed, coreStaff, deputed, loaned, onLeave, higherDegrees, inStudy, adminStaff };
+    return { total, confirmed, unconfirmed, activeDuty, onLeave, coreStaff, deputed, loaned, higherDegrees, inStudy, adminStaff };
   }, [doctors]);
 
   // Export to Excel
@@ -455,9 +495,11 @@ export function DoctorsPage() {
 
   const activeFiltersCount = [
     filters.confirmationStatus && filters.confirmationStatus !== 'all',
+    filters.dutyStatus && filters.dutyStatus !== 'all',
     filters.employmentStatus !== 'all',
     filters.administrativeDuty !== 'all',
     filters.certificateType !== 'all',
+    !!filters.certificateTitle?.trim(),
     filters.certificateStatus !== 'all',
     filters.university !== 'all',
     filters.obtainedYear !== 'all',
@@ -470,9 +512,11 @@ export function DoctorsPage() {
       search: '',
       sortBy: 'recently_added',
       confirmationStatus: 'all',
+      dutyStatus: 'all',
       employmentStatus: 'all',
       administrativeDuty: 'all',
       certificateType: 'all',
+      certificateTitle: '',
       certificateStatus: 'all',
       university: 'all',
       obtainedYear: 'all',
@@ -529,12 +573,12 @@ export function DoctorsPage() {
       </div>
 
       {/* Top Quick Stats Grid */}
-      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-9 gap-2 sm:gap-3">
+      <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 xl:grid-cols-10 gap-2 sm:gap-2.5">
         {/* Total Doctors */}
         <button
           type="button"
           onClick={clearAllFilters}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             activeFiltersCount === 0 && !filters.search
               ? 'border-indigo-300 dark:border-indigo-700 ring-2 ring-indigo-500/20 bg-indigo-50/20 dark:bg-indigo-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -545,50 +589,68 @@ export function DoctorsPage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('totalDoctors')}</span>
             <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-gray-900 dark:text-white mt-1.5">{stats.total}</p>
+          <p className="text-lg sm:text-xl font-bold text-gray-900 dark:text-white mt-1.5">{stats.total}</p>
         </button>
 
-        {/* Confirmed Doctors */}
+        {/* Active Workforce / On Duty */}
         <button
           type="button"
-          onClick={() => setFilters((prev) => ({ ...prev, confirmationStatus: prev.confirmationStatus === 'confirmed' ? 'all' : 'confirmed' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
-            filters.confirmationStatus === 'confirmed'
-              ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+          onClick={() => setFilters((prev) => ({ ...prev, dutyStatus: prev.dutyStatus === 'active_duty' ? 'all' : 'active_duty', employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : prev.employmentStatus }))}
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.dutyStatus === 'active_duty'
+              ? 'border-emerald-500 dark:border-emerald-500 ring-2 ring-emerald-500/30 bg-emerald-50/40 dark:bg-emerald-950/30'
               : 'border-gray-200 dark:border-gray-700'
           }`}
-          title={language === 'ar' ? 'تصفية: البيانات المؤكدة' : 'Filter: Confirmed Data'}
+          title={language === 'ar' ? 'تصفية: على رأس العمل (غير مجازين)' : 'Filter: Active Workforce (Not on leave)'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('confirmedDoctorsCount')}</span>
-            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+            <span className="text-[11px] sm:text-xs font-semibold truncate text-emerald-700 dark:text-emerald-400">{t('activeWorkforce')}</span>
+            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.confirmed}</p>
+          <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.activeDuty}</p>
+        </button>
+
+        {/* On Leave */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, dutyStatus: prev.dutyStatus === 'on_leave' ? 'all' : 'on_leave', employmentStatus: 'all' }))}
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.dutyStatus === 'on_leave' || filters.employmentStatus === 'إجازة'
+              ? 'border-amber-400 dark:border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: الأطباء في إجازة فقط' : 'Filter: On Leave Only'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-[11px] sm:text-xs font-semibold truncate text-amber-700 dark:text-amber-400">{t('onLeave')}</span>
+            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-amber-600 dark:text-amber-400 mt-1.5">{stats.onLeave}</p>
         </button>
 
         {/* Core Staff */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'قوة أساسية' ? 'all' : 'قوة أساسية' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'قوة أساسية'
-              ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+              ? 'border-teal-400 dark:border-teal-600 ring-2 ring-teal-500/20 bg-teal-50/30 dark:bg-teal-950/20'
               : 'border-gray-200 dark:border-gray-700'
           }`}
           title={language === 'ar' ? 'تصفية: قوة أساسية' : 'Filter: Core Staff'}
         >
           <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('coreStaff')}</span>
-            <ShieldCheck className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+            <Users className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 dark:text-teal-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.coreStaff}</p>
+          <p className="text-lg sm:text-xl font-bold text-teal-600 dark:text-teal-400 mt-1.5">{stats.coreStaff}</p>
         </button>
 
         {/* Deputation */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'انتداب' ? 'all' : 'انتداب' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'انتداب' || filters.employmentStatus === 'انتداب_إلى_المستشفى' || filters.employmentStatus === 'انتداب_خارج_المستشفى' || filters.employmentStatus === 'ندب'
               ? 'border-sky-400 dark:border-sky-600 ring-2 ring-sky-500/20 bg-sky-50/30 dark:bg-sky-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -599,14 +661,14 @@ export function DoctorsPage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('deputation')}</span>
             <ArrowLeftRight className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-sky-600 dark:text-sky-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-sky-600 dark:text-sky-400 mt-1.5">{stats.deputed}</p>
+          <p className="text-lg sm:text-xl font-bold text-sky-600 dark:text-sky-400 mt-1.5">{stats.deputed}</p>
         </button>
 
         {/* Loan */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إعارة' ? 'all' : 'إعارة' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.employmentStatus === 'إعارة'
               ? 'border-purple-400 dark:border-purple-600 ring-2 ring-purple-500/20 bg-purple-50/30 dark:bg-purple-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -617,50 +679,14 @@ export function DoctorsPage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('loaned')}</span>
             <Globe className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-purple-600 dark:text-purple-400 mt-1.5">{stats.loaned}</p>
-        </button>
-
-        {/* Leave */}
-        <button
-          type="button"
-          onClick={() => setFilters((prev) => ({ ...prev, employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : 'إجازة' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
-            filters.employmentStatus === 'إجازة'
-              ? 'border-amber-400 dark:border-amber-600 ring-2 ring-amber-500/20 bg-amber-50/30 dark:bg-amber-950/20'
-              : 'border-gray-200 dark:border-gray-700'
-          }`}
-          title={language === 'ar' ? 'تصفية: في إجازة' : 'Filter: On Leave'}
-        >
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('onLeave')}</span>
-            <Clock className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-amber-600 dark:text-amber-400 group-hover:scale-110 transition-transform shrink-0" />
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-amber-600 dark:text-amber-400 mt-1.5">{stats.onLeave}</p>
-        </button>
-
-        {/* Administrative Roles */}
-        <button
-          type="button"
-          onClick={() => setFilters((prev) => ({ ...prev, administrativeDuty: prev.administrativeDuty === 'has_admin' ? 'all' : 'has_admin' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
-            filters.administrativeDuty !== 'all' && filters.administrativeDuty !== 'no_admin'
-              ? 'border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20'
-              : 'border-gray-200 dark:border-gray-700'
-          }`}
-          title={language === 'ar' ? 'تصفية: تكليف إداري' : 'Filter: Administrative Duty'}
-        >
-          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
-            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('administrativeStaff')}</span>
-            <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform shrink-0" />
-          </div>
-          <p className="text-xl sm:text-2xl font-bold text-rose-600 dark:text-rose-400 mt-1.5">{stats.adminStaff}</p>
+          <p className="text-lg sm:text-xl font-bold text-purple-600 dark:text-purple-400 mt-1.5">{stats.loaned}</p>
         </button>
 
         {/* Higher Degrees */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'obtained' ? 'all' : 'obtained' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.certificateStatus === 'obtained'
               ? 'border-fuchsia-400 dark:border-fuchsia-600 ring-2 ring-fuchsia-500/20 bg-fuchsia-50/30 dark:bg-fuchsia-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -671,14 +697,14 @@ export function DoctorsPage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('higherDegrees')}</span>
             <Award className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-fuchsia-600 dark:text-fuchsia-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-fuchsia-600 dark:text-fuchsia-400 mt-1.5">{stats.higherDegrees}</p>
+          <p className="text-lg sm:text-xl font-bold text-fuchsia-600 dark:text-fuchsia-400 mt-1.5">{stats.higherDegrees}</p>
         </button>
 
         {/* Currently Studying */}
         <button
           type="button"
           onClick={() => setFilters((prev) => ({ ...prev, certificateStatus: prev.certificateStatus === 'in_progress' ? 'all' : 'in_progress' }))}
-          className={`p-2.5 sm:p-3.5 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
             filters.certificateStatus === 'in_progress'
               ? 'border-blue-400 dark:border-blue-600 ring-2 ring-blue-500/20 bg-blue-50/30 dark:bg-blue-950/20'
               : 'border-gray-200 dark:border-gray-700'
@@ -689,13 +715,101 @@ export function DoctorsPage() {
             <span className="text-[11px] sm:text-xs font-semibold truncate">{t('inStudy')}</span>
             <Sparkles className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-blue-600 dark:text-blue-400 group-hover:scale-110 transition-transform shrink-0" />
           </div>
-          <p className="text-xl sm:text-2xl font-bold text-blue-600 dark:text-blue-400 mt-1.5">{stats.inStudy}</p>
+          <p className="text-lg sm:text-xl font-bold text-blue-600 dark:text-blue-400 mt-1.5">{stats.inStudy}</p>
+        </button>
+
+        {/* Confirmed Doctors */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, confirmationStatus: prev.confirmationStatus === 'confirmed' ? 'all' : 'confirmed' }))}
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.confirmationStatus === 'confirmed'
+              ? 'border-emerald-400 dark:border-emerald-600 ring-2 ring-emerald-500/20 bg-emerald-50/30 dark:bg-emerald-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: البيانات المؤكدة' : 'Filter: Confirmed Data'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('confirmedDoctorsCount')}</span>
+            <CheckCircle2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-emerald-600 dark:text-emerald-400 group-hover:scale-110 transition-transform shrink-0" />
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-emerald-600 dark:text-emerald-400 mt-1.5">{stats.confirmed}</p>
+        </button>
+
+        {/* Administrative Roles */}
+        <button
+          type="button"
+          onClick={() => setFilters((prev) => ({ ...prev, administrativeDuty: prev.administrativeDuty === 'has_admin' ? 'all' : 'has_admin' }))}
+          className={`p-2.5 sm:p-3 bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl border text-start flex flex-col justify-between transition-all hover:shadow-md hover:-translate-y-0.5 group ${
+            filters.administrativeDuty !== 'all' && filters.administrativeDuty !== 'no_admin'
+              ? 'border-rose-400 dark:border-rose-600 ring-2 ring-rose-500/20 bg-rose-50/30 dark:bg-rose-950/20'
+              : 'border-gray-200 dark:border-gray-700'
+          }`}
+          title={language === 'ar' ? 'تصفية: تكليف إداري' : 'Filter: Administrative Duty'}
+        >
+          <div className="flex items-center justify-between text-gray-500 dark:text-gray-400 w-full">
+            <span className="text-[11px] sm:text-xs font-semibold truncate">{t('administrativeStaff')}</span>
+            <Briefcase className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-rose-600 dark:text-rose-400 group-hover:scale-110 transition-transform shrink-0" />
+          </div>
+          <p className="text-lg sm:text-xl font-bold text-rose-600 dark:text-rose-400 mt-1.5">{stats.adminStaff}</p>
         </button>
       </div>
 
       {/* Search & Filter Control Bar */}
       <div className="bg-white dark:bg-gray-800 p-3 sm:p-4 rounded-xl sm:rounded-2xl border border-gray-200 dark:border-gray-700 shadow-sm space-y-3">
         <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5 sm:gap-3">
+          
+          {/* Quick Workforce Status Tabs (All / Active Duty / On Leave) */}
+          <div className="flex items-center gap-1 bg-gray-100 dark:bg-gray-700/70 p-1 rounded-xl shrink-0">
+            <button
+              type="button"
+              onClick={() => setFilters(prev => ({ ...prev, dutyStatus: 'all', employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : prev.employmentStatus }))}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                (!filters.dutyStatus || filters.dutyStatus === 'all') && filters.employmentStatus !== 'إجازة'
+                  ? 'bg-white dark:bg-gray-600 text-gray-900 dark:text-white shadow-sm'
+                  : 'text-gray-600 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white'
+              }`}
+            >
+              <Users className="w-3.5 h-3.5 text-indigo-500" />
+              <span>{language === 'ar' ? 'الكل' : 'All'}</span>
+              <span className="text-[10px] px-1.5 py-0.5 rounded-full bg-gray-200 dark:bg-gray-500 text-gray-700 dark:text-gray-200">
+                {stats.total}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilters(prev => ({ ...prev, dutyStatus: 'active_duty', employmentStatus: prev.employmentStatus === 'إجازة' ? 'all' : prev.employmentStatus }))}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                filters.dutyStatus === 'active_duty'
+                  ? 'bg-emerald-600 text-white shadow-sm shadow-emerald-600/30'
+                  : 'text-emerald-700 dark:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-950/40'
+              }`}
+            >
+              <ShieldCheck className="w-3.5 h-3.5" />
+              <span>{t('activeWorkforce')}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filters.dutyStatus === 'active_duty' ? 'bg-emerald-700 text-white' : 'bg-emerald-100 dark:bg-emerald-900/60 text-emerald-800 dark:text-emerald-300'}`}>
+                {stats.activeDuty}
+              </span>
+            </button>
+
+            <button
+              type="button"
+              onClick={() => setFilters(prev => ({ ...prev, dutyStatus: 'on_leave', employmentStatus: 'all' }))}
+              className={`px-3 py-1.5 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${
+                filters.dutyStatus === 'on_leave' || filters.employmentStatus === 'إجازة'
+                  ? 'bg-amber-500 text-white shadow-sm shadow-amber-500/30'
+                  : 'text-amber-700 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-950/40'
+              }`}
+            >
+              <Clock className="w-3.5 h-3.5" />
+              <span>{t('onLeave')}</span>
+              <span className={`text-[10px] px-1.5 py-0.5 rounded-full ${filters.dutyStatus === 'on_leave' || filters.employmentStatus === 'إجازة' ? 'bg-amber-600 text-white' : 'bg-amber-100 dark:bg-amber-900/60 text-amber-800 dark:text-amber-300'}`}>
+                {stats.onLeave}
+              </span>
+            </button>
+          </div>
+
           {/* Universal Search Input */}
           <div className="relative flex-1 w-full">
             <Search className="absolute right-3.5 rtl:right-3.5 rtl:left-auto left-auto top-2.5 sm:top-3 w-4 h-4 sm:w-5 sm:h-5 text-gray-400 pointer-events-none" />
@@ -704,8 +818,8 @@ export function DoctorsPage() {
               value={filters.search}
               onChange={(e) => setFilters({ ...filters, search: e.target.value })}
               placeholder={language === 'ar' 
-                ? 'البحث باسم الطبيب، الرقم القومي، الهاتف، الجامعة...' 
-                : 'Search by doctor name, national ID, mobile, university...'}
+                ? 'البحث باسم الطبيب، الرقم القومي، الهاتف، التخصص، الجامعة...' 
+                : 'Search by doctor name, national ID, mobile, specialty, university...'}
               className="w-full pl-3.5 pr-10 rtl:pr-10 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700/50 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:bg-white dark:focus:bg-gray-700 transition-all"
             />
             {filters.search && (
@@ -782,182 +896,303 @@ export function DoctorsPage() {
 
         {/* Expandable Advanced Structured Filters */}
         {showAdvancedFilters && (
-          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 animate-in fade-in duration-150">
-            {/* Filter by Confirmation Status */}
+          <div className="pt-3 border-t border-gray-200 dark:border-gray-700 space-y-4 animate-in fade-in duration-150">
+            
+            {/* Section 1: Employment & Workforce Status */}
             <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByConfirmation')}
-              </label>
-              <select
-                value={filters.confirmationStatus || 'all'}
-                onChange={(e) => setFilters({ ...filters, confirmationStatus: e.target.value as any })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
-              >
-                <option value="all">{t('allConfirmationStatuses')}</option>
-                <option value="confirmed">✅ {t('onlyConfirmed')}</option>
-                <option value="unconfirmed">⏳ {t('onlyUnconfirmed')}</option>
-              </select>
-            </div>
-
-            {/* Filter by Employment Status */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByStatus')}
-              </label>
-              <select
-                value={filters.employmentStatus}
-                onChange={(e) => setFilters({ ...filters, employmentStatus: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{t('allStatuses')}</option>
-                <option value="قوة أساسية">قوة أساسية</option>
-                <option value="انتداب">انتداب (الكل)</option>
-                <option value="انتداب_إلى_المستشفى">👉 منتدب إلى المستشفى</option>
-                <option value="انتداب_خارج_المستشفى">👈 منتدب لخارج المستشفى</option>
-                <option value="إعارة">إعارة</option>
-                <option value="إجازة">إجازة</option>
-                <option value="ندب">ندب</option>
-                <option value="إنهاء خدمة">إنهاء خدمة</option>
-                <option value="أخرى">أخرى</option>
-              </select>
-            </div>
-
-            {/* Filter by Administrative Role */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByAdministrative')}
-              </label>
-              <select
-                value={filters.administrativeDuty}
-                onChange={(e) => setFilters({ ...filters, administrativeDuty: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
-              >
-                <option value="all">{t('allAdministrative')}</option>
-                <option value="has_admin">{t('hasAdminWorkAll')}</option>
-                <option value="inside_dept">🏢 {t('adminInsideDept')}</option>
-                <option value="outside_dept">🌐 {t('adminOutsideDept')}</option>
-                <option value="head_of_dept">👑 {t('headOfDeptOnly')}</option>
-                <option value="no_admin">{t('noAdminWork')}</option>
-              </select>
-            </div>
-
-            {/* Filter by Promotion / Professional Rank */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {language === 'ar' ? 'الدرجة والترقية المهنية' : 'Professional Rank'}
-              </label>
-              <select
-                value={filters.promotionType || 'all'}
-                onChange={(e) => setFilters({ ...filters, promotionType: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{language === 'ar' ? 'كافة الدرجات المهنية' : 'All Ranks'}</option>
-                <option value="طبيب مقيم">طبيب مقيم</option>
-                <option value="مساعد أخصائي">مساعد أخصائي</option>
-                <option value="أخصائي">أخصائي</option>
-                <option value="استشاري مساعد">استشاري مساعد</option>
-                <option value="استشاري">استشاري</option>
-                <option value="رئيس قسم">رئيس قسم</option>
-              </select>
-            </div>
-
-            {/* Filter by Financial Grade */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {language === 'ar' ? 'الدرجة المالية' : 'Financial Grade'}
-              </label>
-              <select
-                value={filters.financialGrade || 'all'}
-                onChange={(e) => setFilters({ ...filters, financialGrade: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{language === 'ar' ? 'كافة الدرجات المالية' : 'All Financial Grades'}</option>
-                <option value="الدرجة الثالثة">الدرجة الثالثة</option>
-                <option value="الدرجة الثانية">الدرجة الثانية</option>
-                <option value="الدرجة الأولى">الدرجة الأولى</option>
-                <option value="مدير عام">مدير عام</option>
-                <option value="الدرجة العالية">الدرجة العالية</option>
-                <option value="الدرجة الممتازة">الدرجة الممتازة</option>
-              </select>
-            </div>
-
-            {/* Filter by Certificate Type */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByType')}
-              </label>
-              <select
-                value={filters.certificateType}
-                onChange={(e) => setFilters({ ...filters, certificateType: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{t('allTypes')}</option>
-                {certificateTypes.map((t) => (
-                  <option key={t.id} value={t.name}>{t.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filter by Certificate Status */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByCertStatus')}
-              </label>
-              <select
-                value={filters.certificateStatus}
-                onChange={(e) => setFilters({ ...filters, certificateStatus: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{language === 'ar' ? 'كافة حالات الشهادات' : 'All Degree Statuses'}</option>
-                <option value="obtained">{t('obtained')}</option>
-                <option value="in_progress">{t('inProgress')}</option>
-              </select>
-            </div>
-
-            {/* Filter by University */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByUniversity')}
-              </label>
-              <select
-                value={filters.university}
-                onChange={(e) => setFilters({ ...filters, university: e.target.value })}
-                className="w-full px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-              >
-                <option value="all">{t('allUniversities')}</option>
-                {universities.map((u) => (
-                  <option key={u.id} value={u.name}>{u.name}</option>
-                ))}
-              </select>
-            </div>
-
-            {/* Filter by Obtained Year & Clear Button */}
-            <div>
-              <label className="block text-xs font-semibold text-gray-600 dark:text-gray-300 mb-1">
-                {t('filterByYear')}
-              </label>
-              <div className="flex items-center space-x-2 rtl:space-x-reverse">
-                <select
-                  value={filters.obtainedYear}
-                  onChange={(e) => setFilters({ ...filters, obtainedYear: e.target.value })}
-                  className="flex-1 px-3 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
-                >
-                  <option value="all">{t('allYears')}</option>
-                  {availableYears.map((yr) => (
-                    <option key={yr} value={yr}>{yr}</option>
-                  ))}
-                </select>
-                {activeFiltersCount > 0 && (
-                  <button
-                    onClick={clearAllFilters}
-                    className="px-2.5 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/50 rounded-xl text-xs font-bold whitespace-nowrap"
-                    title={t('clearFilters')}
+              <div className="text-xs font-bold text-gray-700 dark:text-gray-300 mb-2 flex items-center gap-1.5">
+                <Briefcase className="w-3.5 h-3.5 text-indigo-600 dark:text-indigo-400" />
+                <span>{language === 'ar' ? 'الحالة الوظيفية والتواجد بالعمل' : 'Employment & Duty Status'}</span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-2.5">
+                
+                {/* Filter by Workforce / Duty Status */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {t('dutyStatus')}
+                  </label>
+                  <select
+                    value={filters.dutyStatus || 'all'}
+                    onChange={(e) => setFilters({ ...filters, dutyStatus: e.target.value as any })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
                   >
-                    {language === 'ar' ? 'إعادة ضبط' : 'Reset'}
-                  </button>
-                )}
+                    <option value="all">{t('allDutyStatuses')}</option>
+                    <option value="active_duty">🟢 {t('activeDutyOnly')}</option>
+                    <option value="on_leave">🟡 {t('onLeaveOnly')}</option>
+                  </select>
+                </div>
+
+                {/* Filter by Employment Status */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {t('filterByStatus')}
+                  </label>
+                  <select
+                    value={filters.employmentStatus}
+                    onChange={(e) => setFilters({ ...filters, employmentStatus: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
+                  >
+                    <option value="all">{t('allStatuses')}</option>
+                    <option value="قوة أساسية">قوة أساسية</option>
+                    <option value="انتداب">انتداب (الكل)</option>
+                    <option value="انتداب_إلى_المستشفى">👉 منتدب إلى المستشفى</option>
+                    <option value="انتداب_خارج_المستشفى">👈 منتدب لخارج المستشفى</option>
+                    <option value="إعارة">إعارة</option>
+                    <option value="إجازة">إجازة</option>
+                    <option value="ندب">ندب</option>
+                    <option value="إنهاء خدمة">إنهاء خدمة</option>
+                    <option value="أخرى">أخرى</option>
+                  </select>
+                </div>
+
+                {/* Filter by Administrative Role */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {t('filterByAdministrative')}
+                  </label>
+                  <select
+                    value={filters.administrativeDuty}
+                    onChange={(e) => setFilters({ ...filters, administrativeDuty: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
+                  >
+                    <option value="all">{t('allAdministrative')}</option>
+                    <option value="has_admin">{t('hasAdminWorkAll')}</option>
+                    <option value="inside_dept">🏢 {t('adminInsideDept')}</option>
+                    <option value="outside_dept">🌐 {t('adminOutsideDept')}</option>
+                    <option value="head_of_dept">👑 {t('headOfDeptOnly')}</option>
+                    <option value="no_admin">{t('noAdminWork')}</option>
+                  </select>
+                </div>
+
+                {/* Filter by Promotion / Professional Rank */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {language === 'ar' ? 'الدرجة المهنية' : 'Professional Rank'}
+                  </label>
+                  <select
+                    value={filters.promotionType || 'all'}
+                    onChange={(e) => setFilters({ ...filters, promotionType: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
+                  >
+                    <option value="all">{language === 'ar' ? 'كافة الدرجات المهنية' : 'All Ranks'}</option>
+                    <option value="طبيب مقيم">طبيب مقيم</option>
+                    <option value="مساعد أخصائي">مساعد أخصائي</option>
+                    <option value="أخصائي">أخصائي</option>
+                    <option value="استشاري مساعد">استشاري مساعد</option>
+                    <option value="استشاري">استشاري</option>
+                    <option value="رئيس قسم">رئيس قسم</option>
+                  </select>
+                </div>
+
+                {/* Filter by Financial Grade */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {language === 'ar' ? 'الدرجة المالية' : 'Financial Grade'}
+                  </label>
+                  <select
+                    value={filters.financialGrade || 'all'}
+                    onChange={(e) => setFilters({ ...filters, financialGrade: e.target.value })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white"
+                  >
+                    <option value="all">{language === 'ar' ? 'كافة الدرجات المالية' : 'All Financial Grades'}</option>
+                    <option value="الدرجة الثالثة">الدرجة الثالثة</option>
+                    <option value="الدرجة الثانية">الدرجة الثانية</option>
+                    <option value="الدرجة الأولى">الدرجة الأولى</option>
+                    <option value="مدير عام">مدير عام</option>
+                    <option value="الدرجة العالية">الدرجة العالية</option>
+                    <option value="الدرجة الممتازة">الدرجة الممتازة</option>
+                  </select>
+                </div>
+
+                {/* Filter by Confirmation Status */}
+                <div>
+                  <label className="block text-[11px] font-semibold text-gray-600 dark:text-gray-400 mb-1">
+                    {t('filterByConfirmation')}
+                  </label>
+                  <select
+                    value={filters.confirmationStatus || 'all'}
+                    onChange={(e) => setFilters({ ...filters, confirmationStatus: e.target.value as any })}
+                    className="w-full px-2.5 py-2 rounded-xl border border-gray-300 dark:border-gray-600 bg-gray-50 dark:bg-gray-700 text-xs text-gray-900 dark:text-white font-medium"
+                  >
+                    <option value="all">{t('allConfirmationStatuses')}</option>
+                    <option value="confirmed">✅ {t('onlyConfirmed')}</option>
+                    <option value="unconfirmed">⏳ {t('onlyUnconfirmed')}</option>
+                  </select>
+                </div>
+
               </div>
             </div>
+
+            {/* Section 2: Advanced Academic Degrees & Specialty Search */}
+            <div className="bg-indigo-50/40 dark:bg-indigo-950/20 rounded-2xl p-3 sm:p-4 border border-indigo-100 dark:border-indigo-900/50">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-3">
+                <div className="flex items-center gap-2">
+                  <div className="p-1.5 rounded-lg bg-indigo-600 text-white shadow-sm">
+                    <GraduationCap className="w-4 h-4" />
+                  </div>
+                  <div>
+                    <h4 className="text-xs sm:text-sm font-bold text-gray-900 dark:text-white">
+                      {language === 'ar' ? 'البحث المتقدم في الدرجات العلمية والتخصصات' : 'Academic Degrees & Specialties Advanced Filter'}
+                    </h4>
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {language === 'ar'
+                        ? 'تصفية الأطباء الحاصلين على ماجستير أو دكتوراه أو زمالة في تخصص دقيق محدد'
+                        : 'Filter doctors holding Masters, PhDs, or Fellowships in specific dental specialties'}
+                    </p>
+                  </div>
+                </div>
+
+                {filters.certificateType !== 'all' && (
+                  <span className="text-[11px] font-semibold text-indigo-700 dark:text-indigo-300 bg-indigo-100/70 dark:bg-indigo-900/50 px-2.5 py-1 rounded-full self-start sm:self-auto border border-indigo-200 dark:border-indigo-800">
+                    🎓 {filters.certificateType}: {specialtiesData.enteredCount} {t('registeredSpecialties')}
+                  </span>
+                )}
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
+                
+                {/* 1. Certificate / Degree Type */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('filterByType')}
+                  </label>
+                  <select
+                    value={filters.certificateType}
+                    onChange={(e) => setFilters({ ...filters, certificateType: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="all">{t('allTypes')}</option>
+                    <option value="ماجستير">🎓 ماجستير (Master's)</option>
+                    <option value="دكتوراه">🎖️ دكتوراه (PhD / Doctorate)</option>
+                    <option value="زمالة">🏛️ زمالة (Fellowship)</option>
+                    <option value="دبلوم">📜 دبلوم / دبلومة (Diploma)</option>
+                    <option value="بكالوريوس">🩺 بكالوريوس (Bachelor's)</option>
+                    <option value="شهادة مهنية">💼 شهادة مهنية</option>
+                    <option value="دورة تدريبية">🎯 دورة تدريبية</option>
+                    {certificateTypes
+                      .filter(t => !['ماجستير', 'دكتوراه', 'زمالة', 'دبلوم', 'دبلومة', 'بكالوريوس', 'شهادة مهنية', 'دورة تدريبية'].includes(t.name))
+                      .map((t) => (
+                        <option key={t.id} value={t.name}>{t.name}</option>
+                      ))}
+                  </select>
+                </div>
+
+                {/* 2. Certificate Specialty / Title (Preloaded & Searchable with Datalist) */}
+                <div className="relative">
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300">
+                      {t('filterBySpecialty')}
+                    </label>
+                    {specialtiesData.enteredCount > 0 && (
+                      <span className="text-[10px] text-indigo-600 dark:text-indigo-400 font-bold">
+                        ({specialtiesData.enteredCount} مسجل)
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      list="specialty-suggestions-list"
+                      value={filters.certificateTitle || ''}
+                      onChange={(e) => setFilters({ ...filters, certificateTitle: e.target.value })}
+                      placeholder={filters.certificateType !== 'all' 
+                        ? (language === 'ar' ? `اختر تخصص ${filters.certificateType}...` : `Select ${filters.certificateType} specialty...`)
+                        : t('selectOrTypeSpecialty')}
+                      className="w-full pl-8 pr-3 rtl:pr-3 rtl:pl-8 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    />
+                    {filters.certificateTitle && (
+                      <button
+                        type="button"
+                        onClick={() => setFilters({ ...filters, certificateTitle: '' })}
+                        className="absolute left-2.5 rtl:left-2.5 rtl:right-auto top-2.5 text-gray-400 hover:text-gray-600"
+                        title={language === 'ar' ? 'مسح التخصص' : 'Clear specialty'}
+                      >
+                        <X className="w-3.5 h-3.5" />
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Datalist populated dynamically with entered specialties for the selected degree type + presets */}
+                  <datalist id="specialty-suggestions-list">
+                    {specialtiesData.enteredList.map((spec) => (
+                      <option key={`entered-${spec}`} value={spec}>
+                        {language === 'ar' ? `(مسجل بالنظام) ${spec}` : `(Entered) ${spec}`}
+                      </option>
+                    ))}
+                    {specialtiesData.defaultList.map((spec) => (
+                      <option key={`def-${spec}`} value={spec}>
+                        {spec}
+                      </option>
+                    ))}
+                  </datalist>
+                </div>
+
+                {/* 3. Certificate Status (Obtained / In Progress) */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('filterByCertStatus')}
+                  </label>
+                  <select
+                    value={filters.certificateStatus}
+                    onChange={(e) => setFilters({ ...filters, certificateStatus: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="all">{language === 'ar' ? 'كافة حالات الشهادات' : 'All Degree Statuses'}</option>
+                    <option value="obtained">✅ {t('obtained')}</option>
+                    <option value="in_progress">⏳ {t('inProgress')}</option>
+                  </select>
+                </div>
+
+                {/* 4. University */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('filterByUniversity')}
+                  </label>
+                  <select
+                    value={filters.university}
+                    onChange={(e) => setFilters({ ...filters, university: e.target.value })}
+                    className="w-full px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                  >
+                    <option value="all">{t('allUniversities')}</option>
+                    {universities.map((u) => (
+                      <option key={u.id} value={u.name}>{u.name}</option>
+                    ))}
+                  </select>
+                </div>
+
+                {/* 5. Obtained Year & Reset Actions */}
+                <div>
+                  <label className="block text-xs font-semibold text-gray-700 dark:text-gray-300 mb-1">
+                    {t('filterByYear')}
+                  </label>
+                  <div className="flex items-center space-x-2 rtl:space-x-reverse">
+                    <select
+                      value={filters.obtainedYear}
+                      onChange={(e) => setFilters({ ...filters, obtainedYear: e.target.value })}
+                      className="flex-1 px-3 py-2 rounded-xl border border-indigo-200 dark:border-indigo-800 bg-white dark:bg-gray-800 text-xs text-gray-900 dark:text-white font-medium focus:ring-2 focus:ring-indigo-500 shadow-sm"
+                    >
+                      <option value="all">{t('allYears')}</option>
+                      {availableYears.map((yr) => (
+                        <option key={yr} value={yr}>{yr}</option>
+                      ))}
+                    </select>
+                    
+                    {activeFiltersCount > 0 && (
+                      <button
+                        onClick={clearAllFilters}
+                        className="px-3 py-2 bg-red-50 hover:bg-red-100 text-red-600 dark:bg-red-950/40 dark:hover:bg-red-900/50 rounded-xl text-xs font-bold whitespace-nowrap border border-red-200 dark:border-red-800 transition-colors"
+                        title={t('clearFilters')}
+                      >
+                        {language === 'ar' ? 'إعادة ضبط' : 'Reset'}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
           </div>
         )}
       </div>
