@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { X, User, Phone, MapPin, Calendar, CreditCard, FileText, Loader2, CheckCircle2 } from 'lucide-react';
+import { X, User, Phone, MapPin, Calendar, CreditCard, FileText, Loader2, CheckCircle2, Clock } from 'lucide-react';
 import { supabase } from '../../lib/supabase';
 import type { Doctor } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { AutocompleteInput } from '../common/AutocompleteInput';
 import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
+import { getDoctorLastUpdated } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
 interface DoctorFormModalProps {
@@ -38,36 +39,33 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
       fetchHistoricalSuggestions().then((res) => {
         setAddressSuggestions(res.addresses);
       });
+      if (doctor) {
+        setFormData({
+          name: doctor.name || '',
+          national_id: doctor.national_id || '',
+          birth_date: doctor.birth_date || '',
+          graduation_date: doctor.graduation_date || '',
+          hire_date: doctor.hire_date || '',
+          address: doctor.address || '',
+          phone: doctor.phone || '',
+          notes: doctor.notes || '',
+          is_confirmed: !!doctor.is_confirmed,
+        });
+      } else {
+        setFormData({
+          name: '',
+          national_id: '',
+          birth_date: '',
+          graduation_date: '',
+          hire_date: '',
+          address: '',
+          phone: '',
+          notes: '',
+          is_confirmed: false,
+        });
+      }
     }
-  }, [isOpen]);
-
-  useEffect(() => {
-    if (doctor) {
-      setFormData({
-        name: doctor.name || '',
-        national_id: doctor.national_id || '',
-        birth_date: doctor.birth_date || '',
-        graduation_date: doctor.graduation_date || '',
-        hire_date: doctor.hire_date || '',
-        address: doctor.address || '',
-        phone: doctor.phone || '',
-        notes: doctor.notes || '',
-        is_confirmed: !!doctor.is_confirmed,
-      });
-    } else {
-      setFormData({
-        name: '',
-        national_id: '',
-        birth_date: '',
-        graduation_date: '',
-        hire_date: '',
-        address: '',
-        phone: '',
-        notes: '',
-        is_confirmed: false,
-      });
-    }
-  }, [doctor, isOpen]);
+  }, [isOpen, doctor]);
 
   if (!isOpen) return null;
 
@@ -194,22 +192,33 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
     }
   };
 
+  const lastUpdated = doctor ? getDoctorLastUpdated(doctor, language) : null;
+
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
       <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[96vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-gray-800 dark:to-gray-800 shrink-0">
-          <div className="flex items-center space-x-2.5 rtl:space-x-reverse">
-            <div className="p-1.5 sm:p-2 bg-indigo-600 rounded-lg sm:rounded-xl text-white">
+          <div className="flex items-center space-x-2.5 rtl:space-x-reverse min-w-0">
+            <div className="p-1.5 sm:p-2 bg-indigo-600 rounded-lg sm:rounded-xl text-white shrink-0">
               <User className="w-4 h-4 sm:w-5 sm:h-5" />
             </div>
-            <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white">
-              {doctor ? t('editDoctor') : t('addDoctor')}
-            </h2>
+            <div className="min-w-0">
+              <h2 className="text-base sm:text-xl font-bold text-gray-900 dark:text-white truncate">
+                {doctor ? t('editDoctor') : t('addDoctor')}
+              </h2>
+              {lastUpdated && (
+                <div className="flex items-center gap-1 text-[11px] text-gray-500 dark:text-gray-400 mt-0.5">
+                  <Clock className="w-3 h-3 text-indigo-500 shrink-0" />
+                  <span>{language === 'ar' ? 'آخر تعديل:' : 'Last modified:'}</span>
+                  <strong className="font-semibold text-indigo-600 dark:text-indigo-400">{lastUpdated.formatted}</strong>
+                </div>
+              )}
+            </div>
           </div>
           <button
             onClick={onClose}
-            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors"
+            className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 rounded-lg hover:bg-gray-200/50 dark:hover:bg-gray-700/50 transition-colors shrink-0"
           >
             <X className="w-4 h-4 sm:w-5 sm:h-5" />
           </button>

@@ -2,12 +2,13 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import type { Patient, Treatment, Student, DoctorWithDetails } from '../types';
-import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X, Award, Stethoscope, Sparkles, Briefcase, Building } from 'lucide-react';
+import { Calendar, Users, Activity, Loader2, AlertCircle, Download, CheckCircle, Clock, UserPlus, BarChart2, Edit, UserCheck, X, Award, Stethoscope, Sparkles, Briefcase, Building, BarChart3, GraduationCap } from 'lucide-react';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 import { useLanguage } from '../context/LanguageContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import { getCertificateSummary, getCurrentEmploymentStatus } from '../utils/doctorUtils';
+import { DoctorDetailedStatsModal } from '../components/doctors/DoctorDetailedStatsModal';
 
 type DatePreset = 'today' | 'week' | 'month' | 'lastMonth' | 'custom';
 
@@ -23,6 +24,7 @@ export function ReportsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<'treatments' | 'students' | 'unregistered' | 'doctors'>('treatments');
+  const [isDetailedStatsOpen, setIsDetailedStatsOpen] = useState(false);
   const { t, language } = useLanguage();
 
 
@@ -117,14 +119,16 @@ export function ReportsPage() {
         unregisteredRes,
         doctorsRes,
         historyRes,
-        certsRes
+        certsRes,
+        promotionsRes
       ] = await Promise.all([
         supabase.from('treatments').select('*'),
         supabase.from('students').select('*').eq('registration_status', 'registered'),
         unregisteredQuery,
         supabase.from('doctors').select('*'),
         supabase.from('doctor_employment_history').select('*'),
-        supabase.from('doctor_certificates').select('*')
+        supabase.from('doctor_certificates').select('*'),
+        supabase.from('doctor_promotions').select('*')
       ]);
 
       if (treatmentsRes.error) throw treatmentsRes.error;
@@ -138,11 +142,13 @@ export function ReportsPage() {
       const rawDocs = doctorsRes.data || [];
       const rawHist = historyRes.data || [];
       const rawCerts = certsRes.data || [];
+      const rawProms = promotionsRes.data || [];
 
       const mergedDocs: DoctorWithDetails[] = rawDocs.map(d => ({
         ...d,
         employment_history: rawHist.filter(h => h.doctor_id === d.id),
         certificates: rawCerts.filter(c => c.doctor_id === d.id),
+        promotions: rawProms.filter(p => p.doctor_id === d.id),
         current_status: getCurrentEmploymentStatus(rawHist.filter(h => h.doctor_id === d.id))
       }));
       setDoctorsList(mergedDocs);
@@ -703,6 +709,28 @@ export function ReportsPage() {
             </div>
           ) : (
             <div className="space-y-6">
+              {/* Doctor Stats Header Bar */}
+              <div className="bg-gradient-to-r from-indigo-900 to-purple-900 text-white rounded-2xl p-5 sm:p-6 shadow-lg flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg sm:text-xl font-bold flex items-center gap-2">
+                    <GraduationCap className="w-6 h-6 text-indigo-300" />
+                    <span>{language === 'ar' ? 'التقرير والإحصائيات الشاملة لهيئة الأطباء والدرجات العلمية' : 'Comprehensive Doctors & Academic Degrees Report'}</span>
+                  </h2>
+                  <p className="text-xs sm:text-sm text-indigo-200 mt-1">
+                    {language === 'ar'
+                      ? 'إحصاء الدرجات العلمية (ماجستير، دكتوراه، زمالة...) وتوزيع التخصصات والمجالات الدقيقة والرتب الفنية'
+                      : 'Breakdown of academic degrees, subspecialties, and technical promotions'}
+                  </p>
+                </div>
+                <button
+                  onClick={() => setIsDetailedStatsOpen(true)}
+                  className="px-4 py-2.5 bg-white text-indigo-900 hover:bg-indigo-50 rounded-xl text-xs sm:text-sm font-bold flex items-center justify-center gap-2 shadow-md transition-all active:scale-95 shrink-0"
+                >
+                  <BarChart3 className="w-4 h-4 text-indigo-600" />
+                  <span>{language === 'ar' ? 'عرض التقرير الإحصائي والتفصيلي الكامل' : 'Open Full Detailed Report'}</span>
+                </button>
+              </div>
+
               {/* Analytics Summary Cards */}
               <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3 sm:gap-4">
                 <div className="p-4 bg-purple-50 dark:bg-purple-950/40 rounded-2xl border border-purple-200 dark:border-purple-800">
@@ -959,6 +987,19 @@ export function ReportsPage() {
             </form>
           </div>
         </div>
+      )}
+
+      {/* Comprehensive Detailed Doctors Statistics Modal */}
+      {isDetailedStatsOpen && (
+        <DoctorDetailedStatsModal
+          isOpen={isDetailedStatsOpen}
+          onClose={() => setIsDetailedStatsOpen(false)}
+          doctors={doctorsList}
+          onSelectDoctor={(docId) => {
+            setIsDetailedStatsOpen(false);
+            navigate(`/doctors`);
+          }}
+        />
       )}
     </div>
   );

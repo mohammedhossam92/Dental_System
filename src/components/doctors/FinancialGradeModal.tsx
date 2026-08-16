@@ -7,6 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { AutocompleteInput } from '../common/AutocompleteInput';
 import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
+import { touchDoctorUpdatedAt } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
 interface FinancialGradeModalProps {
@@ -109,6 +110,8 @@ export function FinancialGradeModal({
           .insert([payload]);
         if (error) throw error;
       }
+
+      await touchDoctorUpdatedAt(doctorId);
 
       Swal.fire({
         icon: 'success',

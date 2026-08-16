@@ -7,7 +7,7 @@ import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { AutocompleteInput } from '../common/AutocompleteInput';
 import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
-import { uploadDoctorFile } from '../../utils/doctorUtils';
+import { uploadDoctorFile, touchDoctorUpdatedAt } from '../../utils/doctorUtils';
 import Swal from 'sweetalert2';
 
 interface PromotionModalProps {
@@ -137,6 +137,8 @@ export function PromotionModal({
           .insert([payload]);
         if (error) throw error;
       }
+
+      await touchDoctorUpdatedAt(doctorId);
 
       Swal.fire({
         icon: 'success',

@@ -4,7 +4,7 @@ import { supabase } from '../../lib/supabase';
 import type { DoctorCertificate, University, CertificateType } from '../../types';
 import { useLanguage } from '../../context/LanguageContext';
 import { useAuth } from '../../context/AuthContext';
-import { getCertificateSummary, uploadDoctorFile } from '../../utils/doctorUtils';
+import { getCertificateSummary, uploadDoctorFile, touchDoctorUpdatedAt } from '../../utils/doctorUtils';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { AutocompleteInput } from '../common/AutocompleteInput';
 import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
@@ -274,6 +274,8 @@ export function CertificateFormModal({
           .insert([payload]);
         if (error) throw error;
       }
+
+      await touchDoctorUpdatedAt(doctorId);
 
       Swal.fire({
         icon: 'success',

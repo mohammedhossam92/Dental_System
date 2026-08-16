@@ -314,3 +314,106 @@ export async function uploadDoctorFile(
     };
   }
 }
+
+/**
+ * Find the latest update/create timestamp for a doctor across all relational records
+ */
+export function getDoctorLastUpdated(
+  doctor: any,
+  language: string = 'ar'
+): { formatted: string; relative: string; date: Date | null } {
+  if (!doctor) {
+    return { formatted: language === 'ar' ? 'غير محدد' : 'N/A', relative: '', date: null };
+  }
+
+  const timestamps: number[] = [];
+
+  const addTimestamp = (dateStr?: string | null) => {
+    if (dateStr) {
+      const time = new Date(dateStr).getTime();
+      if (!isNaN(time) && time > 0) {
+        timestamps.push(time);
+      }
+    }
+  };
+
+  addTimestamp(doctor.updated_at);
+  addTimestamp(doctor.created_at);
+
+  if (Array.isArray(doctor.certificates)) {
+    doctor.certificates.forEach((c: any) => {
+      addTimestamp(c.updated_at);
+      addTimestamp(c.created_at);
+    });
+  }
+
+  if (Array.isArray(doctor.promotions)) {
+    doctor.promotions.forEach((p: any) => addTimestamp(p.created_at));
+  }
+
+  if (Array.isArray(doctor.financial_grades)) {
+    doctor.financial_grades.forEach((g: any) => addTimestamp(g.created_at));
+  }
+
+  if (Array.isArray(doctor.employment_history)) {
+    doctor.employment_history.forEach((h: any) => addTimestamp(h.created_at));
+  }
+
+  if (Array.isArray(doctor.documents)) {
+    doctor.documents.forEach((d: any) => addTimestamp(d.created_at));
+  }
+
+  if (timestamps.length === 0) {
+    return { formatted: language === 'ar' ? 'غير متوفر' : 'Not available', relative: '', date: null };
+  }
+
+  const maxTime = Math.max(...timestamps);
+  const date = new Date(maxTime);
+
+  // Formatted date and time string
+  const formatted = date.toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', {
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  // Relative time calculation
+  const now = Date.now();
+  const diffSec = Math.floor((now - maxTime) / 1000);
+  let relative = '';
+
+  if (diffSec < 60) {
+    relative = language === 'ar' ? 'منذ لحظات' : 'just now';
+  } else if (diffSec < 3600) {
+    const min = Math.floor(diffSec / 60);
+    relative = language === 'ar' ? `منذ ${min} دقيقة` : `${min}m ago`;
+  } else if (diffSec < 86400) {
+    const hr = Math.floor(diffSec / 3600);
+    relative = language === 'ar' ? `منذ ${hr} ساعة` : `${hr}h ago`;
+  } else if (diffSec < 2592000) {
+    const days = Math.floor(diffSec / 86400);
+    relative = language === 'ar' ? `منذ ${days} يوم` : `${days}d ago`;
+  } else {
+    relative = formatted;
+  }
+
+  return { formatted, relative, date };
+}
+
+/**
+ * Touch parent doctor's updated_at timestamp in Supabase
+ */
+export async function touchDoctorUpdatedAt(doctorId: string): Promise<void> {
+  if (!doctorId) return;
+  try {
+    await supabase
+      .from('doctors')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', doctorId);
+  } catch (err) {
+    console.warn('Failed to touch doctor updated_at:', err);
+  }
+}
+

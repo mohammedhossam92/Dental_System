@@ -14,7 +14,8 @@ import { useAuth } from '../../context/AuthContext';
 import { WhatsAppButton } from '../common/WhatsAppButton';
 import {
   formatDate, formatMonthYear, formatCertificateDate, getCertificateSummary,
-  getCurrentEmploymentStatus, uploadDoctorFile, formatDisplayValue
+  getCurrentEmploymentStatus, uploadDoctorFile, formatDisplayValue, getDoctorLastUpdated,
+  touchDoctorUpdatedAt
 } from '../../utils/doctorUtils';
 import { DoctorFormModal } from './DoctorFormModal';
 import { CertificateFormModal } from './CertificateFormModal';
@@ -142,6 +143,7 @@ export function DoctorDetailsModal({
       try {
         const { error } = await supabase.from(table).delete().eq('id', id);
         if (error) throw error;
+        await touchDoctorUpdatedAt(doctorId);
         Swal.fire({
           icon: 'success',
           title: t('deleted'),
@@ -192,6 +194,7 @@ export function DoctorDetailsModal({
 
       if (error) throw error;
 
+      await touchDoctorUpdatedAt(doctorId);
       setNewDocTitle('');
       Swal.fire({
         icon: 'success',
@@ -311,6 +314,13 @@ export function DoctorDetailsModal({
                     <span>{t('phone')}:</span>
                     <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong>
                     <WhatsAppButton phone={doctorDetails.phone} size="xs" />
+                  </span>
+                )}
+                {doctorDetails && (
+                  <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/50" title={getDoctorLastUpdated(doctorDetails, language).formatted}>
+                    <Clock className="w-3 h-3 text-indigo-500" />
+                    <span>{language === 'ar' ? 'آخر تعديل:' : 'Last updated:'}</span>
+                    <strong className="font-semibold">{getDoctorLastUpdated(doctorDetails, language).formatted}</strong>
                   </span>
                 )}
               </p>
@@ -508,6 +518,27 @@ export function DoctorDetailsModal({
                     <div className="md:col-span-2 lg:col-span-3">
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('address')}</span>
                       <p className="text-base font-medium text-gray-900 dark:text-white">{formatDisplayValue(doctorDetails?.address, language)}</p>
+                    </div>
+
+                    <div className="md:col-span-2 lg:col-span-3 pt-3 border-t border-gray-200 dark:border-gray-700/60 flex flex-wrap items-center justify-between gap-3 text-xs text-gray-500 dark:text-gray-400">
+                      <div className="flex items-center gap-1.5">
+                        <Calendar className="w-3.5 h-3.5 text-gray-400" />
+                        <span>{language === 'ar' ? 'تاريخ إنشاء السجل:' : 'Record created:'}</span>
+                        <strong className="text-gray-700 dark:text-gray-300 font-mono">
+                          {doctorDetails?.created_at ? new Date(doctorDetails.created_at).toLocaleDateString(language === 'ar' ? 'ar-EG' : 'en-US', { year: 'numeric', month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' }) : (language === 'ar' ? 'غير متوفر' : 'N/A')}
+                        </strong>
+                      </div>
+
+                      <div className="flex items-center gap-1.5">
+                        <Clock className="w-3.5 h-3.5 text-indigo-500" />
+                        <span>{language === 'ar' ? 'آخر تعديل وتحديث للبيانات:' : 'Last modified:'}</span>
+                        <strong className="text-indigo-600 dark:text-indigo-400 font-semibold font-mono">
+                          {doctorDetails ? getDoctorLastUpdated(doctorDetails, language).formatted : ''}
+                        </strong>
+                        {doctorDetails && getDoctorLastUpdated(doctorDetails, language).relative && (
+                          <span className="text-[11px] text-gray-400">({getDoctorLastUpdated(doctorDetails, language).relative})</span>
+                        )}
+                      </div>
                     </div>
 
                     {doctorDetails?.notes && doctorDetails.notes !== 'null' && doctorDetails.notes !== 'undefined' && (

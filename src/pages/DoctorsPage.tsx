@@ -4,7 +4,7 @@ import {
   CheckCircle2, ShieldCheck, ChevronDown, RefreshCw, Layers,
   Phone, CreditCard, Building, Calendar, Edit, Trash2, Eye,
   Sparkles, X, LayoutGrid, List, MapPin, Briefcase, ArrowLeftRight, Globe,
-  GraduationCap, BookOpen, UserCheck
+  GraduationCap, BookOpen, UserCheck, BarChart3
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type {
@@ -23,6 +23,7 @@ import { DoctorFormModal } from '../components/doctors/DoctorFormModal';
 import { DoctorDetailsModal } from '../components/doctors/DoctorDetailsModal';
 import { DoctorExportModal } from '../components/doctors/DoctorExportModal';
 import { DoctorExportDropdown } from '../components/doctors/DoctorExportDropdown';
+import { DoctorDetailedStatsModal } from '../components/doctors/DoctorDetailedStatsModal';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 
@@ -36,8 +37,8 @@ export function DoctorsPage() {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
 
-  // View state
-  const [viewMode, setViewMode] = useState<'table' | 'cards'>('table');
+  // View state - DEFAULT IS CARDS (GRID) FOR BOTH DESKTOP AND MOBILE
+  const [viewMode, setViewMode] = useState<'table' | 'cards'>('cards');
   const [showAdvancedFilters, setShowAdvancedFilters] = useState(false);
 
   // Modals state
@@ -46,6 +47,7 @@ export function DoctorsPage() {
   const [isDetailsOpen, setIsDetailsOpen] = useState(false);
   const [selectedDoctorForExport, setSelectedDoctorForExport] = useState<DoctorWithDetails | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
+  const [isDetailedStatsOpen, setIsDetailedStatsOpen] = useState(false);
 
   // Filter State
   const [filters, setFilters] = useState<DoctorFilterState>({
@@ -543,6 +545,15 @@ export function DoctorsPage() {
         </div>
 
         <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setIsDetailedStatsOpen(true)}
+            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-200 dark:border-purple-800/80 hover:border-purple-300 text-purple-700 dark:text-purple-300 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all hover:shadow hover:scale-[1.02] active:scale-95"
+            title={language === 'ar' ? 'عرض التقرير الإحصائي والتفصيلي للدرجات والتخصصات' : 'View Detailed Statistics & Degrees Report'}
+          >
+            <BarChart3 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-600 dark:text-purple-400" />
+            <span>{language === 'ar' ? 'التقرير الإحصائي والتفصيلي' : 'Detailed Report'}</span>
+          </button>
+
           <button
             onClick={() => {
               setRefreshing(true);
@@ -1618,6 +1629,20 @@ export function DoctorsPage() {
             setSelectedDoctorForExport(null);
           }}
           doctor={selectedDoctorForExport}
+        />
+      )}
+
+      {/* Comprehensive Detailed Degrees, Specialties & Promotions Statistics Modal */}
+      {isDetailedStatsOpen && (
+        <DoctorDetailedStatsModal
+          isOpen={isDetailedStatsOpen}
+          onClose={() => setIsDetailedStatsOpen(false)}
+          doctors={doctors}
+          onSelectDoctor={(docId) => {
+            setIsDetailedStatsOpen(false);
+            setSelectedDoctorId(docId);
+            setIsDetailsOpen(true);
+          }}
         />
       )}
     </div>

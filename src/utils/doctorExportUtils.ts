@@ -671,7 +671,7 @@ export function generateDoctorCardCanvas(doctor: DoctorWithDetails, language: st
 
   const employmentFields: { label: string; val: string; isHighlight?: boolean; highlightColor?: string }[] = [
     { label: isAr ? 'الحالة الوظيفية الحالية' : 'Current Status', val: statusTypeStr },
-    { label: isAr ? 'تاريخ التعيين واستلام العمل' : 'Hire Date', val: formatDate(doctor.hire_date, language) },
+    { label: isAr ? 'تاريخ استلام العمل' : 'Hire Date', val: formatDate(doctor.hire_date, language) },
     { label: isAr ? 'تاريخ التخرج' : 'Graduation Date', val: formatDate(doctor.graduation_date, language) },
     {
       label: isAr ? 'الدرجة المالية الحالية' : 'Financial Grade',
