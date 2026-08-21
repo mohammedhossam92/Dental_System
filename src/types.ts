@@ -268,7 +268,17 @@ export interface DoctorWithDetails extends Doctor {
 
 export interface DoctorFilterState {
   search: string;
-  sortBy?: 'recently_added' | 'oldest' | 'name_asc' | 'name_desc' | 'hire_date_desc' | 'grad_date_desc';
+  sortBy?:
+    | 'recently_added'
+    | 'oldest'
+    | 'name_asc'
+    | 'name_desc'
+    | 'age_desc'
+    | 'age_asc'
+    | 'hire_date_desc'
+    | 'hire_date_asc'
+    | 'grad_date_desc'
+    | 'grad_date_asc';
   confirmationStatus?: 'all' | 'confirmed' | 'unconfirmed';
   dutyStatus?: 'all' | 'active_duty' | 'on_leave';
   employmentStatus: string;

@@ -15,7 +15,7 @@ import { WhatsAppButton } from '../common/WhatsAppButton';
 import {
   formatDate, formatMonthYear, formatCertificateDate, getCertificateSummary,
   getCurrentEmploymentStatus, uploadDoctorFile, formatDisplayValue, getDoctorLastUpdated,
-  touchDoctorUpdatedAt
+  touchDoctorUpdatedAt, getDoctorAge, getDoctorBirthDate
 } from '../../utils/doctorUtils';
 import { DoctorFormModal } from './DoctorFormModal';
 import { CertificateFormModal } from './CertificateFormModal';
@@ -502,7 +502,20 @@ export function DoctorDetailsModal({
 
                     <div>
                       <span className="text-xs font-semibold text-gray-400 block mb-1">{t('birthDate')}</span>
-                      <p className="text-base font-medium text-gray-900 dark:text-white">{formatDate(doctorDetails?.birth_date || null, language)}</p>
+                      <p className="text-base font-medium text-gray-900 dark:text-white">
+                        {formatDate(getDoctorBirthDate(doctorDetails) || doctorDetails?.birth_date || null, language)}
+                        {(() => {
+                          const age = getDoctorAge(doctorDetails);
+                          if (age !== null) {
+                            return (
+                              <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400 mr-2 rtl:mr-2 rtl:ml-0 inline-block">
+                                ({language === 'ar' ? `${age} سنة` : `${age} years old`})
+                              </span>
+                            );
+                          }
+                          return null;
+                        })()}
+                      </p>
                     </div>
 
                     <div>

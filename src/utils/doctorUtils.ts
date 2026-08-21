@@ -113,6 +113,94 @@ export function getYearFromDate(dateString: string | null | undefined): string {
 }
 
 /**
+ * Extract birth date (YYYY-MM-DD) from Egyptian 14-digit National ID
+ */
+export function extractBirthDateFromNationalId(nationalId: string | null | undefined): string | null {
+  if (!nationalId) return null;
+  const clean = String(nationalId).trim();
+  if (clean.length !== 14 || !/^\d{14}$/.test(clean)) return null;
+  const centuryDigit = clean[0];
+  const century = centuryDigit === '2' ? '19' : centuryDigit === '3' ? '20' : null;
+  if (!century) return null;
+  const year = century + clean.substring(1, 3);
+  const month = clean.substring(3, 5);
+  const day = clean.substring(5, 7);
+
+  const m = parseInt(month, 10);
+  const d = parseInt(day, 10);
+  if (m < 1 || m > 12 || d < 1 || d > 31) return null;
+
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Get the effective birth date of a doctor, falling back to national_id if birth_date is not set
+ */
+export function getDoctorBirthDate(doc: { birth_date?: string | null; national_id?: string | null } | null | undefined): string | null {
+  if (!doc) return null;
+  if (doc.birth_date && String(doc.birth_date).trim() && !['null', 'undefined', '---', 'N/A'].includes(String(doc.birth_date).trim())) {
+    return String(doc.birth_date).trim();
+  }
+  return extractBirthDateFromNationalId(doc.national_id);
+}
+
+/**
+ * Get normalized YYYY-MM-DD birth date string for reliable sorting/comparison
+ */
+export function getNormalizedBirthDate(doc: { birth_date?: string | null; national_id?: string | null } | null | undefined): string | null {
+  const bDate = getDoctorBirthDate(doc);
+  if (!bDate) return null;
+
+  const parts = bDate.replace(/[/.]/g, '-').split('-').map((p) => p.trim()).filter(Boolean);
+  if (parts.length === 0) return null;
+  const year = parts[0];
+  if (isNaN(Number(year)) || Number(year) < 1900 || Number(year) > 2100) return null;
+  const month = parts[1] ? parts[1].padStart(2, '0') : '01';
+  const day = parts[2] ? parts[2].padStart(2, '0') : '01';
+  return `${year}-${month}-${day}`;
+}
+
+/**
+ * Calculate age in years from a birth date string (YYYY, YYYY-MM, or YYYY-MM-DD)
+ */
+export function calculateAge(birthDateStr: string | null | undefined): number | null {
+  if (!birthDateStr) return null;
+  const clean = String(birthDateStr).trim();
+  if (!clean || ['null', 'undefined', '---', 'N/A'].includes(clean)) return null;
+
+  const parts = clean.replace(/[/.]/g, '-').split('-').map((p) => p.trim()).filter(Boolean);
+  const year = parseInt(parts[0], 10);
+  if (isNaN(year) || year < 1900 || year > 2100) return null;
+
+  const today = new Date();
+  const currentYear = today.getFullYear();
+  const currentMonth = today.getMonth() + 1; // 1-12
+  const currentDay = today.getDate();
+
+  if (parts.length === 1) {
+    const age = currentYear - year;
+    return age >= 0 ? age : null;
+  }
+
+  const month = parseInt(parts[1], 10) || 1;
+  const day = parts[2] ? parseInt(parts[2], 10) || 1 : 1;
+
+  let age = currentYear - year;
+  if (currentMonth < month || (currentMonth === month && currentDay < day)) {
+    age--;
+  }
+  return age >= 0 ? age : null;
+}
+
+/**
+ * Get calculated age for a doctor
+ */
+export function getDoctorAge(doc: { birth_date?: string | null; national_id?: string | null } | null | undefined): number | null {
+  const bDate = getDoctorBirthDate(doc);
+  return calculateAge(bDate);
+}
+
+/**
  * Format certificate date based on precision / date_mode ('year' vs 'month' vs 'full')
  */
 export function formatCertificateDate(

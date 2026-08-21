@@ -16,7 +16,8 @@ import { useAuth } from '../context/AuthContext';
 import { WhatsAppButton } from '../components/common/WhatsAppButton';
 import {
   getCertificateSummary, getCurrentEmploymentStatus,
-  formatDate, getYearFromDate, formatDisplayValue
+  formatDate, getYearFromDate, formatDisplayValue,
+  getNormalizedBirthDate, getDoctorAge, getDoctorBirthDate
 } from '../utils/doctorUtils';
 import { DEFAULT_CERTIFICATE_TITLES } from '../utils/suggestionUtils';
 import { DoctorFormModal } from '../components/doctors/DoctorFormModal';
@@ -178,7 +179,7 @@ export function DoctorsPage() {
 
   // Filtered Doctors Logic
   const filteredDoctors = useMemo(() => {
-    return doctors.filter((doc) => {
+    const filtered = doctors.filter((doc) => {
       // 0. Filter by Confirmation Status
       if (filters.confirmationStatus && filters.confirmationStatus !== 'all') {
         if (filters.confirmationStatus === 'confirmed' && !doc.is_confirmed) return false;
@@ -309,16 +310,50 @@ export function DoctorsPage() {
         return timeA - timeB;
       }
       if (sortBy === 'name_asc') {
-        return a.name.localeCompare(b.name, 'ar');
+        return (a.name || '').localeCompare(b.name || '', 'ar');
       }
       if (sortBy === 'name_desc') {
-        return b.name.localeCompare(a.name, 'ar');
+        return (b.name || '').localeCompare(a.name || '', 'ar');
+      }
+      if (sortBy === 'age_desc') {
+        const bDateA = getNormalizedBirthDate(a);
+        const bDateB = getNormalizedBirthDate(b);
+        if (!bDateA && !bDateB) return 0;
+        if (!bDateA) return 1;
+        if (!bDateB) return -1;
+        return bDateA.localeCompare(bDateB); // earlier birth date = older doctor first
+      }
+      if (sortBy === 'age_asc') {
+        const bDateA = getNormalizedBirthDate(a);
+        const bDateB = getNormalizedBirthDate(b);
+        if (!bDateA && !bDateB) return 0;
+        if (!bDateA) return 1;
+        if (!bDateB) return -1;
+        return bDateB.localeCompare(bDateA); // later birth date = younger doctor first
       }
       if (sortBy === 'hire_date_desc') {
+        if (!a.hire_date && !b.hire_date) return 0;
+        if (!a.hire_date) return 1;
+        if (!b.hire_date) return -1;
         return (b.hire_date || '').localeCompare(a.hire_date || '');
       }
+      if (sortBy === 'hire_date_asc') {
+        if (!a.hire_date && !b.hire_date) return 0;
+        if (!a.hire_date) return 1;
+        if (!b.hire_date) return -1;
+        return (a.hire_date || '').localeCompare(b.hire_date || '');
+      }
       if (sortBy === 'grad_date_desc') {
+        if (!a.graduation_date && !b.graduation_date) return 0;
+        if (!a.graduation_date) return 1;
+        if (!b.graduation_date) return -1;
         return (b.graduation_date || '').localeCompare(a.graduation_date || '');
+      }
+      if (sortBy === 'grad_date_asc') {
+        if (!a.graduation_date && !b.graduation_date) return 0;
+        if (!a.graduation_date) return 1;
+        if (!b.graduation_date) return -1;
+        return (a.graduation_date || '').localeCompare(b.graduation_date || '');
       }
       return 0;
     });
@@ -859,8 +894,12 @@ export function DoctorsPage() {
                 <option value="oldest">⏳ {language === 'ar' ? 'الأقدم إضافة' : 'Oldest First'}</option>
                 <option value="name_asc">🔤 {language === 'ar' ? 'الاسم (أ - ي)' : 'Name (A to Z)'}</option>
                 <option value="name_desc">🔤 {language === 'ar' ? 'الاسم (ي - أ)' : 'Name (Z to A)'}</option>
+                <option value="age_desc">🎂 {language === 'ar' ? 'السن (الأكبر أولاً)' : 'Age (Oldest First)'}</option>
+                <option value="age_asc">👶 {language === 'ar' ? 'السن (الأصغر أولاً)' : 'Age (Youngest First)'}</option>
                 <option value="hire_date_desc">📅 {language === 'ar' ? 'أحدث استلام عمل' : 'Newest Hire Date'}</option>
+                <option value="hire_date_asc">📅 {language === 'ar' ? 'أقدم استلام عمل' : 'Oldest Hire Date'}</option>
                 <option value="grad_date_desc">🎓 {language === 'ar' ? 'أحدث تخرج' : 'Newest Graduation'}</option>
+                <option value="grad_date_asc">🎓 {language === 'ar' ? 'أقدم تخرج' : 'Oldest Graduation'}</option>
               </select>
             </div>
 
@@ -1308,6 +1347,17 @@ export function DoctorsPage() {
                                   <span>{t('dataConfirmed')}</span>
                                 </span>
                               )}
+                              {(() => {
+                                const age = getDoctorAge(doc);
+                                if (age !== null) {
+                                  return (
+                                    <span className="inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-bold bg-indigo-50 text-indigo-700 dark:bg-indigo-950/50 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800 shrink-0">
+                                      {language === 'ar' ? `${age} سنة` : `${age} yrs`}
+                                    </span>
+                                  );
+                                }
+                                return null;
+                              })()}
                             </div>
                             {doc.address && (
                               <div className="text-xs text-gray-400 flex items-center gap-1 mt-0.5">
@@ -1505,6 +1555,30 @@ export function DoctorsPage() {
                   </div>
 
                   <div className="mt-4 space-y-2 text-xs text-gray-600 dark:text-gray-300">
+                    {(() => {
+                      const docAge = getDoctorAge(doc);
+                      const birthDate = getDoctorBirthDate(doc);
+                      if (docAge !== null || birthDate) {
+                        return (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-3.5 h-3.5 text-indigo-500 shrink-0" />
+                            <div className="flex items-center gap-1.5 flex-wrap">
+                              {docAge !== null && (
+                                <span className="font-bold text-indigo-700 dark:text-indigo-300">
+                                  {language === 'ar' ? `السن: ${docAge} سنة` : `Age: ${docAge} yrs`}
+                                </span>
+                              )}
+                              {birthDate && (
+                                <span className="text-gray-400 text-[11px]">
+                                  ({formatDate(birthDate, language)})
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        );
+                      }
+                      return null;
+                    })()}
                     {doc.national_id && (
                       <div className="flex items-center gap-2">
                         <CreditCard className="w-3.5 h-3.5 text-gray-400" />
