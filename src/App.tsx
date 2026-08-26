@@ -16,6 +16,7 @@ import { AttendancePage } from './pages/AttendancePage';
 import { ProfilePage } from './pages/ProfilePage';
 import { LoginPage } from './pages/LoginPage';
 import { SignUpPage } from './pages/SignUpPage';
+import { DoctorRegistrationPage } from './pages/DoctorRegistrationPage';
 
 function PrivateRoute({ children }: { children: React.ReactNode }) {
   const { user, loading } = useAuth();
@@ -41,6 +42,8 @@ export default function App() {
               <Routes>
                 <Route path="/login" element={<LoginPage />} />
                 <Route path="/signup" element={<SignUpPage />} />
+                <Route path="/register-doctor" element={<DoctorRegistrationPage />} />
+                <Route path="/doctor-registration" element={<DoctorRegistrationPage />} />
                 
                 <Route
                   path="/*"

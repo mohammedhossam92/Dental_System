@@ -4,7 +4,7 @@ import {
   CheckCircle2, ShieldCheck, ChevronDown, RefreshCw, Layers,
   Phone, CreditCard, Building, Calendar, Edit, Trash2, Eye,
   Sparkles, X, LayoutGrid, List, MapPin, Briefcase, ArrowLeftRight, Globe,
-  GraduationCap, BookOpen, UserCheck, BarChart3
+  GraduationCap, BookOpen, UserCheck, BarChart3, Share2
 } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type {
@@ -25,6 +25,7 @@ import { DoctorDetailsModal } from '../components/doctors/DoctorDetailsModal';
 import { DoctorExportModal } from '../components/doctors/DoctorExportModal';
 import { DoctorExportDropdown } from '../components/doctors/DoctorExportDropdown';
 import { DoctorDetailedStatsModal } from '../components/doctors/DoctorDetailedStatsModal';
+import { DoctorShareLinkModal } from '../components/doctors/DoctorShareLinkModal';
 import * as XLSX from 'xlsx';
 import Swal from 'sweetalert2';
 
@@ -49,6 +50,7 @@ export function DoctorsPage() {
   const [selectedDoctorForExport, setSelectedDoctorForExport] = useState<DoctorWithDetails | null>(null);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isDetailedStatsOpen, setIsDetailedStatsOpen] = useState(false);
+  const [isShareLinkOpen, setIsShareLinkOpen] = useState(false);
 
   // Filter State
   const [filters, setFilters] = useState<DoctorFilterState>({
@@ -580,6 +582,15 @@ export function DoctorsPage() {
         </div>
 
         <div className="flex items-center flex-wrap gap-2 w-full sm:w-auto">
+          <button
+            onClick={() => setIsShareLinkOpen(true)}
+            className="px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-teal-50 to-emerald-50 dark:from-teal-950/40 dark:to-emerald-950/40 border border-teal-200 dark:border-teal-800/80 hover:border-teal-300 text-teal-700 dark:text-teal-300 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all hover:shadow hover:scale-[1.02] active:scale-95"
+            title={language === 'ar' ? 'توليد ومشاركة رابط تسجيل بيانات الأطباء' : 'Share Doctor Registration Link'}
+          >
+            <Share2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-teal-600 dark:text-teal-400" />
+            <span>{language === 'ar' ? 'رابط تسجيل الأطباء' : 'Registration Link'}</span>
+          </button>
+
           <button
             onClick={() => setIsDetailedStatsOpen(true)}
             className="px-3 sm:px-4 py-2 sm:py-2.5 bg-gradient-to-r from-purple-50 to-indigo-50 dark:from-purple-950/40 dark:to-indigo-950/40 border border-purple-200 dark:border-purple-800/80 hover:border-purple-300 text-purple-700 dark:text-purple-300 rounded-xl text-xs sm:text-sm font-bold flex items-center gap-1.5 sm:gap-2 shadow-sm transition-all hover:shadow hover:scale-[1.02] active:scale-95"
@@ -1717,6 +1728,14 @@ export function DoctorsPage() {
             setSelectedDoctorId(docId);
             setIsDetailsOpen(true);
           }}
+        />
+      )}
+
+      {/* Doctor Registration Share Link Modal */}
+      {isShareLinkOpen && (
+        <DoctorShareLinkModal
+          isOpen={isShareLinkOpen}
+          onClose={() => setIsShareLinkOpen(false)}
         />
       )}
     </div>
