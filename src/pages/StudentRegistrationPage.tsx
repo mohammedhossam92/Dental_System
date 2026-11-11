@@ -29,6 +29,8 @@ export function StudentRegistrationPage() {
   // Metadata lists from DB
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
   const [workingDaysList, setWorkingDaysList] = useState<WorkingDays[]>([]);
+  const [citySuggestions, setCitySuggestions] = useState<string[]>(DEFAULT_ADDRESS_SUGGESTIONS);
+  const [universitySuggestions, setUniversitySuggestions] = useState<string[]>(DEFAULT_UNIVERSITIES);
   const [loadingMeta, setLoadingMeta] = useState(true);
 
   // Submission state
@@ -45,7 +47,7 @@ export function StudentRegistrationPage() {
   const [university, setUniversity] = useState('');
   const [universityType, setUniversityType] = useState<'حكومي' | 'خاص' | 'اخري'>('حكومي');
   const [classYearId, setClassYearId] = useState<string>(predefinedClassYearId || '');
-  const [workingDaysId, setWorkingDaysId] = useState<string>(''); // Assigned later by administration
+  const workingDaysId = ''; // Assigned later by administration
 
   // Suggestions state
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -60,13 +62,21 @@ export function StudentRegistrationPage() {
       }
       try {
         setLoadingMeta(true);
-        const [cyRes, wdRes] = await Promise.all([
-          supabase.from('class_years').select('*').order('created_at', { ascending: false }),
-          supabase.from('working_days').select('*').order('name', { ascending: true })
+        const [cyRes, wdRes, studentsRes] = await Promise.all([
+          supabase.from('class_years').select('*').eq('organization_id', orgFromUrl).order('created_at', { ascending: false }),
+          supabase.from('working_days').select('*').eq('organization_id', orgFromUrl).order('name', { ascending: true }),
+          supabase.from('students').select('city, university').eq('organization_id', orgFromUrl)
         ]);
 
         if (cyRes.data) setClassYears(cyRes.data);
         if (wdRes.data) setWorkingDaysList(wdRes.data);
+        if (studentsRes.data) {
+          const cities = [...new Set(studentsRes.data.map(student => student.city?.trim()).filter(Boolean))] as string[];
+          const universities = [...new Set(studentsRes.data.map(student => student.university?.trim()).filter(Boolean))] as string[];
+
+          if (cities.length > 0) setCitySuggestions(cities.sort((a, b) => a.localeCompare(b, 'ar')));
+          if (universities.length > 0) setUniversitySuggestions(universities.sort((a, b) => a.localeCompare(b, 'ar')));
+        }
       } catch (err) {
         console.error('Error fetching registration metadata:', err);
       } finally {
@@ -105,14 +115,14 @@ export function StudentRegistrationPage() {
 
   // Filtered dropdown suggestions
   const filteredCities = useMemo(() => {
-    if (!city.trim()) return DEFAULT_ADDRESS_SUGGESTIONS;
-    return DEFAULT_ADDRESS_SUGGESTIONS.filter(c => c.toLowerCase().includes(city.toLowerCase()));
-  }, [city]);
+    if (!city.trim()) return citySuggestions;
+    return citySuggestions.filter(c => c.toLowerCase().includes(city.toLowerCase()));
+  }, [city, citySuggestions]);
 
   const filteredUniversities = useMemo(() => {
-    if (!university.trim()) return DEFAULT_UNIVERSITIES;
-    return DEFAULT_UNIVERSITIES.filter(u => u.toLowerCase().includes(university.toLowerCase()));
-  }, [university]);
+    if (!university.trim()) return universitySuggestions;
+    return universitySuggestions.filter(u => u.toLowerCase().includes(university.toLowerCase()));
+  }, [university, universitySuggestions]);
 
   // LINK EXPIRED SCREEN
   if (isLinkExpired) {
@@ -193,23 +203,6 @@ export function StudentRegistrationPage() {
             </div>
           </div>
 
-          <div className="pt-2 flex justify-center">
-            <button
-              onClick={() => {
-                setSubmittedSuccess(false);
-                setName('');
-                setMobile('');
-                setNationalId('');
-                setBirthDate('');
-                setCity('');
-                setUniversity('');
-                setWorkingDaysId('');
-              }}
-              className="inline-flex items-center gap-2 px-6 py-2.5 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl font-bold text-xs shadow-md shadow-indigo-600/20 active:scale-95 transition-all"
-            >
-              <span>تسجيل طالب آخر</span>
-            </button>
-          </div>
         </div>
       </div>
     );

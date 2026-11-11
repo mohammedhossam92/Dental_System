@@ -3,9 +3,11 @@ import { supabase } from '../lib/supabase';
 import type { WorkingDays, ToothClass, Treatment, ClassYear, Student, University, CertificateType } from '../types';
 import { Trash2, Plus, X, Users, Settings, Edit3, RotateCcw, Building, Award } from 'lucide-react';
 import { useLanguage } from '../context/LanguageContext';
+import { useAuth } from '../context/AuthContext';
 
 export function SettingsPage() {
   const { t, language } = useLanguage();
+  const { organizationId } = useAuth();
   const [workingDays, setWorkingDays] = useState<WorkingDays[]>([]);
   const [toothClasses, setToothClasses] = useState<ToothClass[]>([]);
   const [treatments, setTreatments] = useState<Treatment[]>([]);
@@ -76,7 +78,7 @@ export function SettingsPage() {
         supabase.from('working_days').select('*'),
         supabase.from('tooth_classes').select('*'),
         supabase.from('treatments').select('*'),
-        supabase.from('class_years').select('*'),
+        supabase.from('class_years').select('*').eq('organization_id', organizationId),
         supabase.from('universities').select('*').order('name'),
         supabase.from('certificate_types').select('*').order('name')
       ]);
@@ -411,7 +413,7 @@ export function SettingsPage() {
       } else {
         const { error } = await supabase
           .from('class_years')
-          .insert([{ year_range: yearRange }]);
+          .insert([{ year_range: yearRange, organization_id: organizationId }]);
         if (error) throw error;
       }
 
