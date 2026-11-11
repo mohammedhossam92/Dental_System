@@ -3108,6 +3108,11 @@ export function StudentsPage() {
                         </span>
                       </td>
                     )}
+                    {selectedColumns.includes('registration_end_date') && (
+                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
+                        {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
+                      </td>
+                    )}
                     {selectedColumns.includes('absences') && (
                       <td className="px-4 sm:px-6 py-4 whitespace-nowrap">
                         <button
@@ -3122,11 +3127,6 @@ export function StudentsPage() {
                           <CalendarX className="h-3.5 w-3.5 text-rose-500" />
                           <span>{studentAbsenceStats[student.id]?.totalWeight || 0} days</span>
                         </button>
-                      </td>
-                    )}
-                    {selectedColumns.includes('registration_end_date') && (
-                      <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm text-gray-500 dark:text-gray-400">
-                        {student.registration_end_date ? new Date(student.registration_end_date).toLocaleDateString('en-GB') : 'N/A'}
                       </td>
                     )}
                     <td className="px-4 sm:px-6 py-4 whitespace-nowrap text-sm space-x-2">
