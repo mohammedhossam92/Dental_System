@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useMemo } from 'react';
 import {
   X, Copy, Check, Share2, ExternalLink, QrCode,
-  Sparkles, GraduationCap, Shield, MessageCircle, RefreshCw, Clock, Layers
+  Sparkles, GraduationCap, Shield, MessageCircle, RefreshCw, Clock, Layers, Calendar
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
 import { useLanguage } from '../../context/LanguageContext';
@@ -42,6 +42,7 @@ export function StudentShareLinkModal({
   // Configuration options chosen before generating / copying
   const [expiresInHours, setExpiresInHours] = useState<number | null>(168); // 7 days default
   const [selectedClassYearId, setSelectedClassYearId] = useState<string>(initialClassYearId || '');
+  const [registrationStartDate, setRegistrationStartDate] = useState('');
 
   useEffect(() => {
     if (initialClassYearId) {
@@ -67,8 +68,9 @@ export function StudentShareLinkModal({
       type: 'std_reg',
       expiresInHours,
       classYearId: selectedClassYearId || null,
+      registrationStartDate: registrationStartDate || null,
     });
-  }, [organizationId, expiresInHours, selectedClassYearId]);
+  }, [organizationId, expiresInHours, selectedClassYearId, registrationStartDate]);
 
   const registrationUrl = useMemo(() => {
     const appOrigin = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin)
@@ -269,7 +271,26 @@ export function StudentShareLinkModal({
               </p>
             </div>
 
-            {/* 2. Expiry Period Selector */}
+            {/* 2. Predefined Registration Start Date */}
+            <div className="pt-2 border-t border-indigo-200/70 dark:border-indigo-800/50">
+              <label className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5 mb-1.5">
+                <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400 shrink-0" />
+                <span>{language === 'ar' ? 'تاريخ بدء التسجيل مسبقاً:' : 'Predefined Registration Start Date:'}</span>
+              </label>
+              <input
+                type="date"
+                value={registrationStartDate}
+                onChange={(e) => setRegistrationStartDate(e.target.value)}
+                className="w-full p-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-700 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
+              />
+              <p className="text-[10.5px] text-indigo-700/80 dark:text-indigo-300/80 mt-1">
+                {language === 'ar'
+                  ? 'سيتم حفظ هذا التاريخ تلقائياً للطالب عند التسجيل عبر الرابط.'
+                  : 'This date will be saved automatically for students registering through this link.'}
+              </p>
+            </div>
+
+            {/* 3. Expiry Period Selector */}
             <div className="pt-2 border-t border-indigo-200/70 dark:border-indigo-800/50">
               <div className="flex items-center justify-between gap-2 mb-2">
                 <label className="text-xs font-bold text-indigo-950 dark:text-indigo-200 flex items-center gap-1.5">

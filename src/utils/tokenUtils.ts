@@ -11,6 +11,7 @@ export interface TokenOptions {
   expiresInHours?: number | null; // e.g. 1, 6, 24, 72, 168, 720, or null/undefined for never
   expiresAt?: number | null; // absolute timestamp in ms
   classYearId?: string | null; // predefined class year for student registration
+  registrationStartDate?: string | null; // predefined registration start date for student registration
 }
 
 export interface TokenPayload {
@@ -19,6 +20,7 @@ export interface TokenPayload {
   c: number; // created at (timestamp in ms)
   exp?: number | null; // expiration at (timestamp in ms)
   y?: string | null; // predefined class year ID
+  rs?: string | null; // predefined registration start date (YYYY-MM-DD)
 }
 
 export interface TokenVerificationResult {
@@ -28,6 +30,7 @@ export interface TokenVerificationResult {
   expiresAt: Date | null;
   type: RegistrationTokenType;
   classYearId: string | null;
+  registrationStartDate: string | null;
   error?: 'INVALID' | 'EXPIRED' | 'MISSING';
 }
 
@@ -63,6 +66,10 @@ export function encodeOrgToken(
 
     if (options?.classYearId && options.classYearId.trim()) {
       payload.y = options.classYearId.trim();
+    }
+
+    if (options?.registrationStartDate && options.registrationStartDate.trim()) {
+      payload.rs = options.registrationStartDate.trim();
     }
 
     const json = JSON.stringify(payload);
@@ -142,6 +149,7 @@ export function verifyOrgToken(tokenOrId: string | null | undefined): TokenVerif
       expiresAt: null,
       type: 'doc_reg',
       classYearId: null,
+      registrationStartDate: null,
       error: 'MISSING',
     };
   }
@@ -158,6 +166,7 @@ export function verifyOrgToken(tokenOrId: string | null | undefined): TokenVerif
       expiresAt: null,
       type: 'doc_reg',
       classYearId: null,
+      registrationStartDate: null,
     };
   }
 
@@ -172,6 +181,7 @@ export function verifyOrgToken(tokenOrId: string | null | undefined): TokenVerif
         expiresAt: null,
         type: 'doc_reg',
         classYearId: null,
+        registrationStartDate: null,
       };
     }
     return {
@@ -195,6 +205,7 @@ export function verifyOrgToken(tokenOrId: string | null | undefined): TokenVerif
     expiresAt,
     type: parsed.t || (clean.startsWith('sreg_') ? 'std_reg' : 'doc_reg'),
     classYearId: parsed.y || null,
+    registrationStartDate: parsed.rs || null,
     error: isExpired ? 'EXPIRED' : undefined,
   };
 }

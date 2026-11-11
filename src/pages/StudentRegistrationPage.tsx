@@ -27,6 +27,7 @@ export function StudentRegistrationPage() {
   const orgFromUrl = tokenResult.organizationId;
   const isLinkExpired = tokenResult.isExpired;
   const predefinedClassYearId = tokenResult.classYearId;
+  const predefinedRegistrationStartDate = tokenResult.registrationStartDate;
 
   // Metadata lists from DB
   const [classYears, setClassYears] = useState<ClassYear[]>([]);
@@ -309,6 +310,7 @@ export function StudentRegistrationPage() {
         university_type: universityType,
         working_days_id: null,
         class_year_id: predefinedClassYearId || null,
+        registration_start_date: predefinedRegistrationStartDate || null,
         organization_id: orgFromUrl,
         registration_status: 'pending',
         is_available: true,
