@@ -4996,6 +4996,13 @@ export function StudentsPage() {
           </div>
         </div>
       )}
+
+      <StudentShareLinkModal
+        isOpen={isShareModalOpen}
+        onClose={() => setIsShareModalOpen(false)}
+        classYears={classYears}
+        initialClassYearId={selectedClassYearFilter === 'all' ? null : selectedClassYearFilter}
+      />
     </div>
   );
 }
