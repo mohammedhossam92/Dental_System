@@ -64,7 +64,11 @@ export function StudentShareLinkModal({
   }, [organizationId, expiresInHours, selectedClassYearId]);
 
   const registrationUrl = useMemo(() => {
-    return `${window.location.origin}/register-student${
+    const appOrigin = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin)
+      .trim()
+      .replace(/\/+$/, '');
+
+    return `${appOrigin}/register-student${
       token ? `?token=${encodeURIComponent(token)}` : ''
     }`;
   }, [token]);

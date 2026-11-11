@@ -42,7 +42,11 @@ export function DoctorShareLinkModal({ isOpen, onClose }: DoctorShareLinkModalPr
   }, [organizationId, expiresInHours]);
 
   const registrationUrl = useMemo(() => {
-    return `${window.location.origin}/register-doctor${
+    const appOrigin = (import.meta.env.VITE_PUBLIC_APP_URL || window.location.origin)
+      .trim()
+      .replace(/\/+$/, '');
+
+    return `${appOrigin}/register-doctor${
       token ? `?token=${encodeURIComponent(token)}` : ''
     }`;
   }, [token]);
