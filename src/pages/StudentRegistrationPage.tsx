@@ -13,6 +13,8 @@ import { extractBirthDateFromNationalId, calculateAge } from '../utils/doctorUti
 import { DEFAULT_UNIVERSITIES, DEFAULT_ADDRESS_SUGGESTIONS } from '../utils/suggestionUtils';
 import Swal from 'sweetalert2';
 
+const OTHER_OPTION = '__other__';
+
 export function StudentRegistrationPage() {
   const [searchParams] = useSearchParams();
   const tokenParam = searchParams.get('token');
@@ -45,13 +47,11 @@ export function StudentRegistrationPage() {
   const [birthDate, setBirthDate] = useState('');
   const [city, setCity] = useState('');
   const [university, setUniversity] = useState('');
+  const [cityChoice, setCityChoice] = useState('');
+  const [universityChoice, setUniversityChoice] = useState('');
   const [universityType, setUniversityType] = useState<'حكومي' | 'خاص' | 'اخري'>('حكومي');
   const [classYearId, setClassYearId] = useState<string>(predefinedClassYearId || '');
   const workingDaysId = ''; // Assigned later by administration
-
-  // Suggestions state
-  const [showCityDropdown, setShowCityDropdown] = useState(false);
-  const [showUnivDropdown, setShowUnivDropdown] = useState(false);
 
   // Fetch Class Years and Working Days
   useEffect(() => {
@@ -112,17 +112,6 @@ export function StudentRegistrationPage() {
   const predefinedClassYearObj = useMemo(() => {
     return classYears.find(cy => cy.id === predefinedClassYearId) || null;
   }, [classYears, predefinedClassYearId]);
-
-  // Filtered dropdown suggestions
-  const filteredCities = useMemo(() => {
-    if (!city.trim()) return citySuggestions;
-    return citySuggestions.filter(c => c.toLowerCase().includes(city.toLowerCase()));
-  }, [city, citySuggestions]);
-
-  const filteredUniversities = useMemo(() => {
-    if (!university.trim()) return universitySuggestions;
-    return universitySuggestions.filter(u => u.toLowerCase().includes(university.toLowerCase()));
-  }, [university, universitySuggestions]);
 
   // LINK EXPIRED SCREEN
   if (isLinkExpired) {
@@ -486,80 +475,70 @@ export function StudentRegistrationPage() {
               </div>
 
               {/* City / Governorate */}
-              <div className="relative">
+              <div>
                 <label className="block text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
                   المحافظة / المدينة <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <MapPin className="absolute right-3.5 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <select
+                    required
+                    value={cityChoice}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setCityChoice(value);
+                      setCity(value === OTHER_OPTION ? '' : value);
+                    }}
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  >
+                    <option value="" disabled>-- اختر المدينة / المحافظة --</option>
+                    {citySuggestions.map((suggestion) => <option key={suggestion} value={suggestion}>{suggestion}</option>)}
+                    <option value={OTHER_OPTION}>أخرى (اكتب مدينة جديدة)</option>
+                  </select>
+                </div>
+                {cityChoice === OTHER_OPTION && (
                   <input
                     type="text"
                     required
                     value={city}
-                    onChange={(e) => {
-                      setCity(e.target.value);
-                      setShowCityDropdown(true);
-                    }}
-                    onFocus={() => setShowCityDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowCityDropdown(false), 200)}
-                    placeholder="المنصورة / القاهرة"
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    onChange={(e) => setCity(e.target.value)}
+                    placeholder="اكتب المدينة أو المحافظة"
+                    className="w-full mt-2 px-3.5 py-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
-                </div>
-                {showCityDropdown && filteredCities.length > 0 && (
-                  <ul className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-auto text-xs sm:text-sm">
-                    {filteredCities.map((c, i) => (
-                      <li
-                        key={i}
-                        onMouseDown={() => {
-                          setCity(c);
-                          setShowCityDropdown(false);
-                        }}
-                        className="px-3.5 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        {c}
-                      </li>
-                    ))}
-                  </ul>
                 )}
               </div>
 
               {/* University */}
-              <div className="relative">
+              <div>
                 <label className="block text-xs sm:text-sm font-bold text-gray-800 dark:text-gray-200 mb-1.5">
                   الجامعة / الكلية <span className="text-rose-500">*</span>
                 </label>
                 <div className="relative">
                   <Building className="absolute right-3.5 top-3 w-4 h-4 text-gray-400 pointer-events-none" />
+                  <select
+                    required
+                    value={universityChoice}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      setUniversityChoice(value);
+                      setUniversity(value === OTHER_OPTION ? '' : value);
+                    }}
+                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  >
+                    <option value="" disabled>-- اختر الجامعة / الكلية --</option>
+                    {universitySuggestions.map((suggestion) => <option key={suggestion} value={suggestion}>{suggestion}</option>)}
+                    <option value={OTHER_OPTION}>أخرى (اكتب جامعة أو كلية جديدة)</option>
+                  </select>
+                </div>
+                {universityChoice === OTHER_OPTION && (
                   <input
                     type="text"
                     required
                     value={university}
-                    onChange={(e) => {
-                      setUniversity(e.target.value);
-                      setShowUnivDropdown(true);
-                    }}
-                    onFocus={() => setShowUnivDropdown(true)}
-                    onBlur={() => setTimeout(() => setShowUnivDropdown(false), 200)}
-                    placeholder="جامعة المنصورة"
-                    className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    onChange={(e) => setUniversity(e.target.value)}
+                    placeholder="اكتب اسم الجامعة أو الكلية"
+                    className="w-full mt-2 px-3.5 py-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none"
                   />
-                </div>
-                {showUnivDropdown && filteredUniversities.length > 0 && (
-                  <ul className="absolute z-20 w-full mt-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-xl shadow-lg max-h-40 overflow-auto text-xs sm:text-sm">
-                    {filteredUniversities.map((u, i) => (
-                      <li
-                        key={i}
-                        onMouseDown={() => {
-                          setUniversity(u);
-                          setShowUnivDropdown(false);
-                        }}
-                        className="px-3.5 py-2 cursor-pointer hover:bg-indigo-50 dark:hover:bg-gray-700 transition-colors"
-                      >
-                        {u}
-                      </li>
-                    ))}
-                  </ul>
                 )}
               </div>
 
