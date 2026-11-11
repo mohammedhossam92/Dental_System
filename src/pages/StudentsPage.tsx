@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { useSearchParams } from 'react-router-dom';
-import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare, CalendarX, Calendar, AlertTriangle, Layers, FileCheck, CheckCircle2, XCircle, Clock } from 'lucide-react';
+import { Plus, Upload, Search, X, Filter, Edit, Trash2, Info, ChevronDown, ArrowUp, ArrowDown, Download, FileText, MessageSquare, CalendarX, Calendar, AlertTriangle, Layers, FileCheck, CheckCircle2, XCircle, Clock, Share2, CreditCard } from 'lucide-react';
 import { supabase } from '../lib/supabase';
 import type { Student, WorkingDays, ClassYear, StudentWithDetails, Patient, Treatment, ToothClass, StudentRegistrationPeriod, StudentNote, StudentAbsence, StudentAbsenceExcuse } from '../types';
 import * as XLSX from 'xlsx';
@@ -8,7 +8,9 @@ import { useAuth } from '../context/AuthContext';
 import Swal from 'sweetalert2';
 import { DentalChartPicker } from '../components/DentalChartPicker';
 import { useLanguage } from '../context/LanguageContext';
-import { formatWhatsAppUrl } from '../utils/phoneUtils';
+import { formatWhatsAppUrl, cleanPhoneNumber, isValid11DigitPhone } from '../utils/phoneUtils';
+import { extractBirthDateFromNationalId, calculateAge, formatDate } from '../utils/doctorUtils';
+import { StudentShareLinkModal } from '../components/students/StudentShareLinkModal';
 
 type StudentForm = Omit<Student, 'id' | 'patients_in_progress' | 'patients_completed' | 'created_at' | 'is_available'>;
 
@@ -675,6 +677,8 @@ export function StudentsPage() {
     return Array.from(new Set(dates)).sort();
   }, [students]);
 
+  const [isShareModalOpen, setIsShareModalOpen] = useState(false);
+
   const [newStudent, setNewStudent] = useState<StudentForm>({
     name: '',
     mobile: '',
@@ -687,6 +691,8 @@ export function StudentsPage() {
     registration_status: 'pending',
     registration_start_date: null,
     registration_end_date: null,
+    birth_date: null,
+    national_id: '',
   });
   const [selectedStudentPeriods, setSelectedStudentPeriods] = useState<StudentRegistrationPeriod[]>([]);
   const [periodForm, setPeriodForm] = useState<{ start_date: string; end_date: string }>({ start_date: '', end_date: '' });
@@ -695,6 +701,8 @@ export function StudentsPage() {
   const availableColumns = [
     { id: 'name', label: 'Name' },
     { id: 'mobile', label: 'Mobile' },
+    { id: 'national_id', label: 'National ID' },
+    { id: 'birth_date', label: 'Birth Date' },
     { id: 'city', label: 'City' },
     { id: 'university', label: 'University' },
     { id: 'university_type', label: 'University Type' }, // <-- Added
@@ -903,19 +911,36 @@ export function StudentsPage() {
     if (nameWords.length < 4) {
       await Swal.fire({
         icon: 'error',
-        title: 'Invalid Name',
-        text: 'Name must contain at least 4 words',
+        title: language === 'ar' ? 'الاسم غير مكتمل' : 'Invalid Name',
+        text: language === 'ar' ? 'يجب أن يتكون الاسم من 4 أسماء على الأقل' : 'Name must contain at least 4 words',
         confirmButtonColor: '#4f46e5',
       });
       return;
     }
 
-    // Validate mobile number is exactly 11 digits
-    if (!/^\d{11}$/.test(newStudent.mobile)) {
+    // Validate mobile number is exactly 11 digits (checker for phone number)
+    const cleanMobile = cleanPhoneNumber(newStudent.mobile);
+    if (!cleanMobile || !isValid11DigitPhone(cleanMobile)) {
       await Swal.fire({
         icon: 'error',
-        title: 'Invalid Mobile',
-        text: 'Mobile number must be exactly 11 digits',
+        title: language === 'ar' ? 'رقم الهاتف غير صحيح' : 'Invalid Mobile',
+        text: language === 'ar'
+          ? `يجب أن يتكون رقم الموبايل من 11 رقماً بالضبط (أدخلت ${cleanMobile.length} رقماً - مثال: 01012345678)`
+          : `Mobile number must be exactly 11 digits (entered ${cleanMobile.length})`,
+        confirmButtonColor: '#4f46e5',
+      });
+      return;
+    }
+
+    // Validate national ID if provided (optional - 14 digits)
+    const cleanNatId = cleanPhoneNumber(newStudent.national_id);
+    if (cleanNatId && (cleanNatId.length !== 14 || !/^\d{14}$/.test(cleanNatId))) {
+      await Swal.fire({
+        icon: 'error',
+        title: language === 'ar' ? 'الرقم القومي غير صحيح' : 'Invalid National ID',
+        text: language === 'ar'
+          ? `الرقم القومي اختياري، ولكن عند إدخاله يجب أن يتكون من 14 رقماً بالضبط (أدخلت ${cleanNatId.length} رقماً)`
+          : `National ID must be exactly 14 digits (entered ${cleanNatId.length})`,
         confirmButtonColor: '#4f46e5',
       });
       return;
@@ -926,28 +951,27 @@ export function StudentsPage() {
       const { data: existingMobile } = await supabase
         .from('students')
         .select('id')
-        .eq('mobile', newStudent.mobile)
+        .eq('mobile', cleanMobile)
         .eq('organization_id', organizationId)
         .maybeSingle();
 
       if (existingMobile) {
         await Swal.fire({
           icon: 'error',
-          title: 'Duplicate Mobile',
-          text: 'This mobile number is already registered',
+          title: language === 'ar' ? 'رقم الهاتف مسجل مسبقاً' : 'Duplicate Mobile',
+          text: language === 'ar' ? 'رقم الموبايل مسجل بالفعل لطالب آخر' : 'This mobile number is already registered',
           confirmButtonColor: '#4f46e5',
         });
         return;
       }
     }
 
-    // Validate required fields
+    // Validate required fields (working_days_id can be null and chosen later)
     const requiredFields = [
       { field: 'name', label: 'Name' },
       { field: 'mobile', label: 'Mobile' },
       { field: 'city', label: 'City' },
       { field: 'university', label: 'University' },
-      { field: 'working_days_id', label: 'Working Days' },
     ];
 
     for (const { field, label } of requiredFields) {
@@ -991,13 +1015,17 @@ export function StudentsPage() {
           : new Date().toISOString())
       : null;
 
-    const studentData = {
+    const studentData: any = {
       ...newStudent,
+      mobile: cleanMobile,
+      working_days_id: newStudent.working_days_id || null, // Can be null and chosen later
+      class_year_id: newStudent.class_year_id || null,
+      birth_date: newStudent.birth_date ? newStudent.birth_date : null,
+      national_id: cleanNatId || null,
       organization_id: organizationId,
       registration_start_date: newStudent.registration_status === 'registered' ? newStudent.registration_start_date || null : null,
       registration_end_date: newStudent.registration_status === 'registered' ? newStudent.registration_end_date : null,
       unregistered_at: unregisteredAt,
-      // Remove is_available
     };
 
     try {
@@ -1010,13 +1038,25 @@ export function StudentsPage() {
           );
         }
 
-        const { error } = await supabase
+        let updateRes = await supabase
           .from('students')
           .update(studentData)
           .eq('id', selectedStudent.id)
           .eq('organization_id', organizationId);
 
-        if (error) throw error;
+        // Defensive fallback if birth_date or national_id column does not exist yet
+        if (updateRes.error && (updateRes.error.code === '42703' || updateRes.error.message?.includes('national_id') || updateRes.error.message?.includes('birth_date'))) {
+          const fallbackData = { ...studentData };
+          delete fallbackData.birth_date;
+          delete fallbackData.national_id;
+          updateRes = await supabase
+            .from('students')
+            .update(fallbackData)
+            .eq('id', selectedStudent.id)
+            .eq('organization_id', organizationId);
+        }
+
+        if (updateRes.error) throw updateRes.error;
 
         await Swal.fire({
           title: 'Success!',
@@ -1026,11 +1066,21 @@ export function StudentsPage() {
           timer: 2000
         });
       } else {
-        const { error } = await supabase
+        let insertRes = await supabase
           .from('students')
           .insert([studentData]);
 
-        if (error) throw error;
+        // Defensive fallback if birth_date or national_id column does not exist yet
+        if (insertRes.error && (insertRes.error.code === '42703' || insertRes.error.message?.includes('national_id') || insertRes.error.message?.includes('birth_date'))) {
+          const fallbackData = { ...studentData };
+          delete fallbackData.birth_date;
+          delete fallbackData.national_id;
+          insertRes = await supabase
+            .from('students')
+            .insert([fallbackData]);
+        }
+
+        if (insertRes.error) throw insertRes.error;
 
         await Swal.fire({
           title: 'Success!',
@@ -1068,6 +1118,8 @@ export function StudentsPage() {
       registration_status: 'pending',
       registration_start_date: null,
       registration_end_date: null,
+      birth_date: null,
+      national_id: '',
       // Remove is_available
     });
     setIsEditMode(false);
@@ -1207,6 +1259,8 @@ export function StudentsPage() {
     const headers = [
       'Name',
       'Mobile',
+      'National ID',
+      'Birth Date',
       'City',
       'University',
       'University Type',
@@ -1223,10 +1277,12 @@ export function StudentsPage() {
     const rows = data.map(student => [
       student.name,
       student.mobile,
+      student.national_id || '',
+      student.birth_date || '',
       student.city || '',
       student.university || '',
       student.university_type || '',
-      (student.working_days_id && workingDaysMap.get(student.working_days_id)) || '',
+      (student.working_days_id && workingDaysMap.get(student.working_days_id)) || (language === 'ar' ? 'غير محدد' : 'Unassigned'),
       (student.class_year_id && classYearsMap.get(student.class_year_id)) || '',
       student.registration_status,
       student.registration_start_date ? new Date(student.registration_start_date).toISOString().split('T')[0] : '',
@@ -1342,29 +1398,34 @@ export function StudentsPage() {
           const classYearName = row['Class Year'] || '';
           const classYearId = classYearsMap.get(classYearName) || '';
 
+          const natIdRaw = row['National ID'] || row['الرقم القومي'] || '';
+          const cleanNat = cleanPhoneNumber(String(natIdRaw));
+          const birthRaw = row['Birth Date'] || row['تاريخ الميلاد'] || null;
+
           return {
             name: row['Name'] || '',
-            mobile: row['Mobile'] || '',
+            mobile: cleanPhoneNumber(String(row['Mobile'] || '')),
             city: row['City'] || '',
             university: row['University'] || '',
             university_type: row['University Type'] || 'حكومي',
-            working_days_id: workingDaysId,
-            class_year_id: classYearId,
+            working_days_id: workingDaysId || null,
+            class_year_id: classYearId || null,
             organization_id: organizationId,
             registration_status: row['Registration Status'] || 'registered',
             registration_start_date: row['Registration Start Date'] || null,
             registration_end_date: row['Registration End Date'] || null,
-            unregistered_at: (row['Registration Status'] || 'registered') === 'unregistered' ? new Date().toISOString() : null
+            unregistered_at: (row['Registration Status'] || 'registered') === 'unregistered' ? new Date().toISOString() : null,
+            birth_date: birthRaw ? String(birthRaw).trim() : null,
+            national_id: cleanNat ? cleanNat : null,
           };
         });
 
-        // Validate students data
+        // Validate students data (working_days_id is optional and can be chosen later)
         const invalidStudents = students.filter(student =>
           !student.name ||
           !student.mobile ||
           !student.city ||
-          !student.university ||
-          !student.working_days_id
+          !student.university
         );
 
         if (invalidStudents.length > 0) {
@@ -1380,8 +1441,7 @@ export function StudentsPage() {
             student.name &&
             student.mobile &&
             student.city &&
-            student.university &&
-            student.working_days_id
+            student.university
           );
 
           if (validStudents.length === 0) {
@@ -1416,11 +1476,21 @@ export function StudentsPage() {
           }
 
           // Insert valid students
-          const { error } = await supabase
+          let insertRes = await supabase
             .from('students')
             .insert(validStudents);
 
-          if (error) throw error;
+          if (insertRes.error && (insertRes.error.code === '42703' || insertRes.error.message?.includes('national_id') || insertRes.error.message?.includes('birth_date'))) {
+            const fallbackStudents = validStudents.map(s => {
+              const copy: any = { ...s };
+              delete copy.birth_date;
+              delete copy.national_id;
+              return copy;
+            });
+            insertRes = await supabase.from('students').insert(fallbackStudents);
+          }
+
+          if (insertRes.error) throw insertRes.error;
 
           memoizedFetchData();
           event.target.value = '';
@@ -2030,6 +2100,8 @@ export function StudentsPage() {
       registration_status: student.registration_status || 'pending',
       registration_start_date: student.registration_start_date || latestPeriod?.start_date || null,
       registration_end_date: student.registration_end_date || latestPeriod?.end_date || null,
+      birth_date: student.birth_date || null,
+      national_id: student.national_id || '',
       // Remove is_available
     });
     setSelectedStudent(student);
@@ -2365,6 +2437,14 @@ export function StudentsPage() {
               </div>
             )}
           </div>
+
+          <button
+            onClick={() => setIsShareModalOpen(true)}
+            className="flex-1 sm:flex-none flex items-center justify-center px-4 py-2 bg-emerald-600 text-white rounded-md hover:bg-emerald-700 transition-colors duration-200"
+          >
+            <Share2 className="h-5 w-5 mr-2 ml-2" />
+            {language === 'ar' ? 'مشاركة رابط التسجيل' : 'Share Registration Link'}
+          </button>
 
           <button
             onClick={() => {
@@ -3266,6 +3346,51 @@ export function StudentsPage() {
                     inputMode="numeric"
                   />
                   <p className="text-xs text-gray-500 mt-1">Mobile number must be exactly 11 digits</p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {language === 'ar' ? 'الرقم القومي' : 'National ID'}
+                    <span className="ml-1 text-xs text-gray-400 font-normal">({language === 'ar' ? 'اختياري' : 'optional'})</span>
+                  </label>
+                  <input
+                    type="text"
+                    inputMode="numeric"
+                    value={newStudent.national_id || ''}
+                    onChange={(e) => {
+                      const val = e.target.value.replace(/\D/g, '').slice(0, 14);
+                      const updated = { ...newStudent, national_id: val };
+                      if (val.length === 14) {
+                        const bd = extractBirthDateFromNationalId(val);
+                        if (bd) updated.birth_date = bd;
+                      }
+                      setNewStudent(updated);
+                    }}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base font-mono"
+                    placeholder={language === 'ar' ? 'أدخل الرقم القومي (14 رقم)' : 'Enter 14-digit national ID'}
+                    maxLength={14}
+                  />
+                  <p className="text-xs text-gray-500 mt-1">
+                    {language === 'ar' ? 'يجب أن يكون 14 رقم إذا تم إدخاله' : 'Must be exactly 14 digits if provided'}
+                  </p>
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                    {language === 'ar' ? 'تاريخ الميلاد' : 'Date of Birth'}
+                    <span className="ml-1 text-xs text-gray-400 font-normal">({language === 'ar' ? 'اختياري' : 'optional'})</span>
+                  </label>
+                  <input
+                    type="date"
+                    value={toDateInputValue(newStudent.birth_date)}
+                    onChange={(e) => setNewStudent({ ...newStudent, birth_date: e.target.value || null })}
+                    className="w-full p-2 sm:p-2.5 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm sm:text-base"
+                  />
+                  {newStudent.birth_date && (
+                    <p className="text-xs text-indigo-500 mt-1">
+                      {language === 'ar' ? 'العمر:' : 'Age:'} {calculateAge(newStudent.birth_date)} {language === 'ar' ? 'سنة' : 'years'}
+                    </p>
+                  )}
                 </div>
 
                 <div className="relative">

@@ -24,7 +24,8 @@ import {
   calculateAge,
   formatDate
 } from '../utils/doctorUtils';
-import { decodeOrgToken } from '../utils/tokenUtils';
+import { decodeOrgToken, verifyOrgToken } from '../utils/tokenUtils';
+import { cleanPhoneNumber, isValid11DigitPhone } from '../utils/phoneUtils';
 import { FlexibleDateInput } from '../components/common/FlexibleDateInput';
 import Swal from 'sweetalert2';
 
@@ -53,7 +54,12 @@ export function DoctorRegistrationPage() {
   const navigate = useNavigate();
   const tokenParam = searchParams.get('token');
   const orgParam = searchParams.get('org');
-  const orgFromUrl = decodeOrgToken(tokenParam) || decodeOrgToken(orgParam) || null;
+  const tokenResult = useMemo(() => {
+    return verifyOrgToken(tokenParam || orgParam);
+  }, [tokenParam, orgParam]);
+
+  const orgFromUrl = tokenResult.organizationId;
+  const isLinkExpired = tokenResult.isExpired;
 
   // Loading & submission state
   const [submitting, setSubmitting] = useState(false);
@@ -215,7 +221,7 @@ export function DoctorRegistrationPage() {
     }
 
     // 2. Validate national ID (14 digits)
-    const cleanNationalId = nationalId.trim().replace(/\D/g, '');
+    const cleanNationalId = cleanPhoneNumber(nationalId);
     if (!cleanNationalId) {
       Swal.fire({
         icon: 'warning',
@@ -234,7 +240,7 @@ export function DoctorRegistrationPage() {
     }
 
     // 3. Validate phone number (11 digits)
-    const cleanPhone = phone.trim().replace(/\D/g, '');
+    const cleanPhone = cleanPhoneNumber(phone);
     if (!cleanPhone) {
       Swal.fire({
         icon: 'warning',
@@ -243,7 +249,7 @@ export function DoctorRegistrationPage() {
       });
       return false;
     }
-    if (cleanPhone.length !== 11 || !/^\d{11}$/.test(cleanPhone)) {
+    if (!isValid11DigitPhone(cleanPhone)) {
       Swal.fire({
         icon: 'warning',
         title: 'رقم الموبايل غير صحيح',
@@ -419,6 +425,36 @@ export function DoctorRegistrationPage() {
     }
   };
 
+  // LINK EXPIRED SCREEN
+  if (isLinkExpired) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-rose-50 via-slate-50 to-gray-100 dark:from-gray-900 dark:via-gray-900 dark:to-gray-800 flex items-center justify-center p-4" dir="rtl">
+        <div className="max-w-lg w-full bg-white dark:bg-gray-800 rounded-3xl shadow-2xl border border-rose-200 dark:border-rose-900/40 p-8 text-center space-y-5 animate-fadeIn">
+          <div className="w-20 h-20 bg-rose-100 dark:bg-rose-950/80 rounded-full flex items-center justify-center mx-auto text-rose-600 dark:text-rose-400 ring-8 ring-rose-50 dark:ring-rose-900/30">
+            <Clock className="w-10 h-10 stroke-[2.5]" />
+          </div>
+
+          <div className="space-y-2">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-rose-50 dark:bg-rose-950 text-rose-700 dark:text-rose-300 rounded-full text-xs font-bold border border-rose-200 dark:border-rose-800">
+              <AlertCircle className="w-3.5 h-3.5" />
+              <span>انتهت صلاحية الرابط</span>
+            </div>
+            <h2 className="text-2xl font-black text-gray-900 dark:text-white">
+              عذراً، انتهت صلاحية رابط التسجيل
+            </h2>
+            <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-md mx-auto">
+              هذا الرابط تم إعداده بفترة صلاحية زمنية محددة وقد انتهت صلاحيته
+              {tokenResult.expiresAt ? ` (${tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'full', timeStyle: 'short' })})` : ''}.
+            </p>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+              يرجى التواصل مع إدارة العيادة لطلب رابط تسجيل جديد وصالح.
+            </p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+
   // SUCCESS CONFIRMATION SCREEN
   if (submittedSuccess) {
     return (
@@ -512,9 +548,17 @@ export function DoctorRegistrationPage() {
               <Stethoscope className="w-9 h-9" />
             </div>
             <div className="space-y-1.5 flex-1">
-              <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 rounded-full text-xs font-bold border border-teal-200/60 dark:border-teal-800">
-                <ShieldCheck className="w-3.5 h-3.5" />
-                <span>استمارة تسجيل وتحديث بيانات الأطباء المعتمدة</span>
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="inline-flex items-center gap-2 px-3 py-1 bg-teal-50 dark:bg-teal-950/60 text-teal-700 dark:text-teal-300 rounded-full text-xs font-bold border border-teal-200/60 dark:border-teal-800">
+                  <ShieldCheck className="w-3.5 h-3.5" />
+                  <span>استمارة تسجيل وتحديث بيانات الأطباء المعتمدة</span>
+                </div>
+                {tokenResult.expiresAt && (
+                  <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 rounded-full text-xs font-bold border border-amber-200/60 dark:border-amber-800">
+                    <Clock className="w-3.5 h-3.5 text-amber-500" />
+                    <span>صالح حتى: {tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                  </div>
+                )}
               </div>
               <h1 className="text-2xl sm:text-3xl font-black text-gray-900 dark:text-white tracking-tight">
                 استمارة بيانات الكادر الطبي والمؤهلات العلمية

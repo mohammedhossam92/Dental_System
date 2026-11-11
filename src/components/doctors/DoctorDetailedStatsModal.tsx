@@ -336,8 +336,8 @@ export function DoctorDetailedStatsModal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4 animate-in fade-in duration-200">
-      <div className="bg-white dark:bg-gray-850 dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-6xl max-h-[96vh] sm:max-h-[94vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/70 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4 animate-in fade-in duration-200">
+      <div className="bg-white dark:bg-gray-850 dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-6xl max-h-[92dvh] sm:max-h-[94vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700">
         
         {/* Header */}
         <div className="px-4 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50/80 via-blue-50/60 to-purple-50/70 dark:from-gray-900 dark:via-gray-850 dark:to-gray-800 flex items-center justify-between gap-3 shrink-0">

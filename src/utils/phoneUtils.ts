@@ -7,6 +7,24 @@ export function normalizeArabicDigits(str: string): string {
 }
 
 /**
+ * Strips whitespace, dashes, brackets, and converts Arabic digits to western digits.
+ */
+export function cleanPhoneNumber(phone: string | null | undefined): string {
+  if (!phone) return '';
+  const normalized = normalizeArabicDigits(phone.trim());
+  return normalized.replace(/\D/g, '');
+}
+
+/**
+ * Validates that a phone number is exactly 11 digits (e.g. 01012345678).
+ * Checks after normalizing Arabic-Indic digits and removing non-numeric characters.
+ */
+export function isValid11DigitPhone(phone: string | null | undefined): boolean {
+  const cleaned = cleanPhoneNumber(phone);
+  return cleaned.length === 11 && /^\d{11}$/.test(cleaned);
+}
+
+/**
  * Formats an Egyptian or international mobile number into a valid WhatsApp URL (https://wa.me/<number>)
  * Handles Egypt local numbers (e.g. 010... -> 2010...) and international numbers.
  */

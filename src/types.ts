@@ -5,7 +5,7 @@ export interface Student {
   city: string;
   university: string;
   university_type: 'حكومي' | 'خاص' | 'اخري';
-  working_days_id: string;
+  working_days_id: string | null;
   class_year_id: string | null;
   organization_id: string;
   registration_status: 'registered' | 'unregistered' | 'pending';
@@ -16,6 +16,9 @@ export interface Student {
   patients_in_progress: number;
   patients_completed: number;
   created_at: string;
+  updated_at?: string;
+  birth_date?: string | null;
+  national_id?: string | null;
 }
 
 export interface StudentRegistrationPeriod {
@@ -89,7 +92,8 @@ export interface TreatmentVisit {
 }
 
 export interface StudentWithDetails extends Student {
-  working_days: WorkingDays;
+  working_days?: WorkingDays | null;
+  effective_limit?: number;
 }
 
 export interface ClassYear {

@@ -7,7 +7,8 @@ import { useAuth } from '../../context/AuthContext';
 import { FlexibleDateInput } from '../common/FlexibleDateInput';
 import { AutocompleteInput } from '../common/AutocompleteInput';
 import { fetchHistoricalSuggestions } from '../../utils/suggestionUtils';
-import { getDoctorLastUpdated } from '../../utils/doctorUtils';
+import { getDoctorLastUpdated, extractBirthDateFromNationalId } from '../../utils/doctorUtils';
+import { cleanPhoneNumber, isValid11DigitPhone } from '../../utils/phoneUtils';
 import Swal from 'sweetalert2';
 
 interface DoctorFormModalProps {
@@ -81,17 +82,45 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
       return;
     }
 
+    // Validate national ID if provided (optional, but if provided must be 14 digits)
+    const cleanNationalId = cleanPhoneNumber(formData.national_id);
+    if (cleanNationalId && (cleanNationalId.length !== 14 || !/^\d{14}$/.test(cleanNationalId))) {
+      Swal.fire({
+        icon: 'warning',
+        title: language === 'ar' ? 'الرقم القومي غير صحيح' : 'Invalid National ID',
+        text: language === 'ar'
+          ? `يجب أن يتكون الرقم القومي من 14 رقماً بالضبط (أدخلت ${cleanNationalId.length} رقماً)`
+          : `National ID must be exactly 14 digits (entered ${cleanNationalId.length})`,
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
+    // Validate phone number if provided (optional, but if provided must be 11 digits)
+    const cleanPhone = cleanPhoneNumber(formData.phone);
+    if (cleanPhone && !isValid11DigitPhone(cleanPhone)) {
+      Swal.fire({
+        icon: 'warning',
+        title: language === 'ar' ? 'رقم الهاتف غير صحيح' : 'Invalid Phone Number',
+        text: language === 'ar'
+          ? `يجب أن يتكون رقم الهاتف من 11 رقماً بالضبط (أدخلت ${cleanPhone.length} رقماً - مثال: 01012345678)`
+          : `Phone number must be exactly 11 digits (entered ${cleanPhone.length})`,
+        confirmButtonColor: '#4f46e5'
+      });
+      return;
+    }
+
     try {
       setLoading(true);
 
       const payload = {
         name: formData.name.trim(),
-        national_id: formData.national_id.trim() || null,
+        national_id: cleanNationalId || null,
         birth_date: formData.birth_date ? formData.birth_date.trim() : null,
         graduation_date: formData.graduation_date ? formData.graduation_date.trim() : null,
         hire_date: formData.hire_date ? formData.hire_date.trim() : null,
         address: formData.address.trim() || null,
-        phone: formData.phone.trim() || null,
+        phone: cleanPhone || null,
         notes: formData.notes.trim() || null,
         is_confirmed: formData.is_confirmed,
         organization_id: organizationId || null,
@@ -195,8 +224,8 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
   const lastUpdated = doctor ? getDoctorLastUpdated(doctor, language) : null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[96vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-2xl max-h-[92dvh] sm:max-h-[92vh] flex flex-col overflow-hidden border border-gray-100 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         {/* Header */}
         <div className="flex items-center justify-between px-4 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-gradient-to-r from-indigo-50 to-blue-50 dark:from-gray-800 dark:to-gray-800 shrink-0">
           <div className="flex items-center space-x-2.5 rtl:space-x-reverse min-w-0">
@@ -253,10 +282,20 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
                 <CreditCard className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-2.5 sm:top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
                   type="text"
+                  maxLength={14}
                   value={formData.national_id}
-                  onChange={(e) => setFormData({ ...formData, national_id: e.target.value })}
+                  onChange={(e) => {
+                    const val = e.target.value;
+                    const cleaned = cleanPhoneNumber(val);
+                    const autoBirth = cleaned.length === 14 ? extractBirthDateFromNationalId(cleaned) : null;
+                    setFormData(prev => ({
+                      ...prev,
+                      national_id: val,
+                      birth_date: autoBirth && !prev.birth_date ? autoBirth : prev.birth_date,
+                    }));
+                  }}
                   placeholder="29001011234567"
-                  className="w-full pl-3.5 pr-9 rtl:pr-9 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="w-full pl-3.5 pr-9 rtl:pr-9 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono"
                 />
               </div>
             </div>
@@ -270,10 +309,11 @@ export function DoctorFormModal({ isOpen, onClose, onSuccess, doctor }: DoctorFo
                 <Phone className="absolute right-3 rtl:right-3 rtl:left-auto left-auto top-2.5 sm:top-3 w-4 h-4 text-gray-400 pointer-events-none" />
                 <input
                   type="tel"
+                  maxLength={11}
                   value={formData.phone}
                   onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
                   placeholder="01012345678"
-                  className="w-full pl-3.5 pr-9 rtl:pr-9 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all"
+                  className="w-full pl-3.5 pr-9 rtl:pr-9 rtl:pl-3.5 py-2 sm:py-2.5 rounded-xl border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 focus:border-transparent transition-all font-mono"
                 />
               </div>
             </div>

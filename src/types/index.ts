@@ -13,11 +13,14 @@ export interface Student {
   created_at: string;
   updated_at: string;
   working_days?: string[];
+  working_days_id?: string | null;
   class_year_id?: string;
   class_year?: {
     id: string;
     name: string;
   };
   working_days_relation?: WorkingDays[];
+  birth_date?: string | null;
+  national_id?: string | null;
 }
 {{ ... }}

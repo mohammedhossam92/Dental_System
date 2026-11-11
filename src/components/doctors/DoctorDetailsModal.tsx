@@ -269,65 +269,79 @@ export function DoctorDetailsModal({
   };
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-1.5 sm:p-3 md:p-4">
-      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[96vh] sm:max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
+    <div className="fixed inset-0 z-50 overflow-y-auto bg-black/60 backdrop-blur-sm flex items-center justify-center p-2 sm:p-4">
+      <div className="bg-white dark:bg-gray-800 rounded-xl sm:rounded-2xl shadow-2xl w-full max-w-5xl max-h-[92dvh] sm:max-h-[92vh] flex flex-col overflow-hidden border border-gray-200 dark:border-gray-700 animate-in fade-in zoom-in-95 duration-200">
         
         {/* Top Header Card */}
-        <div className="px-3.5 sm:px-6 py-3.5 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-          <div className="flex items-center space-x-3 rtl:space-x-reverse min-w-0">
-            <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-bold text-base sm:text-xl shadow-sm shrink-0">
-              {doctorDetails?.name?.charAt(0) || <User className="w-5 h-5 sm:w-6 sm:h-6" />}
-            </div>
-            <div className="min-w-0">
-              <div className="flex items-center space-x-1.5 rtl:space-x-reverse flex-wrap gap-1">
-                <h1 className="text-base sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
-                  {doctorDetails?.name || t('loading')}
-                </h1>
-                {doctorDetails?.current_status && (
-                  <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold border ${getStatusBadgeColor(doctorDetails.current_status.status_type)}`}>
-                    {doctorDetails.current_status.status_type}
-                    {doctorDetails.current_status.deputation_direction ? ` (${doctorDetails.current_status.deputation_direction})` : ''}
-                  </span>
-                )}
-                {doctorDetails?.current_status?.has_administrative_duty && (
-                  <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 flex items-center gap-1">
-                    <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                    <span>{doctorDetails.current_status.administrative_role || t('administrativeDuty')}</span>
-                    <span className="text-[9px] sm:text-[11px] opacity-80">
-                      ({doctorDetails.current_status.administrative_scope === 'خارج القسم' 
-                        ? `${t('outsideDepartment')}${doctorDetails.current_status.administrative_facility ? `: ${doctorDetails.current_status.administrative_facility}` : ''}`
-                        : t('insideDepartment')})
-                    </span>
-                  </span>
-                )}
-                {doctorDetails?.is_confirmed && (
-                  <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
-                    <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
-                    <span>{t('dataConfirmed')}</span>
-                  </span>
-                )}
+        <div className="px-3.5 sm:px-6 py-3 sm:py-4 border-b border-gray-200 dark:border-gray-700 bg-white dark:bg-gray-800 flex flex-col gap-2.5 sm:gap-3 shrink-0">
+          {/* Top Line: Avatar + Name + Badges + Close button at top corner */}
+          <div className="flex items-start justify-between gap-2">
+            <div className="flex items-center space-x-2.5 rtl:space-x-reverse min-w-0 flex-1">
+              <div className="w-9 h-9 sm:w-12 sm:h-12 rounded-xl sm:rounded-2xl bg-indigo-600 dark:bg-indigo-500 flex items-center justify-center text-white font-bold text-sm sm:text-xl shadow-sm shrink-0">
+                {doctorDetails?.name?.charAt(0) || <User className="w-5 h-5 sm:w-6 sm:h-6" />}
               </div>
-              <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1">
-                {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
-                {doctorDetails?.phone && (
-                  <span className="inline-flex items-center gap-1">
-                    <span>{t('phone')}:</span>
-                    <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong>
-                    <WhatsAppButton phone={doctorDetails.phone} size="xs" />
-                  </span>
+              <div className="min-w-0 flex-1">
+                <div className="flex items-center space-x-1.5 rtl:space-x-reverse flex-wrap gap-1">
+                  <h1 className="text-base sm:text-xl md:text-2xl font-bold text-gray-900 dark:text-white truncate">
+                    {doctorDetails?.name || t('loading')}
+                  </h1>
+                  {doctorDetails?.current_status && (
+                    <span className={`text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold border ${getStatusBadgeColor(doctorDetails.current_status.status_type)}`}>
+                      {doctorDetails.current_status.status_type}
+                      {doctorDetails.current_status.deputation_direction ? ` (${doctorDetails.current_status.deputation_direction})` : ''}
+                    </span>
+                  )}
+                  {doctorDetails?.is_confirmed && (
+                    <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/60 dark:text-emerald-300 border border-emerald-300 dark:border-emerald-700 flex items-center gap-1">
+                      <CheckCircle2 className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      <span>{t('dataConfirmed')}</span>
+                    </span>
+                  )}
+                </div>
+                {doctorDetails?.current_status?.has_administrative_duty && (
+                  <div className="mt-0.5">
+                    <span className="text-[10px] sm:text-xs px-2 py-0.5 rounded-full font-bold bg-purple-50 text-purple-700 dark:bg-purple-950/60 dark:text-purple-300 border border-purple-200 dark:border-purple-800 inline-flex items-center gap-1">
+                      <Briefcase className="w-2.5 h-2.5 sm:w-3 sm:h-3" />
+                      <span>{doctorDetails.current_status.administrative_role || t('administrativeDuty')}</span>
+                      <span className="text-[9px] sm:text-[11px] opacity-80">
+                        ({doctorDetails.current_status.administrative_scope === 'خارج القسم' 
+                          ? `${t('outsideDepartment')}${doctorDetails.current_status.administrative_facility ? `: ${doctorDetails.current_status.administrative_facility}` : ''}`
+                          : t('insideDepartment')})
+                      </span>
+                    </span>
+                  </div>
                 )}
-                {doctorDetails && (
-                  <span className="inline-flex items-center gap-1 text-[10.5px] sm:text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/40 px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/50" title={getDoctorLastUpdated(doctorDetails, language).formatted}>
-                    <Clock className="w-3 h-3 text-indigo-500" />
-                    <span>{language === 'ar' ? 'آخر تعديل:' : 'Last updated:'}</span>
-                    <strong className="font-semibold">{getDoctorLastUpdated(doctorDetails, language).formatted}</strong>
-                  </span>
-                )}
-              </p>
+                <p className="text-[11px] sm:text-xs text-gray-500 dark:text-gray-400 flex flex-wrap items-center gap-2 sm:gap-3 mt-0.5 sm:mt-1">
+                  {doctorDetails?.national_id && <span>{t('nationalId')}: <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.national_id}</strong></span>}
+                  {doctorDetails?.phone && (
+                    <span className="inline-flex items-center gap-1">
+                      <span>{t('phone')}:</span>
+                      <strong className="text-gray-700 dark:text-gray-200 font-mono">{doctorDetails.phone}</strong>
+                      <WhatsAppButton phone={doctorDetails.phone} size="xs" />
+                    </span>
+                  )}
+                  {doctorDetails && (
+                    <span className="inline-flex items-center gap-1 text-[10px] sm:text-xs text-indigo-600 dark:text-indigo-400 bg-indigo-50/80 dark:bg-indigo-950/40 px-1.5 sm:px-2 py-0.5 rounded-md border border-indigo-100 dark:border-indigo-900/50" title={getDoctorLastUpdated(doctorDetails, language).formatted}>
+                      <Clock className="w-2.5 h-2.5 sm:w-3 sm:h-3 text-indigo-500" />
+                      <span>{language === 'ar' ? 'آخر تعديل:' : 'Last updated:'}</span>
+                      <strong className="font-semibold">{getDoctorLastUpdated(doctorDetails, language).formatted}</strong>
+                    </span>
+                  )}
+                </p>
+              </div>
             </div>
+
+            <button
+              onClick={onClose}
+              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 sm:p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors shrink-0"
+              title={t('close')}
+            >
+              <X className="w-5 h-5" />
+            </button>
           </div>
 
-          <div className="flex items-center space-x-1.5 rtl:space-x-reverse self-end sm:self-center shrink-0 flex-wrap gap-1.5">
+          {/* Action buttons row */}
+          <div className="flex items-center justify-end space-x-1.5 rtl:space-x-reverse shrink-0 flex-wrap gap-1.5 pt-1 border-t border-gray-100 dark:border-gray-700/60 sm:border-0 sm:pt-0">
             {/* Confirmation Toggle Button */}
             <button
               onClick={handleToggleConfirmation}
@@ -355,12 +369,6 @@ export function DoctorDetailsModal({
             >
               <Edit className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-indigo-600 dark:text-indigo-400" />
               <span>{t('edit')}</span>
-            </button>
-            <button
-              onClick={onClose}
-              className="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 p-1.5 sm:p-2 rounded-xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
-            >
-              <X className="w-4 h-4 sm:w-5 sm:h-5" />
             </button>
           </div>
         </div>
@@ -707,7 +715,95 @@ export function DoctorDetailsModal({
                       <p className="text-sm text-gray-500">{language === 'ar' ? 'لا توجد شهادات مسجلة للطبيب' : 'No certificates recorded'}</p>
                     </div>
                   ) : (
-                    <div className="overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
+                    <>
+                      {/* Mobile Card View (< md) */}
+                      <div className="space-y-3 block md:hidden">
+                        {doctorDetails?.certificates?.map((cert) => {
+                          const summaryText = getCertificateSummary(cert, language);
+                          const isObtained = cert.status === 'obtained';
+                          return (
+                            <div key={`mob_cert_${cert.id}`} className="p-3.5 bg-gray-50 dark:bg-gray-700/50 rounded-2xl border border-gray-200 dark:border-gray-600 space-y-2.5">
+                              <div className="flex items-start justify-between gap-2">
+                                <div>
+                                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-800">
+                                    {cert.certificate_type}
+                                  </span>
+                                  <h4 className="font-bold text-sm text-gray-900 dark:text-white mt-1">
+                                    {cert.certificate_title}
+                                  </h4>
+                                  <p className="text-xs text-gray-600 dark:text-gray-300">
+                                    {cert.university_name} {cert.university_country ? `(${cert.university_country})` : ''}
+                                  </p>
+                                </div>
+                                <span className="shrink-0">
+                                  {isObtained ? (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-emerald-100 text-emerald-800 dark:bg-emerald-950/70 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800">
+                                      <CheckCircle2 className="w-3 h-3 mr-1 rtl:mr-0 rtl:ml-1 text-emerald-600 dark:text-emerald-400" />
+                                      {t('obtained')}
+                                    </span>
+                                  ) : (
+                                    <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[11px] font-bold bg-blue-100 text-blue-800 dark:bg-blue-950/70 dark:text-blue-300 border border-blue-200 dark:border-blue-800">
+                                      <Clock className="w-3 h-3 mr-1 rtl:mr-0 rtl:ml-1 text-blue-600 dark:text-blue-400" />
+                                      {t('inProgress')}
+                                    </span>
+                                  )}
+                                </span>
+                              </div>
+
+                              <div className="text-xs text-gray-600 dark:text-gray-300 font-mono">
+                                {isObtained ? (
+                                  <span>{t('obtainedDate')}: {formatCertificateDate(cert.obtained_date, cert.date_mode, language)}</span>
+                                ) : (
+                                  <span className="space-y-0.5 block">
+                                    {cert.study_start_date && <span className="block">{language === 'ar' ? 'بدء:' : 'Start:'} {formatCertificateDate(cert.study_start_date, cert.date_mode, language)}</span>}
+                                    {cert.expected_date && <span className="block text-blue-600 dark:text-blue-400">{language === 'ar' ? 'متوقع:' : 'Exp:'} {formatCertificateDate(cert.expected_date, cert.date_mode, language)}</span>}
+                                  </span>
+                                )}
+                              </div>
+
+                              {summaryText && (
+                                <div className="p-2 bg-slate-100 dark:bg-gray-700/80 rounded-xl text-xs text-slate-800 dark:text-slate-100 leading-relaxed border border-slate-200/80 dark:border-gray-600">
+                                  "{summaryText}"
+                                </div>
+                              )}
+
+                              <div className="flex items-center justify-end gap-1.5 pt-1.5 border-t border-gray-200/60 dark:border-gray-600">
+                                {cert.file_url && (
+                                  <a
+                                    href={cert.file_url}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="p-1.5 text-emerald-600 hover:bg-emerald-50 dark:hover:bg-emerald-950/50 rounded-lg text-xs flex items-center gap-1 font-semibold"
+                                  >
+                                    <ExternalLink className="w-3.5 h-3.5" />
+                                    <span>{t('viewFile')}</span>
+                                  </a>
+                                )}
+                                <button
+                                  onClick={() => {
+                                    setSelectedCert(cert);
+                                    setIsCertModalOpen(true);
+                                  }}
+                                  className="p-1.5 text-blue-600 hover:bg-blue-50 dark:hover:bg-blue-950/50 rounded-lg text-xs flex items-center gap-1 font-semibold"
+                                >
+                                  <Edit className="w-3.5 h-3.5" />
+                                  <span>{t('edit')}</span>
+                                </button>
+                                <button
+                                  onClick={() => handleDeleteItem('doctor_certificates', cert.id, cert.certificate_title)}
+                                  className="p-1.5 text-red-600 hover:bg-red-50 dark:hover:bg-red-950/50 rounded-lg text-xs flex items-center gap-1 font-semibold"
+                                >
+                                  <Trash2 className="w-3.5 h-3.5" />
+                                  <span>{t('delete')}</span>
+                                </button>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      {/* Desktop Table View (>= md) */}
+                      <div className="hidden md:block overflow-x-auto rounded-2xl border border-gray-200 dark:border-gray-700">
                       <table className="min-w-full divide-y divide-gray-200 dark:divide-gray-700 text-right rtl:text-right ltr:text-left">
                         <thead className="bg-slate-50 dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 text-xs font-bold text-slate-700 dark:text-slate-200 uppercase tracking-wider">
                           <tr>
@@ -808,6 +904,7 @@ export function DoctorDetailsModal({
                         </tbody>
                       </table>
                     </div>
+                    </>
                   )}
                 </div>
               )}
