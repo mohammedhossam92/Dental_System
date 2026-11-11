@@ -51,6 +51,8 @@ export function StudentRegistrationPage() {
   const [cityChoice, setCityChoice] = useState('');
   const [universityChoice, setUniversityChoice] = useState('');
   const [universityType, setUniversityType] = useState<'حكومي' | 'خاص' | 'اخري'>('حكومي');
+  const [registrationStartDate, setRegistrationStartDate] = useState(predefinedRegistrationStartDate || '');
+  const [registrationEndDate, setRegistrationEndDate] = useState('');
   const [classYearId, setClassYearId] = useState<string>(predefinedClassYearId || '');
   const workingDaysId = ''; // Assigned later by administration
 
@@ -94,6 +96,10 @@ export function StudentRegistrationPage() {
       setClassYearId(predefinedClassYearId);
     }
   }, [predefinedClassYearId]);
+
+  useEffect(() => {
+    setRegistrationStartDate(predefinedRegistrationStartDate || '');
+  }, [predefinedRegistrationStartDate]);
 
   // Auto-detect birth date when national ID reaches 14 digits
   useEffect(() => {
@@ -271,6 +277,15 @@ export function StudentRegistrationPage() {
       return;
     }
 
+    if (registrationStartDate && registrationEndDate && registrationEndDate < registrationStartDate) {
+      Swal.fire({
+        icon: 'warning',
+        title: 'فترة التسجيل غير صحيحة',
+        text: 'يجب أن يكون تاريخ نهاية التسجيل في نفس تاريخ البداية أو بعده.'
+      });
+      return;
+    }
+
     if (!orgFromUrl) {
       Swal.fire({
         icon: 'error',
@@ -310,7 +325,8 @@ export function StudentRegistrationPage() {
         university_type: universityType,
         working_days_id: null,
         class_year_id: predefinedClassYearId || null,
-        registration_start_date: predefinedRegistrationStartDate || null,
+        registration_start_date: registrationStartDate || null,
+        registration_end_date: registrationEndDate || null,
         organization_id: orgFromUrl,
         registration_status: 'pending',
         is_available: true,
@@ -473,6 +489,53 @@ export function StudentRegistrationPage() {
                     onChange={(e) => setBirthDate(e.target.value)}
                     className="w-full pl-3.5 pr-10 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
                   />
+                </div>
+              </div>
+
+              {/* Registration Period */}
+              <div className="sm:col-span-2 p-4 bg-indigo-50/60 dark:bg-indigo-950/20 border border-indigo-200/70 dark:border-indigo-800/60 rounded-2xl">
+                <div className="flex items-center gap-2 mb-3">
+                  <Calendar className="w-4 h-4 text-indigo-600 dark:text-indigo-400" />
+                  <div>
+                    <h3 className="text-xs sm:text-sm font-bold text-indigo-950 dark:text-indigo-200">
+                      فترة التسجيل
+                    </h3>
+                    <p className="text-[10.5px] text-indigo-700/80 dark:text-indigo-300/80 mt-0.5">
+                      {predefinedRegistrationStartDate
+                        ? 'تم تحديد تاريخ البداية مسبقاً من الإدارة. يمكنك تحديد تاريخ النهاية فقط.'
+                        : 'يمكنك تحديد تاريخ بداية ونهاية التسجيل.'}
+                    </p>
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1.5">
+                      تاريخ بداية التسجيل
+                    </label>
+                    <input
+                      type="date"
+                      value={registrationStartDate}
+                      onChange={(e) => setRegistrationStartDate(e.target.value)}
+                      disabled={Boolean(predefinedRegistrationStartDate)}
+                      className={`w-full px-3.5 py-2.5 rounded-xl border text-xs sm:text-sm outline-none transition-all ${
+                        predefinedRegistrationStartDate
+                          ? 'bg-gray-100 dark:bg-gray-800/60 border-indigo-300 dark:border-indigo-800 text-indigo-700 dark:text-indigo-300 cursor-not-allowed font-bold'
+                          : 'bg-white dark:bg-gray-800 border-gray-300 dark:border-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500'
+                      }`}
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-bold text-gray-800 dark:text-gray-200 mb-1.5">
+                      تاريخ نهاية التسجيل
+                    </label>
+                    <input
+                      type="date"
+                      value={registrationEndDate}
+                      min={registrationStartDate || undefined}
+                      onChange={(e) => setRegistrationEndDate(e.target.value)}
+                      className="w-full px-3.5 py-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                    />
+                  </div>
                 </div>
               </div>
 
