@@ -444,7 +444,7 @@ export function DoctorRegistrationPage() {
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-md mx-auto">
               هذا الرابط تم إعداده بفترة صلاحية زمنية محددة وقد انتهت صلاحيته
-              {tokenResult.expiresAt ? ` (${tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'full', timeStyle: 'short' })})` : ''}.
+              {tokenResult.expiresAt ? ` (${tokenResult.expiresAt.toLocaleString('ar-EG', { dateStyle: 'full', timeStyle: 'short' })})` : ''}.
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               يرجى التواصل مع إدارة العيادة لطلب رابط تسجيل جديد وصالح.
@@ -556,7 +556,7 @@ export function DoctorRegistrationPage() {
                 {tokenResult.expiresAt && (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-amber-50 dark:bg-amber-950/60 text-amber-700 dark:text-amber-300 rounded-full text-xs font-bold border border-amber-200/60 dark:border-amber-800">
                     <Clock className="w-3.5 h-3.5 text-amber-500" />
-                    <span>صالح حتى: {tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                    <span>صالح حتى: {tokenResult.expiresAt.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
                   </div>
                 )}
               </div>

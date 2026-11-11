@@ -133,7 +133,7 @@ export function StudentRegistrationPage() {
             </h2>
             <p className="text-sm text-gray-600 dark:text-gray-300 leading-relaxed max-w-md mx-auto">
               هذا الرابط تم إعداده بفترة صلاحية زمنية محددة وقد انتهت صلاحيته
-              {tokenResult.expiresAt ? ` في ${tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'full', timeStyle: 'short' })}` : ''}.
+              {tokenResult.expiresAt ? ` في ${tokenResult.expiresAt.toLocaleString('ar-EG', { dateStyle: 'full', timeStyle: 'short' })}` : ''}.
             </p>
             <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
               يرجى التواصل مع إدارة العيادة أو منسق الكلية لطلب رابط تسجيل جديد وصالح.
@@ -392,7 +392,7 @@ export function StudentRegistrationPage() {
                 {tokenResult.expiresAt && (
                   <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-50 dark:bg-purple-950/60 text-purple-700 dark:text-purple-300 rounded-full text-xs font-bold border border-purple-200/60 dark:border-purple-800">
                     <Clock className="w-3.5 h-3.5 text-purple-500" />
-                    <span>صالح حتى: {tokenResult.expiresAt.toLocaleDateString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                    <span>صالح حتى: {tokenResult.expiresAt.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' })}</span>
                   </div>
                 )}
                 {predefinedClassYearObj && (
