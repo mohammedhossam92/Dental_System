@@ -45,7 +45,7 @@ export function StudentRegistrationPage() {
   const [university, setUniversity] = useState('');
   const [universityType, setUniversityType] = useState<'حكومي' | 'خاص' | 'اخري'>('حكومي');
   const [classYearId, setClassYearId] = useState<string>(predefinedClassYearId || '');
-  const [workingDaysId, setWorkingDaysId] = useState<string>(''); // Optional!
+  const [workingDaysId, setWorkingDaysId] = useState<string>(''); // Assigned later by administration
 
   // Suggestions state
   const [showCityDropdown, setShowCityDropdown] = useState(false);
@@ -325,8 +325,8 @@ export function StudentRegistrationPage() {
         city: city.trim(),
         university: university.trim(),
         university_type: universityType,
-        working_days_id: workingDaysId ? workingDaysId : null, // Optional!
-        class_year_id: classYearId ? classYearId : null,
+        working_days_id: null,
+        class_year_id: predefinedClassYearId || null,
         organization_id: orgFromUrl,
         registration_status: 'pending',
         is_available: true,
@@ -598,13 +598,8 @@ export function StudentRegistrationPage() {
                 </label>
                 <select
                   value={classYearId}
-                  disabled={!!predefinedClassYearId}
-                  onChange={(e) => setClassYearId(e.target.value)}
-                  className={`w-full p-2.5 rounded-xl border transition-all text-xs sm:text-sm outline-none ${
-                    predefinedClassYearId
-                      ? 'bg-purple-50/50 dark:bg-purple-950/20 border-purple-300 dark:border-purple-800 text-purple-950 dark:text-purple-200 cursor-not-allowed font-bold'
-                      : 'border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500'
-                  }`}
+                  disabled
+                  className="w-full p-2.5 rounded-xl border transition-all text-xs sm:text-sm outline-none bg-purple-50/50 dark:bg-purple-950/20 border-purple-300 dark:border-purple-800 text-purple-950 dark:text-purple-200 cursor-not-allowed font-bold"
                 >
                   <option value="">-- اختر الفرقة الدراسية --</option>
                   {classYears.map((cy) => (
@@ -625,15 +620,10 @@ export function StudentRegistrationPage() {
                 </label>
                 <select
                   value={workingDaysId}
-                  onChange={(e) => setWorkingDaysId(e.target.value)}
-                  className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-white dark:bg-gray-800 text-gray-900 dark:text-white text-xs sm:text-sm focus:ring-2 focus:ring-indigo-500 outline-none transition-all"
+                  disabled
+                  className="w-full p-2.5 rounded-xl border border-gray-300 dark:border-gray-700 bg-gray-100 dark:bg-gray-800/60 text-gray-500 dark:text-gray-400 text-xs sm:text-sm cursor-not-allowed"
                 >
                   <option value="">-- لم يتم التحديد بعد (اختياري - يمكن اختيارها لاحقاً) --</option>
-                  {workingDaysList.map((wd) => (
-                    <option key={wd.id} value={wd.id}>
-                      {wd.name} ({wd.days.join(', ')})
-                    </option>
-                  ))}
                 </select>
                 <p className="text-[10.5px] text-gray-500 mt-1">
                   يمكن ترك هذا الحقل فارغاً الآن وتحديد أيام العمل لاحقاً من قبل إدارة العيادة.

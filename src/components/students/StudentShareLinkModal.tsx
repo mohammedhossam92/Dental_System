@@ -49,6 +49,13 @@ export function StudentShareLinkModal({
     }
   }, [initialClassYearId]);
 
+  // A student link must always carry a predefined class year.
+  useEffect(() => {
+    if (!selectedClassYearId && classYears.length > 0) {
+      setSelectedClassYearId(classYears[0].id);
+    }
+  }, [classYears, selectedClassYearId]);
+
   // Find selected class year object
   const selectedClassYear = useMemo(() => {
     return classYears.find(cy => cy.id === selectedClassYearId) || null;
@@ -249,7 +256,6 @@ export function StudentShareLinkModal({
                 onChange={(e) => setSelectedClassYearId(e.target.value)}
                 className="w-full p-2.5 rounded-xl border border-indigo-300 dark:border-indigo-700 bg-white dark:bg-gray-700 text-xs sm:text-sm font-semibold text-gray-900 dark:text-white focus:ring-2 focus:ring-indigo-500 outline-none shadow-sm"
               >
-                <option value="">{language === 'ar' ? 'بدون تحديد مسبق (يختار الطالب فرقته الدراسية)' : 'No predefinition (Student selects class year)'}</option>
                 {classYears.map((cy) => (
                   <option key={cy.id} value={cy.id}>
                     {cy.year_range}
@@ -259,7 +265,7 @@ export function StudentShareLinkModal({
               <p className="text-[10.5px] text-indigo-700/80 dark:text-indigo-300/80 mt-1">
                 {selectedClassYear
                   ? (language === 'ar' ? `سيتم تثبيت وتحديد الفرقة (${selectedClassYear.year_range}) تلقائياً لأي طالب يسجل عبر هذا الرابط.` : `Students registering via this link will automatically belong to (${selectedClassYear.year_range}).`)
-                  : (language === 'ar' ? 'سيتمكن الطالب من اختيار فرقته الدراسية بنفسه أثناء ملء الاستمارة.' : 'Students can choose their own class year upon registration.')}
+                  : (language === 'ar' ? 'اختر الفرقة قبل نسخ الرابط؛ لن يتمكن الطالب من تغييرها في الاستمارة.' : 'Choose a class year before copying; students cannot change it on the form.')}
               </p>
             </div>
 
