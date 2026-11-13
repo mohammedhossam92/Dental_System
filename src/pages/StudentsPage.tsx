@@ -1779,6 +1779,51 @@ export function StudentsPage() {
     setIsInfoModalOpen(true);
   }
 
+  const handleInfoStatusChange = async (newStatus: Student['registration_status']) => {
+    if (!selectedStudent || !organizationId || newStatus === selectedStudent.registration_status) return;
+
+    try {
+      if (selectedStudent.registration_status !== 'unregistered' && newStatus === 'unregistered') {
+        await archiveRegistrationPeriod(
+          selectedStudent,
+          selectedStudent.registration_start_date,
+          selectedStudent.registration_end_date
+        );
+      }
+
+      const updates = {
+        registration_status: newStatus,
+        registration_start_date: newStatus === 'registered' ? selectedStudent.registration_start_date : null,
+        registration_end_date: newStatus === 'registered' ? selectedStudent.registration_end_date : null,
+        unregistered_at: newStatus === 'unregistered'
+          ? (selectedStudent.unregistered_at || new Date().toISOString())
+          : null,
+      };
+      const { error } = await supabase
+        .from('students')
+        .update(updates)
+        .eq('id', selectedStudent.id)
+        .eq('organization_id', organizationId);
+
+      if (error) throw error;
+
+      const updatedStudent = { ...selectedStudent, ...updates };
+      setSelectedStudent(updatedStudent);
+      setStudents(prevStudents => prevStudents.map(student =>
+        student.id === updatedStudent.id ? { ...student, ...updates } : student
+      ));
+      await refreshSelectedStudentPeriods(selectedStudent.id);
+    } catch (error) {
+      console.error('Error updating student registration status:', error);
+      await Swal.fire({
+        title: 'Error!',
+        text: 'Failed to update student status',
+        icon: 'error',
+        confirmButtonColor: '#4f46e5',
+      });
+    }
+  };
+
   // Add state for Add Patient modal and form
   const [isAddPatientModalOpen, setIsAddPatientModalOpen] = useState(false);
   const [addPatientStudent, setAddPatientStudent] = useState<Student | null>(null);
@@ -3681,17 +3726,18 @@ export function StudentsPage() {
               </div>
 
               <div className="space-y-3 sm:space-y-4">
-                <div className="hidden md:block">
+                <div>
                   <label className="block text-xs sm:text-sm font-medium text-gray-500 dark:text-gray-400 mb-1">Registration Status</label>
-                  <span className={`inline-flex text-xs font-semibold rounded-full px-2 py-1 ${
-                    selectedStudent.registration_status === 'registered'
-                      ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                      : selectedStudent.registration_status === 'unregistered'
-                      ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                      : 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-200'
-                  }`}>
-                    {selectedStudent.registration_status.split('_').map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' ')}
-                  </span>
+                  <select
+                    value={selectedStudent.registration_status}
+                    onChange={(e) => handleInfoStatusChange(e.target.value as Student['registration_status'])}
+                    className="w-full p-2 border rounded-md dark:bg-gray-700 dark:border-gray-600 dark:text-white text-sm"
+                    aria-label="Registration Status"
+                  >
+                    <option value="pending">Pending</option>
+                    <option value="registered">Registered</option>
+                    <option value="unregistered">Unregistered</option>
+                  </select>
                 </div>
 
                 <div>
